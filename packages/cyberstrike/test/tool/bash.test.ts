@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, parseScopedPortSpec, readTargetListInputs } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, scannerExecutableIndex, parseScopedPortSpec, readTargetListInputs } from "../../src/tool/bash"
 import { TargetMemory, type TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -118,132 +118,110 @@ describe("Scanner shell-wrapper detection", () => {
   })
 })
 
-describe("Scope-aware URL source input extraction", () => {
-  test("extracts literal waybackurls pipeline hostnames for persisted scope checks", () => {
+describe("Generic scope-aware CLI target discovery", () => {
+  test("detects positional domains for an unregistered CLI regardless of its name", () => {
     expect(scannerTargets(
-      ["waybackurls"],
-      "printf '%s\\n' 'example.com' | waybackurls",
+      ["unlisted-enumerator", "--all-sources", "--recursive", "example.com"],
+      "unlisted-enumerator --all-sources --recursive example.com",
     )).toContain("https://example.com")
     expect(scannerTargets(
-      ["waybackurls"],
-      "printf '%s\\n' 'example.com' 'api.example.com' | waybackurls",
+      ["another-new-cli", "--subdomains-only", "api.example.com"],
+      "another-new-cli --subdomains-only api.example.com",
+    )).toContain("https://api.example.com")
+  })
+
+  test("detects standard and unfamiliar target flags without requiring an executable mapping", () => {
+    expect(scannerTargets(
+      ["custom-enumerator", "--domain", "example.com", "--all-sources", "--recursive"],
+      "custom-enumerator --domain example.com --all-sources --recursive",
+    )).toContain("https://example.com")
+    // Unknown option names remain discoverable through their hostname-like value.
+    expect(scannerTargets(
+      ["custom-enumerator", "--root-zone", "api.example.com"],
+      "custom-enumerator --root-zone api.example.com",
+    )).toContain("https://api.example.com")
+  })
+
+  test("handles comma-separated domains and URLs generically", () => {
+    expect(scannerTargets(
+      ["custom-enumerator", "--domain", "*.example.com,api.example.net"],
+      "custom-enumerator --domain '*.example.com,api.example.net'",
+    )).toEqual(expect.arrayContaining(["https://example.com", "https://api.example.net"]))
+    expect(scannerTargets(
+      ["custom-crawler", "--target", "https://example.com/docs"],
+      "custom-crawler --target https://example.com/docs",
+    )).toContain("https://example.com/docs")
+  })
+
+  test("does not treat output files, wordlists, or provider settings as targets", () => {
+    expect(scannerTargets(
+      ["custom-enumerator", "--output", "domains.txt", "--wordlist", "common.txt", "example.com"],
+      "custom-enumerator --output domains.txt --wordlist common.txt example.com",
+    )).toEqual(["https://example.com"])
+  })
+
+  test("recognizes unregistered network-capable CLIs for scope gating, but not local text processors", () => {
+    expect(scannerExecutableIndex(["unlisted-enumerator", "--root-zone", "example.com"])).toBe(0)
+    expect(scannerExecutableIndex(["future-network-cli", "example.com", "results.txt"])).toBe(0)
+    expect(scannerExecutableIndex(["future-network-cli", "--seed-file", "domains.txt"])).toBe(0)
+    expect(scannerExecutableIndex(["grep", "example.com", "results.txt"])).toBe(-1)
+  })
+
+  test("extracts literal hostnames from generic pipelines but not filenames", () => {
+    expect(scannerTargets(
+      ["unlisted-collector"],
+      "printf '%s\\n' 'example.com' 'api.example.com' | unlisted-collector",
     )).toEqual(expect.arrayContaining(["https://example.com", "https://api.example.com"]))
+    expect(scannerTargets(["unlisted-collector"], "cat domains.txt | unlisted-collector")).toEqual([])
   })
 
-  test("extracts subfinder targets from standard, inline, wildcard, and comma-separated domain flags", () => {
-    expect(scannerTargets(["subfinder", "-d", "example.com", "-silent"], "subfinder -d example.com -silent")).toContain("https://example.com")
-    expect(scannerTargets(["subfinder", "--domain=example.com", "-silent"], "subfinder --domain=example.com -silent")).toContain("https://example.com")
-    expect(scannerTargets(["subfinder", "-d", "*.example.com,example.net", "-silent"], "subfinder -d '*.example.com,example.net' -silent")).toEqual(expect.arrayContaining(["https://example.com", "https://example.net"]))
+  test("does not treat an upstream scanner's seed as the downstream command's stdin targets", () => {
+    const pipeline = "subfinder -d example.com --all --recursive | brand-new-prober"
+    expect(scannerTargets(["brand-new-prober"], pipeline)).toEqual([])
+    // The downstream executable is still recognized and the gate fails closed
+    // because its real stdin contents cannot be proven before execution.
+    expect(scannerExecutableIndex(["brand-new-prober"], pipeline)).toBe(0)
   })
 
-  test("extracts subfinder target when supported all-source and recursive flags are used", () => {
-    expect(scannerTargets(
-      ["subfinder", "-d", "example.com", "-all", "-recursive", "-silent"],
-      "subfinder -d example.com -all -recursive -silent",
-    )).toContain("https://example.com")
-  })
-
-  test("extracts assetfinder positional domains with and without --subs-only", () => {
-    expect(scannerTargets(
-      ["assetfinder", "--subs-only", "example.com"],
-      "assetfinder --subs-only example.com",
-    )).toEqual(["https://example.com"])
-    expect(scannerTargets(
-      ["assetfinder", "example.com"],
-      "assetfinder example.com",
-    )).toEqual(["https://example.com"])
-  })
-
-  test("extracts tool-specific target flags without treating credentials as targets", () => {
-    expect(scannerTargets(
-      ["findomain", "-t", "example.com", "-r"],
-      "findomain -t example.com -r",
-    )).toContain("https://example.com")
-    expect(scannerTargets(
-      ["findomain", "-t", "example.com", "-r", "-u", "subdomains.txt"],
-      "findomain -t example.com -r -u subdomains.txt",
-    )).toEqual(["https://example.com"])
-    expect(scannerTargets(
-      ["findomain", "-t", "example.com", "-u=results.txt"],
-      "findomain -t example.com -u=results.txt",
-    )).toEqual(["https://example.com"])
-    expect(scannerTargets(
-      ["waymore", "-i", "example.com", "-mode", "U"],
-      "waymore -i example.com -mode U",
-    )).toContain("https://example.com")
-    expect(scannerTargets(
-      ["github-subdomains", "-t", "example.com"],
-      "github-subdomains -t example.com",
-    )).toEqual([])
-  })
-
-  test("extracts gau positional domains without confusing the output path for a target", () => {
-    expect(scannerTargets(
-      ["gau", "--o", "domains.txt", "example.com"],
-      "gau --o domains.txt example.com",
-    )).toEqual(["https://example.com"])
-  })
-
-  test("extracts domain flags from credential-backed passive enumerators", () => {
-    expect(scannerTargets(
-      ["shosubgo", "-d", "example.com", "-s", "TEST_TOKEN"],
-      "shosubgo -d example.com -s TEST_TOKEN",
-    )).toContain("https://example.com")
-    expect(scannerTargets(
-      ["github-subdomains", "-d", "example.com", "-t", "TEST_TOKEN"],
-      "github-subdomains -d example.com -t TEST_TOKEN",
-    )).toContain("https://example.com")
-  })
-
-  test("extracts positional host targets from port scanners", () => {
-    expect(scannerTargets(
-      ["nmap", "-p", "22,80,443", "ubiquiti.example.com", "--max-retries", "2"],
-      "nmap -p 22,80,443 ubiquiti.example.com --max-retries 2",
-    )).toContain("https://ubiquiti.example.com")
-    expect(scannerTargets(
-      ["nmap", "-p", "80,443", "194.209.94.9", "-T4"],
-      "nmap -p 80,443 194.209.94.9 -T4",
-    )).toContain("https://194.209.94.9")
-  })
-
-  test("does not infer a target from a file name when a source reads a list from disk", () => {
-    expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
-  })
-})
-
-describe("Tool-specific target-list input parsing", () => {
-  test("reads findomain -f lists and validates each listed host's syntax", async () => {
+  test("validates target-list file inputs generically without needing a tool name", async () => {
     await using tmp = await tmpdir()
     await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\napi.example.com\n")
-    await expect(readTargetListInputs(["-f", "domains.txt"], tmp.path, "findomain")).resolves.toEqual({
+    await expect(readTargetListInputs(["--target-list", "domains.txt"], tmp.path)).resolves.toEqual({
+      present: true,
+      targets: ["https://example.com", "https://api.example.com"],
+    })
+    await expect(readTargetListInputs(["-i", "domains.txt"], tmp.path)).resolves.toEqual({
+      present: true,
+      targets: ["https://example.com", "https://api.example.com"],
+    })
+    await expect(readTargetListInputs(["--seed-file", "domains.txt"], tmp.path)).resolves.toEqual({
       present: true,
       targets: ["https://example.com", "https://api.example.com"],
     })
   })
 
-  test("reads waymore -i lists but does not mistake a single domain for a filename", async () => {
+  test("treats direct host inputs as targets, not list filenames", async () => {
     await using tmp = await tmpdir()
-    await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\napi.example.com\n")
-    await expect(readTargetListInputs(["-i", "domains.txt"], tmp.path, "waymore")).resolves.toEqual({
-      present: true,
-      targets: ["https://example.com", "https://api.example.com"],
-    })
-    await expect(readTargetListInputs(["-i", "example.com"], tmp.path, "waymore")).resolves.toEqual({
+    await expect(readTargetListInputs(["--input", "example.com"], tmp.path)).resolves.toEqual({
       present: false,
       targets: [],
     })
-    await expect(readTargetListInputs(["-i", "example.com/robots.txt"], tmp.path, "waymore")).resolves.toEqual({
+    await expect(readTargetListInputs(["--input", "example.com/robots.txt"], tmp.path)).resolves.toEqual({
       present: false,
       targets: [],
     })
   })
 
-  test("does not reinterpret github-subdomains -t credential values as target files", async () => {
+  test("rejects unreadable explicitly declared target lists", async () => {
     await using tmp = await tmpdir()
-    await expect(readTargetListInputs(["-t", "TEST_TOKEN"], tmp.path, "github-subdomains")).resolves.toEqual({
-      present: false,
-      targets: [],
-    })
+    await expect(readTargetListInputs(["--target-list", "missing-domains.txt"], tmp.path)).rejects.toThrow("Cannot read target list")
+  })
+
+  test("recognizes generic port flags so ports are scope-checked independently of tool name", () => {
+    expect(scannerTargets(
+      ["new-port-prober", "--ports", "80,443", "example.com"],
+      "new-port-prober --ports 80,443 example.com",
+    )).toContain("https://example.com")
   })
 })
 
