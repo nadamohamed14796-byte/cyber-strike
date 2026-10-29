@@ -136,10 +136,12 @@ export function Session() {
     () => !!session()?.parentID && messages().some((message) => message.role === "user" && message.agent === "proxy-agent"),
   )
   const permissions = createMemo(() => {
+    if (proxyAgentSession()) return sync.data.permission[route.sessionID] ?? []
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.permission[x.id] ?? [])
   })
   const questions = createMemo(() => {
+    if (proxyAgentSession()) return sync.data.question[route.sessionID] ?? []
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.question[x.id] ?? [])
   })
