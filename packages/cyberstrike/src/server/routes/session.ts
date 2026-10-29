@@ -568,7 +568,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   tools: {
                     todowrite: false,
                     todoread: false,
-                    ...(hasTaskPermission ? {} : { task: false }),
                     ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
                   },
                   excludeHistory: true,
