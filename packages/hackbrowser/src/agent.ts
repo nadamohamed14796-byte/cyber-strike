@@ -1018,7 +1018,7 @@ async function explorePageWithAI(
     const currentElements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
     const unexplored = findUnexploredElements(currentElements, semanticActionsDone, seenKeys, globalState.visitedNav)
     if (unexplored.length === 0) break
-    const signature = unexplored.map((element) => `${element.role}::${element.label}`).sort().join("\\n")
+    const signature = [...unexplored].sort().join("\n")
     const progressMetric = semanticActionsDone.size + seenKeys.size + globalState.visitedNav.size
     if (signature === previousUnexploredSignature && progressMetric === previousProgressMetric) {
       const note = `Exploration is incomplete: ${unexplored.length} actionable element(s) remain, but repeated planning made no progress.`
