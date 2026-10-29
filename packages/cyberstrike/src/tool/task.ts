@@ -400,7 +400,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             : outcome === "errored"
               ? `INCOMPLETE: this subagent ERRORED before finishing (${(childError as { name?: string })?.name ?? "error"}). Its results are partial and were NOT credited as tested.`
               : outcome === "stuck"
-                ? "INCOMPLETE: this subagent was TERMINATED for making no progress (it repeated actions or status checks without real testing). Its results are partial and were NOT credited as tested."
+                ? "INCOMPLETE: this subagent repeated actions or status checks without completing its assigned work. Its results are partial and were NOT credited as tested."
                 : "INCOMPLETE: this subagent hit its step limit and was forced to wrap up before finishing. Its results may be partial and were NOT credited as tested."
 
       const output = [
