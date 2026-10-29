@@ -99,8 +99,8 @@ Each run checkpoint should record workspace ID, target/scope provenance, phase r
 ### Agent-usable tools and purpose
 - Python standard library — create/check workspace paths, JSONL manifests, and artifact inventories without extra dependencies.
 - `jq` and `rg` — inspect manifests and search local artifacts.
-- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect the actual evidence-manifest validator interface before use.
-- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool names...>` — verify selected local command availability/version without target traffic.
+- Load `community-tool-selection`, then resolve `scripts/validate_evidence_manifest.py` relative to the parent of its returned `Base directory`; verify the exact file exists and invoke it with an absolute path and `--help`. Do not resolve `.cyberstrike/skill/` against the target workspace.
+- When needed, resolve `scripts/tool_preflight.py` the same way from the installed skill root and run it by absolute path with `--json <tool names...>`; it performs local checks only.
 - `sha256sum` or Python `hashlib` — record stable artifact hashes without altering source evidence.
 
 ### Installation and verification
