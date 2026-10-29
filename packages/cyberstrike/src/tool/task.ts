@@ -29,6 +29,23 @@ import { assertTaskResumeScope } from "./task-resume"
 // web_get_request_detail for the rare response that still exceeds this.
 const MAX_PREPEND_BYTES = 48 * 1024
 
+// Only real subagents may use the internal, background-only escalation path.
+// A primary/user-facing agent must still honor the normal task permission policy.
+export function isInternalImpactHandoff(input: {
+  subagentType: string
+  background?: boolean
+  caller?: string
+  callerMode?: "subagent" | "primary" | "all"
+}) {
+  return (
+    input.subagentType === "impact-hunter" &&
+    input.background === true &&
+    input.caller !== undefined &&
+    input.caller !== "impact-hunter" &&
+    input.callerMode === "subagent"
+  )
+}
+
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
   prompt: z.string().describe("The task for the agent to perform"),
@@ -70,7 +87,13 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       // hand off an evidence-backed finding to it in background mode without
       // gaining general task-spawning privileges. Scope and request tools remain
       // enforced inside Impact Hunter.
-      const impactHandoff = params.subagent_type === "impact-hunter" && params.background === true && caller !== "impact-hunter"
+      const callerAgent = caller && params.subagent_type === "impact-hunter" && params.background === true ? await Agent.get(caller) : undefined
+      const impactHandoff = isInternalImpactHandoff({
+        subagentType: params.subagent_type,
+        background: params.background,
+        caller,
+        callerMode: callerAgent?.mode,
+      })
 
       // Skip permission check when user explicitly invoked via @ or command subtask,
       // or for the narrowly-scoped internal Impact Hunter handoff above.
