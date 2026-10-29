@@ -112,7 +112,7 @@ Looks like not only it was possible to craft a yarn.lock with a malicious intent
 
 ## Steps To Reproduce:
 
-1. Perform an `npm login` or just write `//registry.npmjs.org/:[REDACTED_SECRET]` (which is the format npm uses) to ~/.npmrc. **Doing this from your own account would leak your npm credentials on next steps, so better just use a placeholder.**
+1. Perform an `npm login` or just write `//registry.npmjs.org/:_authToken=[REDACTED_NPM_TOKEN]` (which is the format npm uses) to ~/.npmrc. **Doing this from your own account would leak your npm credentials on next steps, so better just use a placeholder.**
 2. Create an empty package with a single dependency on `"@babel/core": "^7.5.4"`
 3. Perform `yarn install`
 4. Replace all occurances of `https://registry.yarnpkg.com` with `http://registry.npmjs.org/` in the generated `yarn.lock`
