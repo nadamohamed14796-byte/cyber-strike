@@ -84,6 +84,12 @@ Response processing rules:
 
 **IMPORTANT**: The captured `## Response` is your BASELINE — the app's answer to the *unmodified* request, so you don't re-fetch it as-is. It is an input to your testing, NOT a test result. Every verdict you record must come from a request YOU sent with attack/modified input (different IDs, alg:none, injected params, swapped credentials). If you have not sent at least one such request, you have not tested — you have only read.
 
+### JavaScript-derived evidence — mandatory when relevant
+
+Before deciding which test to run, inspect the `target_memory`/JavaScript-correlation context and the current target's saved JavaScript artifacts when they exist. Match by exact origin + method + normalized path; then use the matching source file and SHA-256, source line, enclosing function, path/query/body parameters, header/auth/cookie clues, static sink candidates, and captured request IDs. Read the per-endpoint tester-survey case and its previous outcomes so completed checks are not repeated without new evidence.
+
+Use that source evidence to explain why a test is relevant and to choose one bounded hypothesis with a baseline and negative control. Link test outcomes back to the exact endpoint/candidate and update the survey/verification ledger. A source function, endpoint literal, secret fingerprint, or sink marker is still only a candidate until a safe authorized request demonstrates behavior. If no JS relationship exists, continue normal request/response analysis; absence of a correlation edge is not proof that a code path does not exist.
+
 ### Available Tools
 
 All vulnerability testing agents have access to:

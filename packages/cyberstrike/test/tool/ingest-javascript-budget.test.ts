@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { gzipSync } from "node:zlib"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
@@ -495,3 +496,122 @@ test("reruns JavaScript correlation from saved local assets when the URL queue i
     },
   })
 }, 30_000)
+
+
+test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bundles, and accounts for non-JS URLs", async () => {
+  await using tmp = await tmpdir()
+  const requested: string[] = []
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname
+      requested.push(pathname)
+      const jsMatch = pathname.match(/^\/assets\/(\d+)\.js$/)
+      if (jsMatch) {
+        const index = Number(jsMatch[1])
+        return new Response(
+          'export function loadAsset' + index + '() { return fetch("/api/items/' + index + '") }',
+          { status: 200, headers: { "content-type": "application/javascript" } },
+        )
+      }
+      if (pathname === "/assets/compressed.js.gz") {
+        return new Response(gzipSync('export function loadCompressed() { return fetch("/api/compressed") }'), {
+          status: 200,
+          headers: { "content-type": "application/gzip" },
+        })
+      }
+      if (pathname === "/assets/font.woff2") {
+        return new Response(new Uint8Array([0, 1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "font/woff2" },
+        })
+      }
+      return new Response("not found", { status: 404, headers: { "content-type": "text/plain" } })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local JavaScript queue-resume regression fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const canonicalTarget = configured.workspace.targetURL
+        const session = await Session.create({})
+        Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          keyHash: "ingest-javascript-bounded-resume-root",
+          origin: canonicalTarget,
+          scheme: "http",
+          host: "127.0.0.1",
+          pageUrl: canonicalTarget + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><body>local resume fixture</body></html>",
+          },
+        })
+
+        const urls = [
+          ...Array.from({ length: 30 }, (_, index) => canonicalTarget + "/assets/" + index + ".js"),
+          canonicalTarget + "/assets/compressed.js.gz",
+          canonicalTarget + "/assets/font.woff2",
+        ]
+        const tool = await IngestJavaScriptURLsTool.init()
+        const first = await tool.execute({
+          target_url: canonicalTarget,
+          urls,
+          source: "unit-test-bounded-resume",
+          force_refresh: false,
+        }, toolContext(session.id))
+        const firstMeta = first.metadata as Record<string, unknown>
+        expect(firstMeta.queued_urls).toBe(32)
+        expect(firstMeta.processed_this_invocation).toBe(25)
+        expect(firstMeta.invocation_limit_reached).toBe(true)
+        expect(firstMeta.worklist_pending).toBe(7)
+        expect(firstMeta.collection_complete).toBe(false)
+
+        const second = await tool.execute({
+          target_url: canonicalTarget,
+          urls: [],
+          source: "unit-test-bounded-resume",
+          force_refresh: false,
+        }, toolContext(session.id))
+        const secondMeta = second.metadata as Record<string, unknown>
+        expect(secondMeta.worklist_pending).toBe(0)
+        expect(secondMeta.worklist_retryable_failures).toBe(0)
+        expect(secondMeta.worklist_missing_manifest_records).toBe(0)
+        expect(secondMeta.collection_complete).toBe(true)
+        expect(secondMeta.correlation_saved).toBe(true)
+        expect(secondMeta.analysis_complete).toBe(true)
+        expect(secondMeta.worklist_non_javascript).toBe(1)
+        expect(second.output).toContain("Analyzed source records:")
+        expect(requested.filter((pathname) => pathname.startsWith("/assets/"))).toHaveLength(32)
+        expect(new Set(requested.filter((pathname) => pathname.startsWith("/assets/"))).size).toBe(32)
+
+        const manifest = JSON.parse(await fs.readFile(
+          path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json"),
+          "utf8",
+        )) as { assets: Array<{ url: string; status: string; localPath?: string; contentHash?: string }> }
+        const gzipURL = canonicalTarget + "/assets/compressed.js.gz"
+        const gzipRecord = manifest.assets.find((asset) => asset.url === gzipURL)
+        expect(gzipRecord?.status).toBe("downloaded")
+        expect(gzipRecord?.localPath).toBeTruthy()
+        expect(await fs.readFile(gzipRecord!.localPath!, "utf8")).toContain("loadCompressed")
+        const fontRecord = manifest.assets.find((asset) => asset.url === canonicalTarget + "/assets/font.woff2")
+        expect(fontRecord?.status).toBe("skipped")
+
+        await Session.remove(session.id)
+      },
+    })
+  } finally {
+    server.stop(true)
+  }
+}, 60_000)

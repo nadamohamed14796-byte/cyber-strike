@@ -1851,6 +1851,8 @@ export namespace JavaScriptCorrelation {
     sessionID: string
     targetURL: string
     javascriptURL?: string
+    /** Permit workspace-local static analysis when no target request exists in this session tree. */
+    localOnly?: boolean
   }): Promise<BuildResult> {
     const rootSessionID = Session.root(input.sessionID)
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
@@ -1872,6 +1874,7 @@ export namespace JavaScriptCorrelation {
     sessionID: string
     targetURL: string
     javascriptURL?: string
+    localOnly?: boolean
   }): Promise<BuildResult> {
     const rootSessionID = Session.root(input.sessionID)
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
@@ -1881,7 +1884,8 @@ export namespace JavaScriptCorrelation {
     if (!workspace) {
       throw new Error("No existing target workspace matches this target. Initialize it with target_workspace first.")
     }
-    if (!TargetMemory.isObservedOrAncestorInSession(rootSessionID, workspace.targetURL)) {
+    const sessionAssociated = TargetMemory.isObservedOrAncestorInSession(rootSessionID, workspace.targetURL)
+    if (!sessionAssociated && !input.localOnly) {
       throw new Error("The target or one of its registered descendant workspaces was not observed in this session tree. Refusing to correlate unrelated target data.")
     }
 
@@ -1925,6 +1929,38 @@ export namespace JavaScriptCorrelation {
     const testerSurveyRelativePath = path.posix.join("findings", "tester-survey-" + digest + ".json")
     const legacyTesterSurveyRelativePath = path.posix.join("testing", "tester-survey-" + digest + ".json")
     const analysisCache = new Map<string, JavaScriptSourceAnalysis>()
+    type IngestedAssetRecord = {
+      url: string
+      finalURL?: string
+      source?: string
+      status?: string
+      contentHash?: string
+      bytes?: number
+      localPath?: string
+      contentType?: string
+    }
+    const ingestedAssetRecords: IngestedAssetRecord[] = []
+    let ingestedManifestWarning: string | undefined
+    try {
+      const rawManifest = await readSafeWorkspaceText(workspace.workspacePath, "javascript/asset-manifest.json")
+      if (rawManifest) {
+        const parsed: unknown = JSON.parse(rawManifest)
+        if (!parsed || typeof parsed !== "object" || (parsed as { schemaVersion?: unknown }).schemaVersion !== 1 ||
+            !Array.isArray((parsed as { assets?: unknown }).assets)) {
+          ingestedManifestWarning = "JavaScript asset manifest has an unsupported schema; URL-to-file relationships could not be reconstructed."
+        } else {
+          for (const item of (parsed as { assets: unknown[] }).assets) {
+            if (!item || typeof item !== "object") continue
+            const record = item as IngestedAssetRecord
+            if (typeof record.url === "string" && (record.status === "downloaded" || record.status === "reused")) {
+              ingestedAssetRecords.push(record)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      ingestedManifestWarning = "JavaScript asset manifest could not be read: " + (error instanceof Error ? error.message : String(error))
+    }
     const previousGraphPath = path.join(workspace.workspacePath, "javascript", graphFilename)
     try {
       const info = await fs.lstat(previousGraphPath)
@@ -1953,10 +1989,35 @@ export namespace JavaScriptCorrelation {
           normalizedTarget.targetURL,
           inventoryIssues,
         )
+    for (const file of sourceFiles) {
+      const absoluteFile = path.resolve(workspace.workspacePath, file.relativePath)
+      const matchingRecord = ingestedAssetRecords.find((record) =>
+        record.localPath &&
+        record.contentHash === file.sha256 &&
+        path.resolve(record.localPath) === absoluteFile,
+      )
+      if (!matchingRecord) continue
+      const sourceURL = safeURL(matchingRecord.finalURL ?? matchingRecord.url)
+      if (!sourceURL) continue
+      file.sourceURL = sourceURL.origin + sourceURL.pathname
+      // Local source-map inventory creates virtual source records with a local:// map URL.
+      // Restore the exact manifest-backed URL so the original JS sourceMappingURL can match it,
+      // including signed query parameters without exposing those values in the rendered summary.
+      if (file.sourceMapStatus) {
+        const localMapURL = "local://" + file.relativePath
+        file.sourceMapURL = sourceURL.href
+        for (const embeddedSource of sourceFiles) {
+          if (embeddedSource.sourceMapURL !== localMapURL) continue
+          embeddedSource.sourceMapURL = sourceURL.href
+          embeddedSource.sourceURL = sourceURL.origin + sourceURL.pathname
+        }
+      }
+    }
 
     const projectID = Instance.project.id
-    const sessionIDsSet = new Set<string>([rootSessionID])
-    let frontier = [rootSessionID]
+    // Static-only fallback must not import unrelated requests, credentials, or findings.
+    const sessionIDsSet = new Set<string>(sessionAssociated ? [rootSessionID] : [])
+    let frontier = sessionAssociated ? [rootSessionID] : []
     while (frontier.length > 0) {
       const children = Database.use((db) =>
         chunkForSQLiteIn(frontier).flatMap((parentIDs) =>
@@ -1990,6 +2051,35 @@ export namespace JavaScriptCorrelation {
         }),
       }))
       .filter((item): item is { row: typeof intel[number]; url: URL } => Boolean(item.url))
+
+    for (const record of ingestedAssetRecords) {
+      if (!record.localPath || !record.contentHash) continue
+      const localPath = path.resolve(record.localPath)
+      const relativeLocalPath = path.relative(workspace.workspacePath, localPath)
+      if (!relativeLocalPath || relativeLocalPath.startsWith("..") || path.isAbsolute(relativeLocalPath)) continue
+      try {
+        const localInfo = await fs.lstat(localPath)
+        if (!localInfo.isFile() || localInfo.isSymbolicLink()) continue
+      } catch {
+        continue
+      }
+      const url = safeURL(record.finalURL ?? record.url)
+      if (!url) continue
+      const assetKey = url.origin + url.pathname
+      if (jsCandidates.some((candidate) => candidate.url.origin + candidate.url.pathname === assetKey)) continue
+      jsCandidates.push({
+        row: {
+          id: null as unknown as string,
+          type: "javascript_file",
+          title: url.pathname.split("/").pop() || "downloaded-javascript-asset",
+          asset: url.href,
+          source: record.source ?? "persisted JavaScript asset manifest",
+          confidence_level: "observed",
+          tags: ["javascript", "ingested", record.status ?? "downloaded", "sha256:" + record.contentHash],
+        } as typeof intel[number],
+        url,
+      })
+    }
 
     const targetURL = new URL(normalizedTarget.targetURL)
     const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
@@ -2556,9 +2646,15 @@ export namespace JavaScriptCorrelation {
         targetID: finding.target_id ?? null,
       })),
       edges: [],
-      notes: inventoryIssues.map((issue) =>
-        `JAVASCRIPT INVENTORY GAP: ${issue.relativePath} — ${issue.stage} failed (error ${issue.code}); this item was not completely analyzed. Fix the file/directory access and rerun JavaScript correlation.`,
-      ),
+      notes: [
+        ...inventoryIssues.map((issue) =>
+          `JAVASCRIPT INVENTORY GAP: ${issue.relativePath} — ${issue.stage} failed (error ${issue.code}); this item was not completely analyzed. Fix the file/directory access and rerun JavaScript correlation.`,
+        ),
+        ...(ingestedManifestWarning ? [ingestedManifestWarning] : []),
+        ...(!sessionAssociated ? [
+          "LOCAL-ONLY CORRELATION: the persisted scope manifest authorized workspace asset ingestion, but this target was not observed in the current session tree. Static local source files were analyzed without importing session requests, credentials, observations, or findings.",
+        ] : []),
+      ],
     }
 
     const assetBasenames = new Map(graph.javascriptAssets.map((asset) => [path.posix.basename(new URL(asset.url).pathname).toLowerCase(), asset.url]))
@@ -2574,6 +2670,24 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
+    for (const file of graph.sourceFiles) {
+      const absoluteFile = path.resolve(workspace.workspacePath, file.relativePath)
+      for (const record of ingestedAssetRecords) {
+        if (!record.localPath || record.contentHash !== file.sha256 || path.resolve(record.localPath) !== absoluteFile) continue
+        const sourceURL = safeURL(record.finalURL ?? record.url)
+        if (!sourceURL) continue
+        const assetURL = sourceURL.origin + sourceURL.pathname
+        if (!graph.javascriptAssets.some((asset) => asset.url === assetURL)) continue
+        graph.edges.push({
+          from: "javascript-file:" + file.relativePath,
+          to: "javascript:" + assetURL,
+          relation: "content-hash-match",
+          confidence: "direct",
+          evidence: "The local asset manifest maps this exact SHA-256 content hash to the recorded, scope-checked asset URL.",
+        })
+      }
+    }
+
     graph.endpointCandidates = mergeStructuredJavaScriptEndpoints(
       correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname, targetURL.origin),
       graph.javascriptAnalysis.requestCandidates,
@@ -2599,6 +2713,39 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
+    for (const candidate of graph.javascriptAnalysis.requestCandidates) {
+      const matchingFunctions = candidate.sourceFunction
+        ? graph.javascriptAnalysis.functions
+            .filter((fn) => fn.sourceFile === candidate.sourceFile && fn.name === candidate.sourceFunction && fn.line <= candidate.sourceLine)
+            .sort((a, b) => b.line - a.line)
+        : []
+      const fn = matchingFunctions[0]
+      const requestNode = "javascript-request-candidate:" + createHash("sha256")
+        .update([candidate.sourceFile, candidate.sourceLine, candidate.method ?? "", candidate.urlTemplate].join("\\0"))
+        .digest("hex").slice(0, 16)
+      if (fn) {
+        graph.edges.push({
+          from: "javascript-function:" + candidate.sourceFile + ":" + fn.line + ":" + fn.name,
+          to: requestNode,
+          relation: "function-contains-request-candidate",
+          confidence: "candidate",
+          evidence: "Static lexical function attribution links this request call to the nearest matching function declaration; review minified or complex syntax manually.",
+        })
+      }
+      for (const endpoint of graph.endpointCandidates) {
+        if (!endpoint.sourceFiles.includes(candidate.sourceFile)) continue
+        if (normalizedTemplateShape(endpoint.path) !== normalizedTemplateShape(candidate.path)) continue
+        if (endpoint.method && candidate.method && endpoint.method.toUpperCase() !== candidate.method.toUpperCase()) continue
+        graph.edges.push({
+          from: requestNode,
+          to: endpoint.id,
+          relation: "request-candidate-maps-to-endpoint",
+          confidence: "candidate",
+          evidence: "The structured request call and endpoint share a source file and normalized path; this is static source evidence, not proof of runtime execution.",
+        })
+      }
+    }
+
     for (const response of graph.evidence) {
       graph.edges.push({
         from: "request:" + response.requestID,

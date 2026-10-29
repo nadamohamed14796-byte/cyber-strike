@@ -2,9 +2,13 @@ import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
+import { gunzipSync } from "node:zlib"
 import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
+
+// Bound work per invocation for reliable checkpoints; the total queue is never capped.
+const MAX_ASSETS_PER_INVOCATION = 25
 
 // Redirects are bounded to prevent unending redirect loops; URL/worklist count
 // and asset body size are intentionally not capped.
@@ -36,6 +40,8 @@ type AssetRecord = {
   error?: string
   /** Network/HTTP/body-read attempts for this URL; force_refresh starts a new series. */
   attempts?: number
+  assetKind?: "javascript" | "html" | "source-map" | "non-js"
+  skipReason?: "non-javascript-resource" | "error-document"
 }
 
 type Manifest = {
@@ -139,7 +145,8 @@ function redactURLs(input: string): string {
 function extensionFor(url: string, contentType: string): string {
   const pathname = new URL(url).pathname.toLowerCase()
   if (/text\/html|application\/xhtml\+xml/.test(contentType) || /\.x?html?$/.test(pathname)) return ".html"
-  if (pathname.endsWith(".map") || /source-map\+json|x-source-map/.test(contentType)) return ".map"
+  if (/\.map(?:\.gz)?$/.test(pathname) || /source-map\+json|x-source-map/.test(contentType)) return ".map"
+  if (/\.m?js\.gz$/.test(pathname)) return pathname.endsWith(".mjs.gz") ? ".mjs" : ".js"
   if (pathname.endsWith(".mjs")) return ".mjs"
   if (pathname.endsWith(".cjs")) return ".cjs"
   return ".js"
@@ -221,10 +228,21 @@ export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   return [...output]
 }
 
+function isLikelyScriptErrorDocument(body: string, contentType: string, url: string): boolean {
+  const pathname = new URL(url).pathname
+  if (!/\.(?:m?js|cjs)(?:\.gz)?$/i.test(pathname)) return false
+  const sample = body.trimStart()
+  if (/^(?:Cannot GET\b|Not Found\b|404 Not Found\b|Bad Gateway\b)/i.test(sample)) return true
+  if (/^<!doctype\s+html|^<html\b/i.test(sample) && !/<script\b/i.test(sample)) return true
+  if (/application\/(?:json|problem\+json)/i.test(contentType) &&
+      /^\s*\{/.test(sample) && /"(?:error|message|status)"\s*:/i.test(sample)) return true
+  return false
+}
+
 function looksLikeJavaScript(body: string, contentType: string, url: string): boolean {
   if (/text\/html|application\/xhtml\+xml/i.test(contentType)) return false
   if (/javascript|ecmascript|x-javascript|source-map\+json|x-source-map/i.test(contentType)) return true
-  if (new URL(url).pathname.toLowerCase().endsWith(".map")) {
+  if (/\.map(?:\.gz)?$/i.test(new URL(url).pathname)) {
     try {
       const parsed = JSON.parse(body) as { version?: unknown; sources?: unknown; mappings?: unknown }
       return parsed.version === 3 && Array.isArray(parsed.sources) && typeof parsed.mappings === "string"
@@ -236,7 +254,7 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
   if (/^(?:<!doctype\s+html|<html\b)/i.test(sample)) return false
   // A script extension remains a strong asset hint even when a CDN serves it as
   // text/plain or a minified bundle does not match the lightweight syntax sniff.
-  if (/\.(?:m?js|cjs)$/i.test(new URL(url).pathname)) return true
+  if (/\.(?:m?js|cjs)(?:\.gz)?$/i.test(new URL(url).pathname)) return true
   return /(?:\b(?:function|const|let|var|import|export|class|return|throw|async|await)\b|\b(?:fetch|axios|window|document|globalThis|self|define|require|exports|module)\s*[.(=]|=>|!function\s*\(|sourceMappingURL)/.test(sample)
 }
 
@@ -487,7 +505,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let terminalNotRetried = 0
     const automaticRetryScheduled = new Set<string>()
 
-    for (let index = 0; index < inputURLs.length; index++) {
+    let processedThisInvocation = 0
+    for (let index = 0; index < inputURLs.length && processedThisInvocation < MAX_ASSETS_PER_INVOCATION; index++) {
+      processedThisInvocation++
       if (ctx.abort.aborted) {
         await saveProgress(true)
         break
@@ -654,24 +674,58 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress()
         continue
       }
-      receivedBytes += bytes.byteLength
+      const receivedResponseBytes = bytes.byteLength
+      receivedBytes += receivedResponseBytes
+      const responsePath = new URL(finalURL).pathname
+      if (/\.gz$/i.test(responsePath) && bytes.byteLength >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        try {
+          // Some CDNs serve gzip payloads as files (.js.gz) rather than HTTP content-encoding.
+          // Hash/save the decoded source so identical plain and gzip-delivered bundles deduplicate.
+          bytes = new Uint8Array(gunzipSync(bytes))
+        } catch (error) {
+          const prior = byURL.get(url)
+          const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+          const record: AssetRecord = {
+            ...prior, url, finalURL, source: mergeAssetSourceLabel(sources), sources,
+            status: "failed", retryable: false, attempts: (prior?.attempts ?? 0) + 1,
+            assetKind: /\.map\.gz$/i.test(responsePath) ? "source-map" : "javascript",
+            contentType, bytes: receivedResponseBytes,
+            error: "gzip asset could not be decompressed: " + redactURLs(error instanceof Error ? error.message : String(error)),
+            fetchedAt: new Date().toISOString(),
+          }
+          records.push(record); byURL.set(url, record); failed++
+          await saveProgress()
+          continue
+        }
+      }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       const isHTML = isHTMLResponse(body, contentType, finalURL)
-      if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
+      const finalPathname = new URL(finalURL).pathname
+      const expectedSourceMap = /\.map(?:\.gz)?$/i.test(finalPathname) || /source-map\+json|x-source-map/i.test(contentType)
+      const expectedJavaScript = /\.(?:m?js|cjs)(?:\.gz)?$/i.test(finalPathname) || /(?:java|ecma)script|x-javascript/i.test(contentType)
+      if (expectedJavaScript && isLikelyScriptErrorDocument(body, contentType, finalURL)) {
         const prior = byURL.get(url)
         const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const record: AssetRecord = {
-          ...prior,
-          url,
-          finalURL,
-          source: mergeAssetSourceLabel(sources),
-          sources,
-          status: "skipped",
-          retryable: undefined,
-          pendingRefresh: undefined,
-          contentType,
+          ...prior, url, finalURL, source: mergeAssetSourceLabel(sources), sources,
+          status: "failed", retryable: false, attempts: (prior?.attempts ?? 0) + 1,
+          assetKind: "javascript", skipReason: "error-document", contentType, bytes: bytes.byteLength,
+          error: "HTTP " + response.status + " returned an error document instead of a JavaScript asset",
+          fetchedAt: new Date().toISOString(),
+        }
+        records.push(record); byURL.set(url, record); failed++
+        await saveProgress()
+        continue
+      }
+      if (!isHTML && !expectedSourceMap && !looksLikeJavaScript(body, contentType, finalURL)) {
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const record: AssetRecord = {
+          ...prior, url, finalURL, source: mergeAssetSourceLabel(sources), sources,
+          status: "skipped", retryable: undefined, pendingRefresh: undefined,
+          assetKind: "non-js", skipReason: "non-javascript-resource", contentType,
           bytes: bytes.byteLength,
-          error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map",
+          error: "response is not a JavaScript asset, HTML container, or source map; excluded from JavaScript coverage",
           fetchedAt: new Date().toISOString(),
         }
         records.push(record); byURL.set(url, record); skipped++
@@ -723,8 +777,14 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let analysisSummary = ctx.abort.aborted ? "Correlation not run because ingestion was interrupted; pending assets are saved for resume." : "Analysis not run."
     let analysisError: string | undefined
     let analyzedSourceRecords = 0
+    let analysisCoverageGaps = 0
     const localJavaScriptInputs = await hasLocalJavaScriptInputs(root)
-    const shouldRunCorrelation = !ctx.abort.aborted && (downloaded + reused > 0 || localJavaScriptInputs)
+    const hasUnfinishedQueue = [...byURL.values()].some((record) =>
+      record.status === "pending" || (record.status === "failed" && record.retryable === true),
+    )
+    // Avoid rebuilding the full graph after every bounded slice; once pending work drains,
+    // correlate the complete local corpus exactly once.
+    const shouldRunCorrelation = !ctx.abort.aborted && !hasUnfinishedQueue && (downloaded + reused > 0 || localJavaScriptInputs)
     if (shouldRunCorrelation) {
       ctx.metadata({
         title: "Correlating JavaScript and captured requests",
@@ -736,14 +796,19 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         },
       })
       try {
-        const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: params.target_url })
+        const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: params.target_url, localOnly: true })
         analyzedSourceRecords = result.graph.sourceFiles.length
+        analysisCoverageGaps =
+          result.graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")).length +
+          result.graph.sourceFiles.filter((file) => Boolean(file.sourceMapStatus && file.sourceMapStatus !== "analyzed")).length +
+          (result.graph.sourceMapReferences ?? []).filter((item) => !["analyzed", "out-of-scope"].includes(item.status)).length
         analysisSummary = [
           "JavaScript correlation snapshot: " + result.graphPath,
           "Endpoint inventory: " + result.endpointPath,
           "Unique endpoint candidates: " + result.graph.endpointCandidates.length,
           "Unique source records: " + analyzedSourceRecords,
           "Source-map references: " + (result.graph.sourceMapReferences ?? []).length,
+          "Unresolved source/inventory gaps: " + analysisCoverageGaps,
         ].join("\n")
       } catch (error) {
         analysisError = error instanceof Error ? error.message : String(error)
@@ -759,6 +824,19 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const worklistRetryable = worklistRecords.filter((record) => record?.status === "failed" && record.retryable === true).length
     const worklistSettled = allQueuedURLs.length - worklistMissingRecords - worklistPending - worklistRetryable
     const worklistAvailable = worklistRecords.filter((record) => record?.status === "downloaded" || record?.status === "reused").length
+    const isNonJavaScriptSkip = (record: AssetRecord | undefined) => {
+      if (record?.status !== "skipped") return false
+      if (record.skipReason === "non-javascript-resource" && record.assetKind === "non-js") return true
+      // Legacy manifests predate typed exclusions. Do not hide an old failed JS/source-map
+      // response merely because it used the previous generic "does not look like JS" message.
+      const pathname = (() => { try { return new URL(record.url).pathname } catch { return "" } })()
+      const looksLikeCodeAsset = /\.(?:m?js|cjs|map)(?:\.gz)?$/i.test(pathname) ||
+        /(?:java|ecma)script|source-map/i.test(record.contentType ?? "")
+      return record.error === "response does not look like JavaScript, HTML with script elements, or a version-3 source map" &&
+        !looksLikeCodeAsset
+    }
+    const worklistNonJavaScript = worklistRecords.filter((record) => isNonJavaScriptSkip(record)).length
+    const worklistAccounted = worklistAvailable + worklistNonJavaScript
     const globalPending = finalManifestAssets.filter((record) => record.status === "pending").length
     const globalRetryable = finalManifestAssets.filter((record) => record.status === "failed" && record.retryable === true).length
     const manifestReconciled = worklistMissingRecords === 0 && worklistPending === 0 && worklistRetryable === 0
@@ -769,10 +847,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       invalidCount === 0 &&
       globalPending === 0 &&
       globalRetryable === 0 &&
-      worklistAvailable === allQueuedURLs.length &&
-      finalManifestAssets.every((record) => record.status === "downloaded" || record.status === "reused")
+      worklistAccounted === allQueuedURLs.length &&
+      finalManifestAssets.every((record) =>
+        record.status === "downloaded" || record.status === "reused" || isNonJavaScriptSkip(record),
+      )
     const correlationSaved = shouldRunCorrelation && !ctx.abort.aborted && !analysisError
-    const completeAnalysis = collectionComplete && correlationSaved && analyzedSourceRecords > 0
+    const completeAnalysis = collectionComplete && correlationSaved && analyzedSourceRecords > 0 && analysisCoverageGaps === 0
     const resultTitle = ctx.abort.aborted
       ? "JavaScript ingestion interrupted — pending work saved"
       : analysisError || !manifestReconciled || globalPending > 0 || globalRetryable > 0
@@ -780,7 +860,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         : !collectionComplete
           ? "JavaScript ingestion finished with asset gaps"
           : !completeAnalysis
-            ? "JavaScript evidence saved — no analyzable source records confirmed"
+            ? analyzedSourceRecords > 0
+              ? "JavaScript evidence saved — source/inventory coverage gaps remain"
+              : "JavaScript evidence saved — no analyzable source records confirmed"
             : "JavaScript URL ingestion complete"
 
     return {
@@ -792,6 +874,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Unique URLs in complete worklist (supplied, resumed, and discovered): " + allQueuedURLs.length,
         "Worklist records settled with an explicit terminal status: " + worklistSettled + "/" + allQueuedURLs.length,
         "Worklist records with downloaded/reused content: " + worklistAvailable + "/" + allQueuedURLs.length,
+        "Explicitly excluded non-JavaScript resources: " + worklistNonJavaScript,
+        "URLs processed in this invocation: " + processedThisInvocation + " (per-invocation slice: " + MAX_ASSETS_PER_INVOCATION + "; no total URL cap)",
         "Worklist records still pending: " + worklistPending,
         "Worklist retryable failures: " + worklistRetryable,
         "Worklist URLs without manifest records: " + worklistMissingRecords,
@@ -806,10 +890,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Newly downloaded bytes: " + downloadedBytes,
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
-        "Correlation status: " + (analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : correlationSaved ? (completeAnalysis ? "ran and saved a full-coverage snapshot" : !collectionComplete ? "ran and saved a partial snapshot; collection still has coverage gaps" : "ran but no analyzable source records were confirmed") : "not run because no local or newly collected asset was available"),
+        "Correlation status: " + (analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : correlationSaved ? (completeAnalysis ? "ran and saved a full-coverage snapshot" : !collectionComplete ? "ran and saved a partial snapshot; collection still has coverage gaps" : analyzedSourceRecords > 0 ? "ran and saved source records, but unresolved source/inventory gaps remain" : "ran but no analyzable source records were confirmed") : "deferred until the persisted queue has no pending/retryable items"),
         "Analyzed source records: " + analyzedSourceRecords,
         analysisSummary,
-        ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
+        ...records.filter((record) => record.status === "failed" || (record.status === "skipped" && !isNonJavaScriptSkip(record))).map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
       ].join("\n"),
       metadata: {
         manifest_path: manifestPath,
@@ -819,6 +903,11 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         queued_urls: allQueuedURLs.length,
         worklist_settled: worklistSettled,
         worklist_available: worklistAvailable,
+        worklist_non_javascript: worklistNonJavaScript,
+        processed_this_invocation: processedThisInvocation,
+        per_invocation_limit: MAX_ASSETS_PER_INVOCATION,
+        invocation_limit_reached: !ctx.abort.aborted && processedThisInvocation >= MAX_ASSETS_PER_INVOCATION &&
+          [...byURL.values()].some((record) => record.status === "pending" || (record.status === "failed" && record.retryable === true)),
         worklist_pending: worklistPending,
         worklist_retryable_failures: worklistRetryable,
         worklist_missing_manifest_records: worklistMissingRecords,
@@ -836,6 +925,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        analysis_coverage_gaps: analysisCoverageGaps,
         analyzed_source_records: analyzedSourceRecords,
         analysis_complete: completeAnalysis,
         interrupted: ctx.abort.aborted,

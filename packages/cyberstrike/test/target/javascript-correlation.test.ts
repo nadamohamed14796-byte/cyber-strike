@@ -1254,3 +1254,37 @@ test("correlates scoped descendant JavaScript from a policy-only root workspace"
     },
   })
 })
+
+
+test("analyzes scoped workspace-local JavaScript when the target is absent from the session tree", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://local-only.example", {
+        include: ["https://local-only.example"],
+        authorizationSource: "Local-only JavaScript correlation regression test",
+        authorizationReference: "https://example.test/authorized-local-fixture",
+      })
+      const workspace = configured.workspace
+      const assetDir = path.join(workspace.workspacePath, "javascript", "assets")
+      await fs.mkdir(assetDir, { recursive: true })
+      await fs.writeFile(
+        path.join(assetDir, "example.js"),
+        'async function loadProfile(userId) { return fetch("/api/users/" + userId) }',
+        "utf8",
+      )
+      const session = await Session.create({})
+      const result = await JavaScriptCorrelation.build({
+        sessionID: session.id,
+        targetURL: workspace.targetURL,
+        localOnly: true,
+      })
+      expect(result.graph.sourceFiles.some((file) => file.basename === "example.js")).toBe(true)
+      expect(result.graph.javascriptAnalysis.functions.some((fn) => fn.name === "loadProfile")).toBe(true)
+      expect(result.graph.javascriptAnalysis.requestCandidates.some((request) => request.path === "/api/users/{userId}")).toBe(true)
+      expect(result.graph.requests).toHaveLength(0)
+      expect(result.graph.notes.some((note) => note.startsWith("LOCAL-ONLY CORRELATION:"))).toBe(true)
+    },
+  })
+})

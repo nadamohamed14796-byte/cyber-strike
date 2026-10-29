@@ -24,12 +24,13 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
         sessionID: ctx.sessionID,
         targetURL: params.target_url,
         javascriptURL: params.javascript_url,
+        localOnly: true,
       })
       const graph = result.graph
       return {
         title: graph.sourceFiles.length || result.capturedAssetCount ? "JavaScript correlation saved" : "JavaScript correlation incomplete",
         output: [
-          "Collection status: " + (result.capturedAssetCount > 0 ? "captured assets persisted" : "NO captured JavaScript/source-map response bodies found; this is not a successful collection"),
+          "Collection status: " + (graph.sourceFiles.length > 0 ? "JavaScript/source-map sources analyzed from local and/or captured assets" : "no analyzable JavaScript/source-map sources were found; collection coverage must be checked in the ingestion manifest"),
           "Persisted captured asset files: " + result.capturedAssetCount,
           "Analysis status: " + (graph.sourceFiles.length > 0 ? "source records analyzed" : "no source records analyzed"),
           "Target workspace: " + result.workspacePath,
@@ -89,8 +90,10 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           findings: graph.findings.length,
           edges: graph.edges.length,
           captured_asset_files: result.capturedAssetCount,
-          collection_complete: result.capturedAssetCount > 0,
-          analysis_complete: graph.sourceFiles.length > 0,
+          source_inventory_available: graph.sourceFiles.length > 0,
+          analysis_complete: graph.sourceFiles.length > 0 &&
+            !graph.notes.some((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")) &&
+            !(graph.sourceMapReferences ?? []).some((item) => !["analyzed", "out-of-scope"].includes(item.status)),
         },
       }
     } catch (error) {
