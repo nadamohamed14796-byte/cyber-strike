@@ -47,13 +47,26 @@
 
 ---
 
-## 与方法论的关系
+## 与其他参考资料的关系
+
+以下路径均相对于当前 playbooks skill 的 Base directory。先加载对应参考 skill，再用它返回的 `Base directory` 与 `<skill_files>` 读取具体文件。
 
 ```
-methodology/01-attack-priority   →  决定先打哪个 playbook
-methodology/04-control-gap        →  端点归类 → 翻到对应 playbook
-methodology/02-bypass-toolkit     →  payload 被拦时的通用绕过
-methodology/03-evidence            →  写报告前的证据纪律
-playbooks/<type>.md                →  具体类型的探测/利用细节
-templates/report-submission.md     →  H1/Bugcrowd 三段式提交模板
+../src-hunter-methodology/00-index.md                 → 方法论导航
+../src-hunter-methodology/01-attack-priority.md       → 选择下一项有证据支撑的测试假设
+../src-hunter-methodology/02-bypass-toolkit.md        → 有明确理由且符合政策时，参考安全的差异化测试
+../src-hunter-methodology/03-evidence-discipline.md   → 证据质量、对照实验和误报检查
+../src-hunter-methodology/04-control-gap-hunting.md   → 将已观察到的行为转成控制缺口假设
+../src-hunter-methodology/05-srctimebox-priority.md   → 需要时使用优先级/时间盒方法
+../src-hunter-dictionaries/chinese-srcfingerprints.md → 已观察到的组件指纹匹配时
+../src-hunter-dictionaries/default-credentials-cn.md  → 仅在项目政策允许时进行狭窄的默认凭据核验
+../src-hunter-industry/banking-finance.md             → 目标确属范围内的金融/支付业务时
+../src-hunter-industry/telecom-isp.md                 → 目标确属范围内的电信/ISP 业务时
+../payloader/SKILL.md                                 → 需要某个具体测试类别的 payload 时
+../h1-reports/by-weakness/SKILL.md                    → 需要相关公开历史案例来形成/反驳假设时
+../src-hunter-compliance/compliance.md                → 报告前审阅合规和数据处理要求
+../src-hunter-templates/report-submission.md          → 报告已有可重现证据后使用提交模板
+../src-hunter-tools/mcp-jshook.md                     → 确有工具选择/MCP 调用需求时
 ```
+
+参考资料不等于测试授权，也不能证明当前目标存在漏洞。只加载当前证据真正需要的资料；当前 CyberStrike scope、项目政策和运行时检查始终优先。
