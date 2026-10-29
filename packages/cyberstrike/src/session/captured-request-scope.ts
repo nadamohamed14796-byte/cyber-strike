@@ -23,16 +23,22 @@ export type CapturedRequestScopeDecision = {
 export async function checkCapturedRequestScope(
   request: CapturedRequestScopeInput,
 ): Promise<CapturedRequestScopeDecision> {
-  let parsed: ReturnType<typeof parseRawRequest>
-  try {
-    parsed = parseRawRequest({ raw: request.rawRequest, scheme: request.scheme })
-  } catch {
-    return { allowed: false, reason: "captured request could not be parsed into a concrete URL" }
-  }
-
   let candidate: URL
   try {
-    candidate = new URL(parsed.rawPath, parsed.origin)
+    const requestLine = request.rawRequest.split(/\r?\n/, 1)[0]?.trim() ?? ""
+    const targetMatch = requestLine.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\S+)\s+HTTP/i)
+    if (!targetMatch) {
+      return { allowed: false, reason: "captured request could not be parsed into a concrete URL" }
+    }
+    const target = targetMatch[2]!
+    if (/^https?:\/\//i.test(target)) {
+      // In proxy/absolute-form requests, the request-target itself is authoritative.
+      // Do not let an inconsistent scheme hint or Host header rewrite its origin.
+      candidate = new URL(target)
+    } else {
+      const parsed = parseRawRequest({ raw: request.rawRequest, scheme: request.scheme })
+      candidate = new URL(parsed.rawPath, parsed.origin)
+    }
   } catch {
     return { allowed: false, reason: "captured request URL is invalid" }
   }
