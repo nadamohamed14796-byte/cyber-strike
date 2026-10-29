@@ -691,7 +691,7 @@ function normalizePassiveLookupDomain(value: string | null | undefined): string 
 
 const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains", "--domains-file", "-targets", "--targets-file"])
 
-async function readTargetListInputs(
+export async function readTargetListInputs(
   args: string[],
   cwd: string,
   scannerName: string,
