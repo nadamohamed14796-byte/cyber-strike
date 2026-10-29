@@ -53,3 +53,7 @@ Use `report_vulnerability` only when the evidence demonstrates server-side retri
 ## Stop conditions
 
 Stop when scope is unclear, the controlled destination is not authorized, the test would touch internal/metadata services or sensitive data, the result cannot be attributed, or no meaningful safe test remains.
+
+
+## Integrated specialist knowledge
+Use SSRF/cache/host playbooks only when request evidence shows a server-side fetch, URL parser, callback, import, preview, webhook, or cache/host trust boundary. Trace the user-controlled value to the server-side destination and distinguish client-side fetches, ordinary validation errors, open redirects, and actual server-side requests. Prefer vendor-provided testing endpoints or an owned callback service, low-impact canaries, and minimal proof; do not probe internal production services, cloud metadata, or unrelated networks without explicit authorization. Preserve correlation IDs and evidence of where the request originated.
