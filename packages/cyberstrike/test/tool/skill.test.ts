@@ -630,10 +630,11 @@ The skill body must still load.
             ask: async () => {},
           }
           const originalSpawn = Bun.spawn.bind(Bun)
-          const spawnSpy = spyOn(Bun, "spawn").mockImplementation((command, options) => {
+          const injectedSpawn = ((command: string[], options?: any) => {
             if (options?.cwd === skillDir) throw new Error("Injected companion-file listing failure")
             return originalSpawn(command, options)
-          })
+          }) as typeof Bun.spawn
+          const spawnSpy = spyOn(Bun, "spawn").mockImplementation(injectedSpawn)
           try {
             const result = await tool.execute({ action: "load", name: "listing-failure-skill" }, ctx)
 
