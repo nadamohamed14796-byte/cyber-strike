@@ -1,6 +1,12 @@
 import z from "zod"
 import { Tool } from "./tool"
 
+const LEGACY_TOOL_REPLACEMENTS: Record<string, string> = {
+  sublist3r: "Legacy subdomain enumerator. Prefer subfinder and current OWASP Amass v5.",
+  waybackurls: "Legacy URL-history collector. Prefer gau and waymore.",
+  gospider: "Older crawler. Prefer current ProjectDiscovery katana when its coverage fits.",
+}
+
 const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; description: string; verify?: string }> = {
   nmap: { check: "nmap", install: "if command -v brew >/dev/null 2>&1; then brew install nmap; else apt-get update && apt-get install -y nmap; fi", description: "Network scanner" },
   nuclei: {
@@ -23,7 +29,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   },
   amass: {
     check: "amass",
-    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/owasp-amass/amass/v4/...@master",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); CGO_ENABLED=0 go install -v github.com/owasp-amass/amass/v5/cmd/amass@latest",
     description: "Attack surface mapping",
   },
   assetfinder: {
@@ -47,6 +53,11 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     description: "Wayback Machine URL fetcher",
   },
   gau: { check: "gau", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/lc/gau/v2/cmd/gau@latest", description: "URL aggregator" },
+  waymore: {
+    check: "waymore",
+    install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install waymore",
+    description: "Historical URL and archived-response discovery",
+  },
   hakrawler: {
     check: "hakrawler",
     install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/hakluke/hakrawler@latest",
@@ -95,6 +106,11 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
     const results: Array<{ tool: string; installed: boolean; action: string }> = []
 
     for (const name of params.tools) {
+      const legacyReplacement = LEGACY_TOOL_REPLACEMENTS[name]
+      if (legacyReplacement) {
+        results.push({ tool: name, installed: false, action: legacyReplacement })
+        continue
+      }
       const spec = TOOL_INSTALL_MAP[name]
       if (!spec) {
         // Safe fallback: install a same-named package only from the configured OS
