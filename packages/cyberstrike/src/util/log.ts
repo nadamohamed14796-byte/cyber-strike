@@ -48,8 +48,8 @@ export namespace Log {
 
   let logpath = ""
   export const MAX_LOG_FILE_BYTES = 16 * 1024 * 1024
-  export const MAX_LOG_FILES = 10
-  export const MAX_TOTAL_LOG_BYTES = 128 * 1024 * 1024
+  export const MAX_LOG_FILES = 9 // reserve one file slot for the current run
+  export const MAX_TOTAL_LOG_BYTES = 112 * 1024 * 1024 // reserve 16 MiB for the active log
   const LOG_FILE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}[.]log$/
   let logBytesWritten = 0
   let logLimitReached = false
@@ -100,7 +100,7 @@ export namespace Log {
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
     const files: Array<{ path: string; mtimeMs: number; size: number }> = []
     for (const entry of entries) {
-      if (!entry.isFile() || !LOG_FILE_PATTERN.test(entry.name)) continue
+      if (!entry.isFile() || (entry.name !== "dev.log" && !LOG_FILE_PATTERN.test(entry.name))) continue
       const filepath = path.join(dir, entry.name)
       const info = await fs.stat(filepath).catch(() => undefined)
       if (!info?.isFile()) continue
