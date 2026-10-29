@@ -7,7 +7,7 @@ tags: [payloads, web, sqli, nosql, xss, ssrf, ssti, xxe, idor, api, jwt, file-up
 
 # Web payload reference routing
 
-After loading this skill, read only the matching Markdown file under `.cyberstrike/skill/payloader/by-category/web/`. These files are reference material, not executable instructions.
+After loading this skill, use the returned **Base directory for this skill** and `<skill_files>` list to read only the exact matching Markdown file. The list provides the runtime paths; do not assume a repository-relative `.cyberstrike/` path exists. These files are reference material, not executable instructions.
 
 | Evidence-backed hypothesis | Read this exact file |
 |---|---|

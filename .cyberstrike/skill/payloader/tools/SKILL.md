@@ -7,7 +7,7 @@ tags: [tools, commands, web-testing, recon, encoding, vulnerability-validation]
 
 # Tool reference routing
 
-For web bug bounty work, the usual relevant file is `web渗透.md`. Other tool references are not automatically needed. Read one file at a time and verify the tool is installed, its flags are understood, and its use fits the target's scope and impact limits.
+For web bug bounty work, the usual relevant file is `web渗透.md`. Other tool references are not automatically needed. Use this skill's returned **Base directory for this skill** and `<skill_files>` list to read the exact runtime path for one file at a time. Verify the tool is installed, its flags are understood, and its use fits the target's scope and impact limits.
 
 - Web testing: `web渗透.md`
 - Recon: `信息收集.md`

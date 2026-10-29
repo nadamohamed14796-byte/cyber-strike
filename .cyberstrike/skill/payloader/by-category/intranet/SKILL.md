@@ -7,7 +7,7 @@ tags: [intranet, internal-network, authorized-assessment, post-exploitation]
 
 # Internal-network reference routing
 
-Use this material only when internal-network assets and the relevant techniques are explicitly within the engagement scope. Do not infer permission from the presence of this library. Never use credential theft, persistence, EDR evasion, malware, lateral movement into unapproved hosts, or exfiltration. For a normal external web bug bounty, do not load these files.
+Use this material only when internal-network assets and the relevant techniques are explicitly within the engagement scope. Do not infer permission from the presence of this library. Never use credential theft, persistence, EDR evasion, malware, lateral movement into unapproved hosts, or exfiltration. For a normal external web bug bounty, do not load these files. When a file is justified, use this skill's returned **Base directory for this skill** and `<skill_files>` list to read the exact runtime path; do not guess a repo-relative path.
 
 - ADCS: `adcs攻击.md`
 - Exchange: `exchange攻击.md`

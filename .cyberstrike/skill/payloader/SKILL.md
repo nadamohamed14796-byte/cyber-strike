@@ -24,4 +24,4 @@ This is a routing skill, not a payload to execute. **Search/load this skill when
 - Read only the one or two files needed for the current evidence gap. Do not load the entire library into context.
 - If a reference cannot be opened, say so and do not claim it was consulted or silently substitute a remembered payload.
 
-Source: `nadamohamed14796-byte/src-hunter`, `references/payloader`. Raw JSON exports are omitted because the categorized Markdown files are the readable source of truth.
+Source: `nadamohamed14796-byte/src-hunter`, `references/payloader`. Raw JSON exports are omitted because the categorized Markdown files are the readable source of truth. After this skill is loaded, use the returned **Base directory for this skill** and `<skill_files>` list: read `index.md` and the exact relevant reference path shown there. Do not assume a repository-relative `.cyberstrike/` path exists in the installed runtime.
