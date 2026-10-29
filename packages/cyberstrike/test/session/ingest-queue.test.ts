@@ -620,7 +620,7 @@ describe("captured request payload preservation", () => {
           },
         )
 
-        expect(response.status).toBe(202)
+        expect(response.status, `ingest rejection response: ${await response.clone().text()}`).toBe(202)
         const stored = Request.get(session.id).find((item) => item.raw_request)
         expect(stored?.raw_request).toBe(rawRequest)
         expect(stored?.raw_request).toContain("X-Captured-Header-23: value-23")
