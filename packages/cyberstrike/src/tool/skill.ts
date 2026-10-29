@@ -17,24 +17,12 @@ const accessibleCache = new Map<string, { catalog: ReturnType<typeof Skill.state
 export const SkillTool = Tool.define("skill", async (ctx) => {
   // Lazy load skills only when tool is executed
   const description = [
-    "Manage and load specialized security skills with context-efficient lazy loading.",
+    "Find and load the right skill from the complete catalog when it helps the current task.",
     "",
-    "WHEN TO USE:",
-    "  - At phase entry, inspect the ranked phase candidates and load the relevant specialist before doing its detailed procedure.",
-    "  - When new technology/framework, endpoint type, CWE, vulnerability signal, or evidence gap appears, search by its exact name, tags, category, tech stack, or CWE and load the best matching skill.",
-    "  - After a material finding, use suggest/chain to discover conditional follow-up skills; load a chain partner only when its prerequisite/evidence branch is applicable.",
-    "  - A search result, outline, or chain suggestion is NOT loaded content. Only action=load loads the full skill. Confirm the returned <skill_content> before claiming it is loaded.",
+    "Simple workflow: search by evidence, technology, or skill name; load the exact returned name; read the returned content before applying it. All catalog skills are searchable and loadable, but load only relevant skills rather than the whole catalog.",
     "",
-    "Actions:",
-    "  load    - Load a skill into context (requires skill name)",
-    "  outline - Preview skill purpose, routing metadata and section headings without loading its full content",
-    "  unload  - Remove a skill from context to free tokens",
-    "  search  - Search normalized keywords, tags, categories, technologies, CWE IDs, prerequisites and chain partners",
-    "  chain   - Analyze current findings for kill-chain opportunities",
-    "  suggest - Get next-step skill suggestions from findings, including prerequisite ordering",
-    "  list    - Show a page of available skills or currently loaded skills",
-    "",
-    'Use "search" to narrow the skills available to this agent; list/search support limit and offset pagination. Never load every skill or treat chains_with as automatic testing authorization.'
+    "Actions: load full content; search metadata; outline a preview; list available/loaded skills; suggest or chain conditional next skills; unload a skill when no longer needed.",
+    "Search and list are paginated; continue with the returned next offset when needed. A search hit or outline is not loaded content. A skill never grants scope or testing permission."
   ].join("\n")
 
   const parameters = z.object({
@@ -42,8 +30,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       .enum(["load", "outline", "unload", "search", "chain", "suggest", "list"])
       .default("load")
       .describe("Action to perform"),
-    name: z.string().optional().describe("Skill name (for load/unload)"),
-    query: z.string().optional().describe("Search query (for search action)"),
+    name: z.string().optional().describe("Exact skill name from search/list (preferred for load/outline/unload)"),
+    query: z.string().optional().describe("Search by observed technology, behavior, skill name, or evidence gap"),
     tech: z.array(z.string()).optional().describe("Tech stack filter (for search action)"),
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
@@ -151,7 +139,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "unload") {
         if (!params.name) throw new Error("Skill name required for unload action")
-        const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+        const canonicalName = accessibleSkills.find((entry) => entry.name.trim().toLocaleLowerCase("en-US") === params.name!.trim().toLocaleLowerCase("en-US"))?.name ?? SkillIndex.resolveReference(params.name) ?? params.name
         const removed = SkillContext.unload(canonicalName)
         return {
           title: removed ? `Unloaded: ${canonicalName}` : `Not loaded: ${canonicalName}`,
@@ -267,7 +255,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "outline") {
         if (!params.name) throw new Error("Skill name required for outline action")
-        const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+        const canonicalName = accessibleSkills.find((entry) => entry.name.trim().toLocaleLowerCase("en-US") === params.name!.trim().toLocaleLowerCase("en-US"))?.name ?? SkillIndex.resolveReference(params.name) ?? params.name
         const skill = await Skill.get(canonicalName)
         if (!skill) {
           throw new Error(`Skill "${params.name}" was not found or has an ambiguous metadata reference. Use skill(action="search", query="...") to find an exact name.`)
@@ -329,7 +317,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       // Allow exact technique IDs from skill metadata to resolve to the one
       // canonical catalog entry; ambiguous aliases deliberately do not resolve.
-      const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+      const canonicalName = accessibleSkills.find((entry) => entry.name.trim().toLocaleLowerCase("en-US") === params.name!.trim().toLocaleLowerCase("en-US"))?.name ?? SkillIndex.resolveReference(params.name) ?? params.name
       const skill = await Skill.get(canonicalName)
       if (!skill) {
         const sample = accessibleSkills.slice(0, 5).map((entry) => entry.name)
