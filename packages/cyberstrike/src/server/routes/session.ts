@@ -1668,18 +1668,62 @@ export const SessionRoutes = lazy(() =>
             sessionID = undefined
           }
         }
+
+        const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
+        const isHTTPRequest = looksLikeHTTPRequest(body.text, Boolean(body.scheme || body.response))
+
+        // Scope-check captured HTTP traffic BEFORE normalization: Normalize.run may
+        // update endpoint templates and invoke the Tier-3 model. Out-of-scope input
+        // must not cause those side effects, create credentials/requests, or spawn
+        // the proxy analyzer. A missing session is created only after this gate.
+        if (isHTTPRequest) {
+          const scopeDecision = await checkCapturedRequestScope({
+            rawRequest: body.text,
+            scheme: body.scheme ?? inferScheme(body.text),
+          })
+          if (!scopeDecision.allowed) {
+            const firstLine = body.text.split(/\\r?\\n/, 1)[0]?.trim() ?? ""
+            const methodLabel = firstLine.match(/^([A-Z]+)\\s+/i)?.[1]?.toUpperCase() ?? "HTTP"
+            const pathLabel = scopeDecision.url
+              ? (() => {
+                  try { return new URL(scopeDecision.url).pathname || "/" } catch { return "(unresolved URL)" }
+                })()
+              : "(unresolved URL)"
+            const malformed = scopeDecision.reason === "captured request could not be parsed into a concrete URL" ||
+              scopeDecision.reason === "captured request URL is invalid"
+            if (sessionID) {
+              await IngestSummary.notice(
+                sessionID,
+                `Captured request rejected before analysis: ${methodLabel} ${pathLabel} — it was not stored or analyzed. Reason: ${scopeDecision.reason}.`,
+              ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID, error: String(error) }))
+            }
+            log.info("captured HTTP request rejected before normalization", {
+              sessionID,
+              method: methodLabel,
+              path: pathLabel,
+              status: malformed ? 400 : 403,
+              reason: scopeDecision.reason,
+            })
+            c.status(malformed ? 400 : 403)
+            return c.json({
+              error: malformed
+                ? "Captured HTTP request could not be parsed; it was not stored or analyzed."
+                : "Captured HTTP request was not stored or analyzed because it is not authorized by persisted target scope.",
+              reason: scopeDecision.reason,
+            })
+          }
+        }
+
         if (!sessionID) {
           const session = await Session.create({})
           sessionID = session.id
         }
-
-        const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         const normalized = await runNormalize(body, sessionID, ingestDryRun)
 
         // Never route a malformed extension capture into the ordinary parent-chat
         // branch. That fallback writes into the active text window and can hijack
         // the user's conversation when request normalization fails.
-        if (!normalized && looksLikeHTTPRequest(body.text, Boolean(body.scheme || body.response))) {
+        if (!normalized && isHTTPRequest) {
           await IngestSummary.notice(
             sessionID,
             "Extension request rejected before analysis: CyberStrike could not parse the captured HTTP request. The raw request was not sent to the parent agent; check the extension's request-line/headers format and server logs.",
@@ -1694,34 +1738,6 @@ export const SessionRoutes = lazy(() =>
           return c.json({
             error: "Captured HTTP request could not be parsed; it was not sent to the parent chat session.",
           })
-        }
-
-        // Captured HTTP traffic is untrusted input. Enforce the canonical persisted
-        // scope before storing raw headers/body, registering credentials, or dispatching
-        // the proxy analyzer. A browser/extension client is not an authorization boundary.
-        if (normalized) {
-          const scopeDecision = await checkCapturedRequestScope({
-            rawRequest: body.text,
-            scheme: normalized.scheme,
-          })
-          if (!scopeDecision.allowed) {
-            const pathLabel = normalized.normalizedPath.split("?")[0] || "/"
-            await IngestSummary.notice(
-              sessionID,
-              `Captured request rejected by persisted scope: ${normalized.method} ${pathLabel} — it was not stored or analyzed. Reason: ${scopeDecision.reason}.`,
-            ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID, error: String(error) }))
-            log.info("captured HTTP request rejected by persisted scope", {
-              sessionID,
-              method: normalized.method,
-              path: pathLabel,
-              reason: scopeDecision.reason,
-            })
-            c.status(403)
-            return c.json({
-              error: "Captured HTTP request was not stored or analyzed because it is not authorized by persisted target scope.",
-              reason: scopeDecision.reason,
-            })
-          }
         }
 
         // Handle credential registration
