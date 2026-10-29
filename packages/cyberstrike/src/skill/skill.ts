@@ -42,6 +42,8 @@ export namespace Skill {
     severity_boost: z.record(z.string(), z.string()).optional(),
   })
   export type Info = z.infer<typeof Info>
+  /** Lightweight catalog entry. Full Markdown bodies are read only by Skill.get(). */
+  export type Metadata = Omit<Info, "content">
 
   export const InvalidError = NamedError.create(
     "SkillInvalidError",
@@ -90,7 +92,7 @@ export namespace Skill {
   }
 
   export const state = Instance.state(async () => {
-    const skills: Record<string, Info> = {}
+    const skills: Record<string, Metadata> = {}
     const skillPriorities = new Map<string, number>()
     const dirs = new Set<string>()
 
@@ -108,7 +110,8 @@ export namespace Skill {
     }
 
     const loadSkill = async (match: string, sourcePriority: number) => {
-      const md = await ConfigMarkdown.parse(match).catch((err) => {
+      const fileContent = await Bun.file(match).text()
+      const md = await ConfigMarkdown.parseContent(fileContent, match).catch((err) => {
         const message = ConfigMarkdown.FrontmatterError.isInstance(err)
           ? err.data.message
           : `Failed to parse skill ${match}`
@@ -147,7 +150,6 @@ export namespace Skill {
       }
 
       const raw = md.data as Record<string, unknown>
-      const fileContent = await Bun.file(match).text()
       const verified = await SkillSigning.verify({
         content: fileContent,
         sha256: typeof raw.sha256 === "string" ? raw.sha256 : undefined,
@@ -172,7 +174,6 @@ export namespace Skill {
         name: parsed.data.name,
         description: parsed.data.description,
         location: match,
-        content: md.content,
         verified,
         version: typeof raw.version === "string" ? raw.version : undefined,
         author: typeof raw.author === "string" ? raw.author : undefined,
@@ -355,23 +356,51 @@ export namespace Skill {
     }
   })
 
-  export async function get(name: string) {
-    return state().then((x) => {
-      // Exact names are canonical. A case-insensitive exact-name fallback makes
-      // skill invocation resilient to model casing mistakes without fuzzy matches.
-      const exact = x.skills[name]
-      if (exact) return exact
-      const normalized = name.trim().toLocaleLowerCase("en-US")
-      if (!normalized) return undefined
-      const matches = Object.values(x.skills).filter(
-        (skill) => skill.name.trim().toLocaleLowerCase("en-US") === normalized,
-      )
-      return matches.length === 1 ? matches[0] : undefined
-    })
+  export async function get(name: string): Promise<Info | undefined> {
+    const catalog = await state()
+
+    // Resolve only a canonical exact name (case-insensitive fallback is also exact).
+    const exact = catalog.skills[name]
+    const normalized = name.trim().toLocaleLowerCase("en-US")
+    const matches = normalized
+      ? Object.values(catalog.skills).filter((item) => item.name.trim().toLocaleLowerCase("en-US") === normalized)
+      : []
+    const metadata = exact ?? (matches.length === 1 ? matches[0] : undefined)
+    if (!metadata) return undefined
+
+    // Hydrate the full body only for the selected skill. Re-check identity and
+    // integrity because the source may have changed since catalog discovery.
+    try {
+      const fileContent = await Bun.file(metadata.location).text()
+      const md = await ConfigMarkdown.parseContent(fileContent, metadata.location)
+      const parsed = Info.pick({ name: true, description: true }).safeParse(md.data)
+      if (!parsed.success || parsed.data.name !== metadata.name || parsed.data.description !== metadata.description) {
+        log.warn("skill metadata changed since catalog discovery; refresh the catalog", {
+          name: metadata.name,
+          path: metadata.location,
+        })
+        return undefined
+      }
+
+      const verified = await SkillSigning.verify({
+        content: fileContent,
+        sha256: metadata.sha256,
+        signature: metadata.signature,
+        signed_by: metadata.signed_by,
+      })
+      if (verified === "tampered") {
+        log.warn("skill integrity check failed during on-demand load", { name: metadata.name, path: metadata.location })
+        return undefined
+      }
+      return { ...metadata, content: md.content, verified }
+    } catch (error) {
+      log.error("failed to load skill content on demand", { name: metadata.name, path: metadata.location, error })
+      return undefined
+    }
   }
 
-  export async function all() {
-    return state().then((x) => Object.values(x.skills))
+  export async function all(): Promise<Metadata[]> {
+    return state().then((snapshot) => Object.values(snapshot.skills))
   }
 
   export async function dirs() {
