@@ -17,7 +17,7 @@ import { Observation } from "../session/observation"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
-import { assertTaskResumeScope } from "./task-resume"
+import { assertTaskResumeScope, isInternalImpactHandoff } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
 // Raised 16KB→48KB: validation showed weak models (o4-mini) do NOT follow the
@@ -31,21 +31,6 @@ const MAX_PREPEND_BYTES = 48 * 1024
 
 // Only real subagents may use the internal, background-only escalation path.
 // A primary/user-facing agent must still honor the normal task permission policy.
-export function isInternalImpactHandoff(input: {
-  subagentType: string
-  background?: boolean
-  caller?: string
-  callerMode?: "subagent" | "primary" | "all"
-}) {
-  return (
-    input.subagentType === "impact-hunter" &&
-    input.background === true &&
-    input.caller !== undefined &&
-    input.caller !== "impact-hunter" &&
-    input.callerMode === "subagent"
-  )
-}
-
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
   prompt: z.string().describe("The task for the agent to perform"),
