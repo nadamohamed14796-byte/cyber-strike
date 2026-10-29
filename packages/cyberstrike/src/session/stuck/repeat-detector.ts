@@ -60,9 +60,9 @@ export class RepeatDetector {
 
   /**
    * Feed the signatures of one completed step's tool calls. Returns the strongest
-   * verdict triggered this step: "nudge" the first time any signature reaches the
-   * limit (caller forces a tool-free wrap-up next turn), then "abort" if a signature
-   * reaches the limit again after a nudge (backstop). "ok" otherwise.
+   * verdict triggered this step: "nudge" once a signature reaches the limit so the
+   * caller can run a recovery turn with tools available; "abort" if it repeats after
+   * that recovery, so the caller can schedule a terminal wrap-up. "ok" otherwise.
    */
   observe(signatures: string[]): RepeatVerdict {
     // A nudge triggered by this step must not turn another signature in the same
