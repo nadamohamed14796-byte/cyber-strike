@@ -1,4 +1,4 @@
-// Cross-turn "agent monologue" / no-progress detector (loop-termination Layer 2).
+// Cross-turn "agent monologue" / no-progress detector (loop-recovery Layer 2).
 // Pure state machine — no framework/DB/IO — so it is deterministic and unit-testable
 // with no mocks. It complements, and does NOT duplicate, two existing mechanisms:
 //   - the WITHIN-turn identical-call repeat is handled by the doom_loop check
@@ -15,8 +15,8 @@ export type StuckReason = "monologue"
 
 export type Verdict =
   | { kind: "ok" }
-  | { kind: "nudge"; reason: StuckReason; detail: string } // 1st strike — force wrap-up next turn
-  | { kind: "abort"; reason: StuckReason; detail: string } // 2nd strike — terminate the run
+  | { kind: "nudge"; reason: StuckReason; detail: string } // first strike — try recovery with tools available
+  | { kind: "abort"; reason: StuckReason; detail: string } // repeated stall — request terminal wrap-up
 
 export interface StepObservation {
   /** The tool calls the model made in this step (empty = a text-only step). */
@@ -47,9 +47,9 @@ export class StuckDetector {
   constructor(private readonly cfg: StuckConfig) {}
 
   /**
-   * Feed one completed step. A step is "progress" iff it made at least one non-read-only
-   * tool call (see signals.isProgressTool). No-progress steps accumulate a streak; once
-   * it reaches `maxMonologue` the detector nudges once, then aborts if it stays stuck.
+   * Feed one completed step. A step counts as progress when at least one non-read-only
+   * tool call succeeds (see signals.isProgressTool). No-progress steps accumulate a streak;
+   * the first threshold triggers a recovery turn, and a repeated stall requests wrap-up.
    */
   observe(step: StepObservation): Verdict {
     if (!this.cfg.enabled) return { kind: "ok" }
