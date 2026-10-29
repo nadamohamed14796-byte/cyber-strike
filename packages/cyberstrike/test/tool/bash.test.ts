@@ -160,6 +160,14 @@ describe("Scope-aware URL source input extraction", () => {
       "findomain -t example.com -r",
     )).toContain("https://example.com")
     expect(scannerTargets(
+      ["findomain", "-t", "example.com", "-r", "-u", "subdomains.txt"],
+      "findomain -t example.com -r -u subdomains.txt",
+    )).toEqual(["https://example.com"])
+    expect(scannerTargets(
+      ["findomain", "-t", "example.com", "-u=results.txt"],
+      "findomain -t example.com -u=results.txt",
+    )).toEqual(["https://example.com"])
+    expect(scannerTargets(
       ["waymore", "-i", "example.com", "-mode", "U"],
       "waymore -i example.com -mode U",
     )).toContain("https://example.com")
