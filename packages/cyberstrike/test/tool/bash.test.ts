@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, parseScopedPortSpec } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, parseScopedPortSpec, readTargetListInputs } from "../../src/tool/bash"
 import { TargetMemory, type TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -154,6 +154,28 @@ describe("Scope-aware URL source input extraction", () => {
     )).toEqual(["https://example.com"])
   })
 
+  test("extracts tool-specific target flags without treating credentials as targets", () => {
+    expect(scannerTargets(
+      ["findomain", "-t", "example.com", "-r"],
+      "findomain -t example.com -r",
+    )).toContain("https://example.com")
+    expect(scannerTargets(
+      ["waymore", "-i", "example.com", "-mode", "U"],
+      "waymore -i example.com -mode U",
+    )).toContain("https://example.com")
+    expect(scannerTargets(
+      ["github-subdomains", "-t", "example.com"],
+      "github-subdomains -t example.com",
+    )).toEqual([])
+  })
+
+  test("extracts gau positional domains without confusing the output path for a target", () => {
+    expect(scannerTargets(
+      ["gau", "--o", "domains.txt", "example.com"],
+      "gau --o domains.txt example.com",
+    )).toEqual(["https://example.com"])
+  })
+
   test("extracts domain flags from credential-backed passive enumerators", () => {
     expect(scannerTargets(
       ["shosubgo", "-d", "example.com", "-s", "TEST_TOKEN"],
@@ -178,6 +200,38 @@ describe("Scope-aware URL source input extraction", () => {
 
   test("does not infer a target from a file name when a source reads a list from disk", () => {
     expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
+  })
+})
+
+describe("Tool-specific target-list input parsing", () => {
+  test("reads findomain -f lists and validates each listed host's syntax", async () => {
+    await using tmp = await tmpdir()
+    await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\napi.example.com\n")
+    await expect(readTargetListInputs(["-f", "domains.txt"], tmp.path, "findomain")).resolves.toEqual({
+      present: true,
+      targets: ["https://example.com", "https://api.example.com"],
+    })
+  })
+
+  test("reads waymore -i lists but does not mistake a single domain for a filename", async () => {
+    await using tmp = await tmpdir()
+    await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\napi.example.com\n")
+    await expect(readTargetListInputs(["-i", "domains.txt"], tmp.path, "waymore")).resolves.toEqual({
+      present: true,
+      targets: ["https://example.com", "https://api.example.com"],
+    })
+    await expect(readTargetListInputs(["-i", "example.com"], tmp.path, "waymore")).resolves.toEqual({
+      present: false,
+      targets: [],
+    })
+  })
+
+  test("does not reinterpret github-subdomains -t credential values as target files", async () => {
+    await using tmp = await tmpdir()
+    await expect(readTargetListInputs(["-t", "TEST_TOKEN"], tmp.path, "github-subdomains")).resolves.toEqual({
+      present: false,
+      targets: [],
+    })
   })
 })
 
