@@ -36,13 +36,20 @@ test("program-root scope can authorize a separate domain without requiring the r
         tool.execute({ action, target_url: root.workspace.targetURL, phase, summary, scope_validation_target: scopeValidationTarget }, ctx)
 
       expect((await execute("begin", "scope_validation")).metadata.saved).toBe(true)
+      const discoveryBeforeScope = await execute("begin", "asset_discovery")
+      expect(discoveryBeforeScope.metadata.saved).toBe(false)
+      expect(discoveryBeforeScope.metadata.reason).toBe("foundation_prerequisites_unresolved")
+
       const rejected = await execute("complete", "scope_validation", "Reviewed and persisted the program policy scope.", "https://not-authorized.example.net/")
       expect(rejected.metadata.saved).toBe(false)
       expect(rejected.metadata.reason).toBe("scope_validation_target_out_of_scope")
       expect((await execute("complete", "scope_validation", "Reviewed and persisted the program policy scope.", "https://fullbarhomologa.modoblackfullbar.com.br/")).metadata.saved).toBe(true)
       expect((await execute("begin", "workspace_setup")).metadata.saved).toBe(true)
-      expect((await execute("complete", "workspace_setup", "Canonical workspace files and directories verified.")).metadata.saved).toBe(true)
+      const discoveryBeforeWorkspace = await execute("begin", "asset_discovery")
+      expect(discoveryBeforeWorkspace.metadata.saved).toBe(false)
+      expect(discoveryBeforeWorkspace.metadata.reason).toBe("foundation_prerequisites_unresolved")
 
+      expect((await execute("complete", "workspace_setup", "Canonical workspace files and directories verified.")).metadata.saved).toBe(true)
       const discovery = await execute("begin", "asset_discovery")
       expect(discovery.metadata.saved).toBe(true)
       expect(discovery.title).not.toContain("blocked by persisted scope")
