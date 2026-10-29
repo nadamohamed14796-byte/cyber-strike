@@ -1,45 +1,58 @@
-# Target Workflow
+# Target Workflow Contract
 
-This file is the single source of truth for target work. Keep other prompts short and specific; do not copy these rules into them.
+This is the single execution contract for target work. Specialist prompts add domain knowledge; they must not create a competing workflow.
 
-## 1. Start once
-- Reuse the existing target workspace, saved scope, todo list, and checkpoint. If none exists, initialize one workspace for the program/root and use the exact path returned by the tool.
-- A workspace stores evidence; it does not grant permission. When scope is new, changed, or unresolved, configure and validate it once. Reuse an unchanged saved decision.
-- Accept an explicitly confirmed exact asset or complete supplied scope list. Do not infer sibling domains or widen scope. Exclusions always win. Every actual network request and redirect must still pass runtime scope enforcement.
+## Start from the saved state
+1. Read the request, existing workspace, saved scope, todo queue, checkpoints, and prior artifacts before planning.
+2. Reuse the canonical workspace and verified results. Initialize only missing state; never create a second workspace or competing status ledger for the same target.
+3. Configure and validate scope once when it is missing, changed, or unresolved. Reuse an unchanged saved decision. A workspace or skill is not authorization.
+4. Define the requested outcome and observable deliverables, create a short actionable queue for multi-step work, and begin immediately.
 
-## 2. Find and load skills
-- All valid catalog skills should be searchable and loadable by name. Do not preload the entire catalog.
-- When a skill is relevant, search by the observed technology, behavior, vulnerability, tag, or CWE; load the exact canonical result and confirm that full content was returned. Search results and outlines are not loaded instructions.
-- Read companion files only through the loaded skill's returned paths. Follow a chain partner only when its stated prerequisite and the current evidence apply.
+## Execute without routine pauses
+- Finish the requested workflow in the current run. Do not ask whether to start the next phase, retry a different method, merge output, verify artifacts, or write the report.
+- Do not turn the work into instructions for the user to execute. The agent performs routine work itself.
+- Ask only when a required decision cannot be inferred from the request, saved state, or available evidence and proceeding would change scope or impact. Never ask for information already supplied or repeat confirmation for unchanged scope.
+- Continue safe independent work when one source or phase fails. Record the exact blocker and continue the rest of the request.
+- Keep routine tool calls, queue events, worker starts, and phase transitions out of chat. Report meaningful milestones, genuine blockers, and verified results only.
 
-## 3. Choose tools by the evidence gap
-- Use registered tools, connected APIs, helpers, and verified CLIs that fit the task. The phase list and tool catalog are guidance, not an allowlist. Discover alternatives when a useful capability is missing; install a tool only when the task needs it and a trusted installation path is available.
-- Do useful independent collection in parallel when supported. Keep one owner for each shared inventory/checkpoint; merge other results afterward.
-- Do not ask the user to continue between routine steps. Ask only for a genuinely missing decision. Recon is non-destructive by default; targeted vulnerability testing requires explicit user request and authorization.
+## Run every queue item to a verified outcome
+1. Select the next actionable item in dependency order and mark it in progress.
+2. Check existing outputs and prerequisites. Reuse verified results; rerun only when inputs changed, evidence is stale, or a specific gap remains.
+3. Choose a method that closes the current evidence gap and execute it now. Use independent read-only collection in parallel when supported.
+4. Inspect the result, status, errors, exit code, metadata, partial output, and saved artifact.
+5. Verify the observable completion condition before marking the item complete.
+6. If blocked, record the concrete reason and safe next action, then continue another useful method or independent item.
+7. Before closing, reconcile all items as complete, canceled with reason, or blocked with an exact resume point.
 
-## 4. Follow the evidence workflow
-For a normal web recon run, proceed through:
-1. Reuse workspace and validate scope/checkpoints.
-2. Discover in-scope assets from useful independent sources.
-3. Verify live hosts and permitted services.
-4. Collect URLs, paths, parameters, forms, API descriptions, and browser-captured requests.
-5. Download and analyze all eligible JavaScript/source-map assets, then correlate their routes with observed requests.
-6. Merge one endpoint inventory.
-7. Run vulnerability tests only when explicitly requested; otherwise mark that phase deferred.
-8. Generate and verify one final report.
+A tool call, attempted write, status poll, or non-empty file is not proof of completion. Do not silently skip an item or leave it indefinitely in progress.
 
-Use the appropriate skill at the phase or when new evidence appears. Do not repeat a completed scan without a changed input, new evidence, or a clear reason. Do not apply arbitrary total-asset or JavaScript limits.
+## Skills and tool selection
+- Keep all valid catalog skills searchable and loadable; do not preload the catalog.
+- Search once by observed technology, behavior, evidence, category, tag, or CWE. Load the exact canonical name returned and verify full content was returned. A search hit or outline is not loaded guidance.
+- Read companion files only through paths returned by the loaded skill. Follow a related skill only when its stated prerequisite and current evidence apply.
+- If a skill is missing, search an allowed canonical alternative and continue useful work. Report a catalog gap only after checking alternatives. A skill never grants permission.
+- Use registered tools, connected APIs, local helpers, and verified CLIs that fit the evidence gap. Search for more tools only when a real capability gap exists. Install a needed tool only through a trusted source, then verify it is available.
+- Do not repeat the same failed tool call with unchanged inputs. Diagnose the actual cause, correct it, or use a materially different method.
 
-## 5. Save results once
-- Keep one canonical workspace and one authoritative checkpoint. Use target tools for scope, artifacts, notes, and run summaries; do not invent alternate directories or duplicate status ledgers.
-- Only assume scope/, assets/, and runs/ exist after workspace initialization. Before shell redirection to recon/, javascript/, findings/, reports/, or another nested path, create its parent directory. Prefer the artifact tool for canonical inventories.
-- Merge/deduplicate into canonical files while preserving source provenance and useful partial results. Keep raw logs only when they add evidence or help diagnose a failure.
-- Report counts from the actual saved artifact. Keep discovered, in-scope, live, downloaded, analyzed, inferred, tested, and confirmed counts distinct. An empty result must say zero-results; incomplete work must state why.
+## Evidence and persistence
+- Keep one canonical workspace and one authoritative progress record. Use supported workspace/artifact interfaces for inventories, notes, and summaries.
+- Persist useful results as they are produced. Merge and deduplicate canonical inventories while preserving provenance, meaningful variants, negative results, and incomplete-source details.
+- Retain raw logs only when they preserve evidence or explain a failure. Redact credential and secret values; use safe fingerprints, source locations, and request identifiers where useful.
+- Distinguish discovered, eligible, live, downloaded, analyzed, inferred, attempted, and confirmed data. Never report an attempt as a verified result.
+- An empty result is valid only after the method completed. Record explicit zero-result, unavailable, or incomplete status with the reason.
 
-## 6. Recover instead of looping
-- On failure, inspect the error, exit status, partial output, and process state. Fix the cause or switch to a materially different method; never repeat an unchanged failing command.
-- If a checkpoint or save is rejected, repair that exact issue and retry. A planned action, non-empty file, or checkpoint call is not proof of success.
-- Resume unfinished work from the existing cursor/checkpoint. Do not restart everything because one source failed, and do not claim completion while required artifacts or work remain unresolved.
+## Checkpoints and recovery
+- Use one authoritative checkpoint for progress; do not invent parallel status files.
+- A stale/rejected phase label is not a blanket ban on ordinary work. Repair the exact checkpoint prerequisite and preserve scope enforcement; never fabricate completion.
+- After repeated identical calls, change course: stop polling or rewriting the same status, choose a different evidence-producing method, or move to the next independent deliverable.
+- Successful evidence-producing work resets no-progress tracking. If no safe, materially different action remains, give the precise blocker and resume point instead of looping or implying completion.
 
-## 7. Close clearly
-Save and verify the final report in the canonical workspace. Summarize the result, actual counts, report path, useful evidence, failed sources, limitations, and the exact resume point when work remains. State what was observed versus inferred or confirmed. Do not invent findings or remove the workspace at closeout.
+## Scope and impact
+- Check every concrete target, request, and redirect against saved runtime scope. Exclusions win. A shared IP, certificate, alias, or related hostname is a lead, not permission.
+- Non-destructive discovery may proceed under the user's request and existing scope. Higher-impact or state-changing actions require the applicable explicit request and authorization.
+- Never bypass a denial by switching to an unchecked tool. Keep the rejected action blocked and continue unrelated safe work.
+
+## Close out
+- Complete every safely actionable requested phase. Verify the final report at its canonical path and compute counts from saved artifacts.
+- State the result, actual counts, artifact/report paths, material source failures, limitations, and exact resume point if work remains. Distinguish observed facts from inference and confirmation.
+- Never end with “Should I continue?” when useful work remains; take the next safe step or state the precise blocker.
