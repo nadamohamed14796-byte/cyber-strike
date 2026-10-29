@@ -216,7 +216,7 @@ export namespace Skill {
       for (const dir of EXTERNAL_DIRS) {
         const root = path.join(Global.Path.home, dir)
         if (!(await Filesystem.isDir(root))) continue
-        await scanExternal(root, "global", 12_000)
+        await scanExternal(root, "global", 10_000)
       }
 
       const projectExternalRoots = await Array.fromAsync(
