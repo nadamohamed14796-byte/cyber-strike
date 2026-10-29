@@ -201,8 +201,9 @@ assetfinder target.com
 # DNSRecon
 dnsrecon -d target.com -t std
 
-# Sublist3r
-sublist3r -d target.com
+# Use maintained collectors; verify current flags with the installed version's --help.
+subfinder -d target.com -silent -o subdomains.txt
+amass enum -passive -d target.com -o amass-subdomains.txt
 ```
 
 #### Certificate Transparency
@@ -322,17 +323,16 @@ eyewitness --web -f urls.txt -d output/
 | **Amass**       | Subdomain enumeration | `amass enum -d target.com` |
 | **Subfinder**   | Subdomain discovery   | `subfinder -d target.com`  |
 | **DNSRecon**    | DNS enumeration       | `dnsrecon -d target.com`   |
-| **Sublist3r**   | Subdomain enumeration | `sublist3r -d target.com`  |
 | **Assetfinder** | Find domains          | `assetfinder target.com`   |
 
 ### Verification/Analysis
 
 | Tool           | Description     | Usage                       |
 | -------------- | --------------- | --------------------------- |
-| **httpx**      | HTTP toolkit    | `cat hosts.txt \| httpx`    |
-| **EyeWitness** | Screenshot tool | `eyewitness -f urls.txt`    |
-| **Aquatone**   | Screenshot tool | `cat hosts.txt \| aquatone` |
+| **httpx**      | HTTP toolkit    | `httpx -l verified-hosts.txt -json -o httpx.jsonl` |
 | **WhatWeb**    | Tech identifier | `whatweb target.com`        |
+
+For screenshots, use a currently maintained browser-based workflow only when visual evidence is needed. Do not treat older screenshot utilities as a required dependency.
 
 ### Online Services
 
@@ -362,11 +362,13 @@ echo ""
 echo "[+] Port Scanning..."
 nmap -sV -p 80,443,8080,8443,8000,3000,4443,5000,9000 $TARGET -oN nmap_web.txt
 
-# 2. Subdomain Enumeration
-echo "[+] Subdomain Enumeration..."
-subfinder -d $TARGET -o subdomains.txt
-amass enum -passive -d $TARGET >> subdomains.txt
-sort -u subdomains.txt -o subdomains.txt
+# 2. Passive subdomain enumeration
+echo "[+] Passive Subdomain Enumeration..."
+subfinder -d "$TARGET" -silent -o subfinder.txt
+amass enum -passive -d "$TARGET" -o amass.txt
+cat subfinder.txt amass.txt 2>/dev/null | sort -u > subdomain-candidates.txt
+# Before any active probe, normalize each candidate and pass it through the
+# persisted target-scope resolver. Save only approved hosts to verified-hosts.txt.
 
 # 3. Certificate Analysis
 echo "[+] Certificate Analysis..."
@@ -426,8 +428,11 @@ done < $WORDLIST
 ### Aquatone Pipeline
 
 ```bash
-# Full discovery pipeline
-cat domains.txt | amass enum -passive -df - | httpx -silent | aquatone -out screenshots/
+# Stage results locally, then validate candidates against persisted target scope.
+# Never pipe freshly discovered hostnames straight into a network scanner.
+amass enum -passive -d "$TARGET" -o amass-candidates.txt
+# After scope validation writes verified-hosts.txt:
+httpx -l verified-hosts.txt -json -o httpx.jsonl
 ```
 
 ---
