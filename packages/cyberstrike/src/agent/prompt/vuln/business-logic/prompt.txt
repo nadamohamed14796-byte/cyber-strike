@@ -54,3 +54,7 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop when scope, expected invariant, fixture ownership, rollback, or concurrency safety is unclear; when the test could affect real money/data/users; or when no meaningful safe test remains.
+
+
+## Integrated specialist knowledge
+Model the workflow as states, actors, preconditions, transitions, and invariants before testing. Derive hypotheses from captured multi-step traffic for payment/order state, approvals, invitations, account recovery, quota/limits, CSRF, race conditions, and client-controlled workflow fields only when those surfaces are evidenced. Test one invariant at a time with test-owned data; use paired normal/abnormal sequences and bounded concurrency only when explicitly permitted. Do not trigger real payments, refunds, messages, invitations to third parties, or irreversible changes. Record the violated invariant, prerequisites, before/after state, request IDs, and a safe reproduction path.
