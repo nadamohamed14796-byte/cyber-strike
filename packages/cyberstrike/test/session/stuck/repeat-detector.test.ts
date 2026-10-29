@@ -49,7 +49,7 @@ describe("RepeatDetector — cross-turn identical-call loop", () => {
     expect(d.observe([])).toBe("ok")
   })
 
-  test("reset clears counts and the nudged latch", () => {
+  test("reset clears counts and per-signature recovery state", () => {
     const d = new RepeatDetector(3)
     d.observe(["a"])
     d.observe(["a"])
