@@ -37,20 +37,10 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/tomnomnom/assetfinder@latest",
     description: "Passive subdomain discovery",
   },
-  sublist3r: {
-    check: "sublist3r",
-    install: "apt-get update && apt-get install -y sublist3r || (command -v pipx >/dev/null 2>&1 && pipx install Sublist3r)",
-    description: "Subdomain discovery using search engines",
-  },
   findomain: {
     check: "findomain",
     install: "apt-get update && apt-get install -y findomain || cargo install findomain",
     description: "Subdomain discovery",
-  },
-  waybackurls: {
-    check: "waybackurls",
-    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/tomnomnom/waybackurls@latest",
-    description: "Wayback Machine URL fetcher",
   },
   gau: { check: "gau", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/lc/gau/v2/cmd/gau@latest", description: "URL aggregator" },
   waymore: {
@@ -76,11 +66,6 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     description: "Web server scanner",
   },
   wpscan: { check: "wpscan", install: "gem install wpscan || brew install wpscan", description: "WordPress scanner" },
-  gospider: {
-    check: "gospider",
-    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/jaeles-project/gospider@latest",
-    description: "Web spidering",
-  },
   arjun: { check: "arjun", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install arjun", description: "Parameter discovery" },
   paramspider: { check: "paramspider", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install paramspider", description: "Parameter mining" },
   commix: { check: "commix", install: "apt-get update && apt-get install -y commix || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install commix)", description: "Command injection" },
