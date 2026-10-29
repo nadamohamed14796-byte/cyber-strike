@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test"
-import { assertTaskResumeScope } from "../../src/tool/task-resume"
-import { isInternalImpactHandoff } from "../../src/tool/task"
+import { assertTaskResumeScope, isInternalImpactHandoff } from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
   expect(() => assertTaskResumeScope({ id: "child-1", parentID: "parent-1" }, "parent-1")).not.toThrow()
