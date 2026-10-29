@@ -305,7 +305,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
         },
         parts: promptParts,
-      } as const
+      }
 
       if (params.background) {
         // Persist the child prompt first, then run its normal session loop without
