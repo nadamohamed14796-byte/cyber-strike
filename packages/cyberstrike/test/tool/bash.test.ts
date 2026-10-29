@@ -185,7 +185,7 @@ describe("Generic scope-aware CLI target discovery", () => {
 
   test("validates target-list file inputs generically without needing a tool name", async () => {
     await using tmp = await tmpdir()
-    await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\\napi.example.com\\n")
+    await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\napi.example.com\n")
     await expect(readTargetListInputs(["--target-list", "domains.txt"], tmp.path)).resolves.toEqual({
       present: true,
       targets: ["https://example.com", "https://api.example.com"],
