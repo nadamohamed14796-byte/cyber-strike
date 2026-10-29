@@ -82,7 +82,7 @@ export class RepeatDetector {
           repeatedAfterRecovery = true
         } else {
           this.nudgedSignatures.add(sig)
-          if (verdict !== "abort") verdict = "nudge"
+          verdict = "nudge"
         }
       }
     }
