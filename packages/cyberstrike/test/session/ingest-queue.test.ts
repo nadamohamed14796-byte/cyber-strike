@@ -6,6 +6,7 @@ import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
+import { Server } from "../../src/server/server"
 import { Database, eq } from "../../src/storage/db"
 import { RequestJavaScriptCaptureTable, RequestTable } from "../../src/session/session.sql"
 
@@ -577,5 +578,53 @@ test("retains changed JavaScript response versions when request analysis is dedu
     )
     expect(afterRepeat).toHaveLength(2)
     await Session.remove(session.id)
+  })
+})
+
+describe("captured request payload preservation", () => {
+  test("stores every captured header and body byte for later request detail and replay", async () => {
+    await withInstance(async () => {
+      const previousDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN
+      process.env.CYBERSTRIKE_INGEST_DRY_RUN = "true"
+      let sessionID: string | undefined
+      try {
+        const session = await Session.create({ title: "complete-captured-request-test" })
+        sessionID = session.id
+        const body = JSON.stringify({ marker: "end-of-body-marker", payload: "x".repeat(12 * 1024) })
+        const extraHeaders = Array.from(
+          { length: 24 },
+          (_, index) => "X-Captured-Header-" + String(index).padStart(2, "0") + ": value-" + index,
+        ).join("\r\n")
+        const rawRequest = [
+          "POST /api/profile HTTP/1.1",
+          "Host: example.test",
+          "Content-Type: application/json",
+          extraHeaders,
+          "Content-Length: " + Buffer.byteLength(body, "utf8"),
+          "",
+          body,
+        ].join("\r\n")
+
+        const response = await Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: rawRequest, sessionID: session.id, scheme: "https" }),
+          },
+        )
+
+        expect(response.status).toBe(202)
+        const stored = Request.get(session.id).find((item) => item.raw_request)
+        expect(stored?.raw_request).toBe(rawRequest)
+        expect(stored?.raw_request).toContain("X-Captured-Header-23: value-23")
+        expect(stored?.raw_request).toContain('"marker":"end-of-body-marker"')
+        expect(stored?.raw_request).toContain("x".repeat(12 * 1024))
+      } finally {
+        if (sessionID) await Session.remove(sessionID).catch(() => {})
+        if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
+        else process.env.CYBERSTRIKE_INGEST_DRY_RUN = previousDryRun
+      }
+    })
   })
 })

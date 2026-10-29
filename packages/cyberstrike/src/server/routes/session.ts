@@ -43,80 +43,6 @@ import { JavaScriptCorrelation, isJavaScriptOrSourceMapResponse, isSourceMapResp
 
 const log = Log.create({ service: "server" })
 
-const MAX_REQUEST_SIZE = 16 * 1024 // 16 KB
-const MAX_REQUEST_HEADERS = 20 // First N headers
-const MAX_REQUEST_BODY = 8 * 1024 // 8 KB
-
-function truncateRawRequest(rawRequest: string): string {
-  const originalSize = Buffer.byteLength(rawRequest, "utf-8")
-
-  const lines = rawRequest.split("\n")
-  if (lines.length === 0) return rawRequest
-
-  // 1. Keep request line (GET /path HTTP/1.1)
-  const requestLine = lines[0]
-  const result: string[] = [requestLine]
-
-  // 2. Find blank line separating headers and body
-  let blankLineIndex = -1
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === "") {
-      blankLineIndex = i
-      break
-    }
-  }
-
-  // 3. Add headers (up to MAX_REQUEST_HEADERS)
-  const headerLines = blankLineIndex === -1 ? lines.slice(1) : lines.slice(1, blankLineIndex)
-  const truncatedHeaders = headerLines.slice(0, MAX_REQUEST_HEADERS)
-  result.push(...truncatedHeaders)
-
-  const removedHeaderCount = headerLines.length - truncatedHeaders.length
-  if (removedHeaderCount > 0) {
-    result.push(`[... ${removedHeaderCount} more headers truncated ...]`)
-  }
-
-  // 4. Add blank line if there was one
-  if (blankLineIndex !== -1) {
-    result.push("")
-
-    // 5. Add body (up to MAX_REQUEST_BODY)
-    const bodyLines = lines.slice(blankLineIndex + 1)
-    const bodyText = bodyLines.join("\n")
-    const bodySize = Buffer.byteLength(bodyText, "utf-8")
-
-    if (bodySize > MAX_REQUEST_BODY) {
-      const truncatedBody = bodyText.slice(0, MAX_REQUEST_BODY)
-      result.push(truncatedBody)
-      result.push(
-        `\n[... body truncated: showing first ${formatSize(MAX_REQUEST_BODY)} of ${formatSize(bodySize)} ...]`,
-      )
-    } else {
-      result.push(bodyText)
-    }
-  }
-
-  const finalResult = result.join("\n")
-  const finalSize = Buffer.byteLength(finalResult, "utf-8")
-
-  // Log only if truncation occurred
-  if (removedHeaderCount > 0 || originalSize !== finalSize) {
-    log.debug("truncated raw request", {
-      originalSize,
-      finalSize,
-      removedHeaders: removedHeaderCount,
-    })
-  }
-
-  return finalResult
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} bytes`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 export interface AccessContextInput {
   triggerElement?: string
   elementRoles?: string[]
@@ -1924,13 +1850,15 @@ export const SessionRoutes = lazy(() =>
               javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
           }
-          const truncatedRawRequest = truncateRawRequest(body.text)
+          // Preserve the exact browser-captured request for web_get_request_detail,
+          // replay, and Impact Hunter handoff. Prompt injection is bounded separately
+          // in task.ts, so truncating persisted evidence here would be irreversible.
           const req = Request.add({
             sessionID,
             method: normalized.method,
             normalizedPath: normalized.normalizedPath,
             credentialID,
-            rawRequest: truncatedRawRequest,
+            rawRequest: body.text,
             bodyHash: normalized.bodyHash,
             queryHash: normalized.queryKeyHash,
             response: body.response,
