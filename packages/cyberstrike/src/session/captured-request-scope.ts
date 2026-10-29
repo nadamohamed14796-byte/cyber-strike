@@ -28,7 +28,14 @@ export async function checkCapturedRequestScope(
 
   let candidate: URL
   try {
-    candidate = new URL(request.normalizedPath, request.origin)
+    const origin = new URL(request.origin)
+    if ((origin.protocol !== "http:" && origin.protocol !== "https:") || origin.username || origin.password) {
+      return { allowed: false, reason: "captured request origin is not a credential-free HTTP(S) origin" }
+    }
+    candidate = new URL(request.normalizedPath, origin.origin)
+    if (candidate.origin !== origin.origin) {
+      return { allowed: false, reason: "captured request path changes origin; refusing scope bypass" }
+    }
   } catch {
     return { allowed: false, reason: "captured request URL is invalid" }
   }
