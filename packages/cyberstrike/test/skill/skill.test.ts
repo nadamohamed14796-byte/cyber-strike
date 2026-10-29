@@ -502,7 +502,7 @@ test("portable release skill catalog takes precedence when the source checkout i
   ])
 
   const sourceCheckout = Skill.runtimeSkillSources(dataDirectory, executablePath, true)
-  expect(sourceCheckout[1].priority).toBeLessThan(sourceCheckout[0].priority)
+  expect(sourceCheckout[1]!.priority).toBeLessThan(sourceCheckout[0]!.priority)
 })
 
 test("skill source discovery does not scan an identical catalog path twice", () => {
