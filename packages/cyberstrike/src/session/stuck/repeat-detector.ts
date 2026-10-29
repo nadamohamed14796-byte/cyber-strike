@@ -111,7 +111,9 @@ export class ReadOnlyRepeatDetector {
   }
 
   observe(toolCalls: { tool: string; input?: unknown; succeeded?: boolean }[]): RepeatVerdict {
-    if (toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))) {
+    // A non-polling action breaks the status-read streak; the separate failure detector
+    // decides whether unsuccessful work attempts keep repeating.
+    if (toolCalls.some((call) => isProgressTool(call.tool))) {
       this.detector.reset()
       return "ok"
     }
