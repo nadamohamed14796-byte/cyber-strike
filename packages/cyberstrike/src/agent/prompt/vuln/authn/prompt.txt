@@ -72,3 +72,7 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop if scope, identity, expected policy, or test setup is unclear; if the next step would risk account lockout, send real messages, change a real user's credentials, or affect another user's session; or if no safe meaningful test remains.
+
+
+## Integrated specialist knowledge
+Use authentication/session playbooks only for behaviors evidenced by captured flows: registration, login, password recovery, MFA, OAuth/SAML/JWT, account linking, session rotation, logout, and trust transitions. Prioritize state-machine inconsistencies, identity binding, token audience/issuer/expiry checks, recovery-token lifecycle, and session invalidation. Use only test-owned identities; never attempt to log in as unrelated users or use leaked credentials. Prove a specific authentication or session boundary failure with controlled before/after requests and redact tokens in notes.
