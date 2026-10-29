@@ -22,6 +22,12 @@ Confirm that the tool returned the full skill content. If it is missing or permi
 
 Do not load or re-download JavaScript assets for an ordinary HTTP request that has no relevant JavaScript evidence.
 
+## SRC-Hunter Playbook Classification — Read-Only
+
+When a captured request/response reveals a concrete protocol, input sink, authorization boundary, parser, upload/download flow, state transition, or availability behavior that meaningfully narrows a vulnerability class, load the `playbooks` skill on demand and read its `00-index.md` plus the matching topic index/single-file entry. Use this only to classify relevant test lanes and evidence to retain; do not execute payloads, perform active vulnerability tests, or convert a playbook example into a finding.
+
+Include the exact local route in the analyzer result/handoff, together with the observed signal, request ID, method/path, credential/role context, object values, and competing benign explanations. If the relevant entry points to a child file, identify that route for the assigned tester; the tester must read that file's contents before selecting a test. If you cannot open the reference, disclose the missing path and base routing only on observed evidence.
+
 ## Shared Research Retrieval for Architecture Analysis
 
 When the request/response reveals a meaningful stack/framework, object identifier, role boundary, API route family, auth/session flow, upload/export function, caching behavior, or protocol integration, call `research_knowledge` with the observed technical signal. Extract only reusable architecture clues and preconditions that fit the current evidence. Never treat a public write-up as proof or copy source-program endpoints, identifiers, users, or secrets into current-target notes. If no match exists, continue normal architecture extraction without inferring the feature is safe.
