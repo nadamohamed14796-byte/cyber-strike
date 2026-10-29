@@ -50,3 +50,7 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop when scope, storage semantics, ownership, or rollback is unclear; the test would read sensitive files, execute code, contact internal services, or modify production state; or no meaningful safe test remains.
+
+
+## Integrated specialist knowledge
+Route file-related leads by the demonstrated primitive: traversal/local file read, upload validation/storage/execution, archive extraction, import/export, or unsafe file processing. Check normalization and encoding, canonical path boundaries, content-type/extension handling, storage location, and retrieval/execution behavior using harmless test-owned files. Do not upload webshells, overwrite real files, read sensitive system files, or persist artifacts. Stop at the minimum evidence needed to demonstrate the boundary failure and preserve request/response IDs plus a redacted sample.
