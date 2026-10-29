@@ -42,6 +42,7 @@ const parameters = z.object({
   command: z.string().describe("The command that triggered this task").optional(),
   request_id: z.string().describe("Request ID to use as current request context (parent session).").optional(),
   request_context: z.string().describe("Optional text to prepend before the task (e.g. extra context).").optional(),
+  background: z.boolean().describe("Start the subagent in the background and return its task_id immediately; use only when the caller can safely continue without the result.").optional(),
 })
 
 export const TaskTool = Tool.define("task", async (ctx) => {
@@ -289,7 +290,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       // single source.
       const promptParts = await SessionPrompt.resolvePromptParts(prompt)
 
-      const result = await SessionPrompt.prompt({
+      const promptInput = {
         messageID,
         sessionID: session.id,
         model: {
@@ -304,7 +305,36 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
         },
         parts: promptParts,
-      })
+      } as const
+
+      if (params.background) {
+        // Persist the child prompt first, then run its normal session loop without
+        // awaiting completion. The child session is already linked to this parent,
+        // so the caller can continue recon and resume the child later by task_id.
+        await SessionPrompt.prompt({ ...promptInput, noReply: true })
+        void SessionPrompt.loop({ sessionID: session.id }).catch((error) => {
+          console.error("[task] background subagent failed", {
+            sessionID: session.id,
+            agent: agent.name,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
+        return {
+          title: params.description,
+          metadata: {
+            sessionId: session.id,
+            model,
+            outcome: "background" as const,
+          },
+          output: [
+            `Background task started: ${params.description}`,
+            `task_id: ${session.id} (resume this exact task_id to inspect or continue its results)`,
+            "The subagent is still running; this is not a completion or success verdict.",
+          ].join("\n"),
+        }
+      }
+
+      const result = await SessionPrompt.prompt(promptInput)
 
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
