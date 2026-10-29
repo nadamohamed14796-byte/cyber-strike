@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test"
-import { assertTaskResumeScope, isInternalImpactHandoff, selectTaskRequestContext } from "../../src/tool/task-resume"
+import {
+  assertTaskResumeScope,
+  isInternalImpactHandoff,
+  requestIDFromPromptText,
+  selectTaskRequestContext,
+} from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
   expect(() => assertTaskResumeScope({ id: "child-1", parentID: "parent-1" }, "parent-1")).not.toThrow()
@@ -44,4 +49,26 @@ test("implicit request context is inferred only when unambiguous", () => {
     ...requests,
     { id: "req-active-2", status: "processing", time: { updated: 40 } },
   ])).toEqual({ reason: "ambiguous_processing_requests" })
+})
+
+
+test("request identity parser reads only known identity sections", () => {
+  expect(requestIDFromPromptText([
+    "## Request Task Identity",
+    "- Request ID: req-captured-1",
+    "- Method: POST",
+    "## Required Evidence-Driven Analysis",
+    "Request ID: decoy-without-list-marker",
+  ].join("\n"))).toBe("req-captured-1")
+
+  expect(requestIDFromPromptText([
+    "Unrelated text mentioning Request ID: not-an-identity",
+    "## Current request",
+    "- request_id: req-nested-2",
+    "- method: GET",
+    "## Credential Context",
+  ].join("\n"))).toBe("req-nested-2")
+
+  expect(requestIDFromPromptText("Request ID: not-in-a-known-section")).toBeUndefined()
+  expect(requestIDFromPromptText("## Request Task Identity\n- Method: GET")).toBeUndefined()
 })
