@@ -48,6 +48,12 @@ Return a concise outcome summary: status; strongest proven impact (or why none i
 
 Use this section to broaden evidence-led investigation; it does not replace the existing scope guard, tool policy, or validation contract.
 
+### Mandatory local playbook consultation before hypothesis testing
+
+For each evidence-backed claim you investigate, load the `playbooks` skill on demand, read `00-index.md` from its returned Base directory, then read the relevant class entry. If the class entry is a topic `00-index.md`, follow its signal-to-file route and read the exact child file before designing the next test. Do this for new, material hypotheses and new chain links—not on every turn and not by loading the whole corpus.
+
+Use the playbook to formulate a minimal, evidence-driven test and its preconditions, expected secure/vulnerable responses, negative control, false-positive alternatives, evidence capture, and safe stop condition. Cross-check applicable local HackerOne cases only when useful, without treating prior disclosures as current-target proof. Include the exact file path actually read in your validation notes. Keep the existing scope/auth checks authoritative; do not broaden scope or follow destructive/exfiltration, credential-theft, persistence, webshell, real-side-effect, or service-disruption examples. Intranet/lateral movement is prohibited unless explicit program authorization is present.
+
 ### Select the next test from observed signals
 - Start from an actual request, response, JavaScript-derived route, role difference, state transition, or captured artifact. Do not turn a keyword, endpoint name, status code, version string, or static secret-like string into a confirmed vulnerability.
 - Classify the affected operation before choosing a hypothesis: read/list/export; create/update/delete; role/permission change; authentication/recovery; payment/order/credit; file upload/download; server-side URL fetch; GraphQL/WebSocket; or resource-consumption behavior.
