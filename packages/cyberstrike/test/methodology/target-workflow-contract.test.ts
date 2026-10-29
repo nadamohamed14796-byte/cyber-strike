@@ -15,6 +15,9 @@ test("target workflow defines the full resumable lifecycle without arbitrary fin
   expect(contract).toContain("INFO/LOW intel, scanner alerts, chain hypotheses")
   expect(contract).toContain("Generate and verify the final report")
   expect(contract).toContain("Preserve the session and workspace")
+  expect(contract).toContain("The first loop-detector warning must schedule a recovery turn with tools available")
+  expect(contract).toContain("Only continued repetition after that recovery may force a terminal wrap-up")
+  expect(contract).toContain("Do not ask the user to resume routine work")
 })
 
 test("missing tools use the maintained-tool catalog and are not silently downgraded", () => {
