@@ -503,7 +503,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let terminalNotRetried = 0
     const automaticRetryScheduled = new Set<string>()
 
-    for (let index = 0; index < inputURLs.length; index++)
+    for (let index = 0; index < inputURLs.length; index++) {
       if (ctx.abort.aborted) {
         await saveProgress(true)
         break
