@@ -113,7 +113,7 @@ export function Header() {
             <box flexDirection="column" gap={1}>
               <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={narrow() ? 1 : 0}>
                 <text fg={theme.text}>
-                  <b>Subagent session</b>
+                  <b>{session()?.title?.includes("(@proxy-agent subagent)") ? "Proxy Agent · Request Window" : "Subagent session"}</b>
                 </text>
                 <ContextInfo context={context} cost={cost} usage={treeUsage} />
               </box>
