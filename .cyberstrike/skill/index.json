@@ -249,6 +249,7 @@
       ],
       "cwe_ids": [],
       "files": [
+        "RECON_PHASE_TOOL_MATRIX.md",
         "SKILL.md"
       ]
     },
