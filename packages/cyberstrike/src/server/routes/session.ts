@@ -39,6 +39,7 @@ import { proxyAnalyzerTaskPermission } from "../../session/captured-request-perm
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
+import { checkCapturedRequestScope } from "../../session/captured-request-scope"
 import { JavaScriptCorrelation, isJavaScriptOrSourceMapResponse, isSourceMapResponse, safeCorrelationResponsePreview } from "../../target/javascript-correlation"
 
 const log = Log.create({ service: "server" })
@@ -1603,7 +1604,7 @@ export const SessionRoutes = lazy(() =>
               },
             },
           },
-          ...errors(400, 404),
+          ...errors(400, 403, 404),
         },
       }),
       validator(
@@ -1693,6 +1694,34 @@ export const SessionRoutes = lazy(() =>
           return c.json({
             error: "Captured HTTP request could not be parsed; it was not sent to the parent chat session.",
           })
+        }
+
+        // Captured HTTP traffic is untrusted input. Enforce the canonical persisted
+        // scope before storing raw headers/body, registering credentials, or dispatching
+        // the proxy analyzer. A browser/extension client is not an authorization boundary.
+        if (normalized) {
+          const scopeDecision = await checkCapturedRequestScope({
+            origin: normalized.origin,
+            normalizedPath: normalized.normalizedPath,
+          })
+          if (!scopeDecision.allowed) {
+            const pathLabel = normalized.normalizedPath.split("?")[0] || "/"
+            await IngestSummary.notice(
+              sessionID,
+              `Captured request rejected by persisted scope: ${normalized.method} ${pathLabel} — it was not stored or analyzed. Reason: ${scopeDecision.reason}.`,
+            ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID, error: String(error) }))
+            log.info("captured HTTP request rejected by persisted scope", {
+              sessionID,
+              method: normalized.method,
+              path: pathLabel,
+              reason: scopeDecision.reason,
+            })
+            c.status(403)
+            return c.json({
+              error: "Captured HTTP request was not stored or analyzed because it is not authorized by persisted target scope.",
+              reason: scopeDecision.reason,
+            })
+          }
         }
 
         // Handle credential registration
