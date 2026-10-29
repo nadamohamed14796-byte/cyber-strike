@@ -51,7 +51,7 @@ function isBinaryBuffer(buf: Buffer): boolean {
 const TARGET_ARGUMENT_FLAGS = new Set([
   "-u", "--url", "--urls", "--url-list", "-target", "--target", "--target-url",
   "--target-host", "--target-domain", "-host", "--host", "--hostname", "--hostnames",
-  "-d", "--domain", "--domains", "--domain-name", "-t", "--scope", "--origin",
+  "-d", "--domain", "--domains", "--domain-name", "-t", "-h", "--scope", "--origin",
   "--input", "-i", "--input-url", "--endpoint", "--base-url",
 ])
 const TARGET_LIST_FLAGS = new Set([
@@ -66,13 +66,12 @@ const EXPLICIT_TARGET_LIST_FLAGS = new Set([
   "--host-list", "--hosts-file", "--input-file", "--list-file", "--domain-list",
   "--domains-list", "--hostname-list", "--hostnames-file",
 ])
-const AMBIGUOUS_TARGET_FILE_FLAGS = new Set(["-f", "--file", "-i", "--input"])
 const CLI_OPTIONS_WITH_NON_TARGET_VALUES = new Set([
   "-o", "--o", "--output", "-output", "--output-file", "-out", "-on", "-ox", "-og", "-oa",
   "-w", "--wordlist", "--word-list", "-p", "--ports", "--port", "-port", "--top-ports",
   "-rate", "--rate", "--min-rate", "--max-rate", "--threads", "-threads", "--timeout",
   "-timeout", "--retries", "--proxy", "--proxy-url", "--proxy-list", "-x",
-  "-h", "--header", "-H", "--headers", "--user-agent", "-ua", "--cookie",
+  "--header", "--headers", "--user-agent", "-ua", "--cookie",
   "--api-key", "--token", "--api-token", "--username", "--password", "--config",
   "--template", "-template", "--format", "-of", "--severity", "--exclude",
 ])
@@ -148,7 +147,7 @@ function commandExecutableIndex(command: string[]): number {
   return -1
 }
 
-function scannerExecutableIndex(command: string[], commandText = ""): number {
+export function scannerExecutableIndex(command: string[], commandText = ""): number {
   const executableIndex = commandExecutableIndex(command)
   if (executableIndex < 0) return -1
   const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
@@ -527,7 +526,7 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
   const scannerName = (value: string | undefined) => {
     if (!value) return undefined
     const name = path.basename(stripOuterShellQuotes(value)).toLowerCase()
-    return SCANNER_TOOL_NAMES.has(name) ? name : undefined
+    return name || undefined
   }
   const shellPayload = async (argv: string[], start: number) => {
     const wrapperName = path.basename(stripOuterShellQuotes(argv[start] ?? "")).toLowerCase()
@@ -866,7 +865,7 @@ export function parseScopedPortSpec(spec: string): number[] | undefined {
 }
 
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
-  const scannerIndex = scannerExecutableIndex(command)
+  const scannerIndex = scannerExecutableIndex(command, commandText)
   if (scannerIndex < 0) {
     const executableIndex = commandExecutableIndex(command)
     const launchedScanner = executableIndex >= 0 ? await scannerLaunchedByWrapper(command, executableIndex) : undefined
@@ -922,14 +921,14 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   // Target lists are allowed only after every concrete entry is parsed and
   // checked against the persisted scope below; the list itself grants no access.
   let portScanPorts: number[] | undefined
-  const portFlag = args.findIndex((value) => ["--ports", "-port"].includes(value.toLowerCase()) || value === "-p")
+  const portFlag = args.findIndex((value) => ["--ports", "--port", "-port"].includes(value.toLowerCase()) || value === "-p")
   const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
   // A recognized explicit port-list option is enforced regardless of which CLI
   // implements it. Never let a new scanner evade port policy by being unlisted.
   if (portSpec && (["--ports", "-port"].includes(args[portFlag]!.toLowerCase()) || /^\d+(?:[-,]\d+)*$/.test(portSpec))) {
     const parsedPorts = parseScopedPortSpec(portSpec)
     if (!parsedPorts) {
-      if (["--ports", "-port"].includes(args[portFlag]!.toLowerCase())) {
+      if (["--ports", "--port", "-port"].includes(args[portFlag]!.toLowerCase())) {
         throw new Error("Cannot run " + scanner + ": invalid explicit port specification " + portSpec + ". No command was started.")
       }
     } else {
@@ -1125,7 +1124,7 @@ export async function findWrappedScannerInvocation(payload: string): Promise<str
     for (const node of tree.rootNode.descendantsOfType("command")) {
       if (!node) continue
       const command = commandTokens(node)
-      const scannerIndex = scannerExecutableIndex(command)
+      const scannerIndex = scannerExecutableIndex(command, commandText)
       if (scannerIndex >= 0) return command.slice(scannerIndex)
 
       const executableIndex = commandExecutableIndex(command)
