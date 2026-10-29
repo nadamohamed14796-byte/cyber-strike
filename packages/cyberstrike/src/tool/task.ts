@@ -29,6 +29,31 @@ import { assertTaskResumeScope, isInternalImpactHandoff, selectTaskRequestContex
 // web_get_request_detail for the rare response that still exceeds this.
 const MAX_PREPEND_BYTES = 48 * 1024
 
+// Captured-request child sessions carry their canonical request ID in the
+// server-built initial prompt. Recover it from that session so parallel Extension
+// requests cannot accidentally inherit another in-flight request's context when
+// a model omits the optional Task.request_id argument.
+async function requestIDFromSession(sessionID: string): Promise<string | undefined> {
+  const messages = await Session.messages({ sessionID })
+  for (const message of messages) {
+    if (message.info.role !== "user") continue
+    const text = message.parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("\\n")
+    for (const heading of ["## Request Task Identity", "## Current request"]) {
+      const start = text.indexOf(heading)
+      if (start < 0) continue
+      const remainder = text.slice(start)
+      const nextHeading = remainder.indexOf("\\n## ", heading.length)
+      const section = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading)
+      const match = section.match(/^\\s*-\\s*(?:Request ID|request_id):\\s*([^\\r\\n]+)\\s*$/im)
+      if (match?.[1]) return match[1].trim()
+    }
+  }
+  return undefined
+}
+
 // Only real subagents may use the internal, background-only escalation path.
 // A primary/user-facing agent must still honor the normal task permission policy.
 const parameters = z.object({
@@ -119,6 +144,16 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
+      const sessionRequestID = await requestIDFromSession(ctx.sessionID)
+      if (sessionRequestID && params.request_id && params.request_id !== sessionRequestID) {
+        throw new Error(
+          `Request context mismatch: this subagent session is bound to request ${sessionRequestID}, but task request_id ${params.request_id} was supplied. Use the current session's request ID to avoid cross-request context mixing.`,
+        )
+      }
+      // Prefer the session-bound request ID automatically when the model omits
+      // the optional argument. An explicit conflicting ID is rejected above.
+      const requestID = params.request_id ?? sessionRequestID
+
       const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
 
       const session = await iife(async () => {
@@ -205,14 +240,14 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         // Request records live on the root session; this also works when one
         // subagent delegates to another nested subagent.
         const requests = Request.get(Session.root(ctx.sessionID))
-        const selection = selectTaskRequestContext(requests, params.request_id)
+        const selection = selectTaskRequestContext(requests, requestID)
         const current = selection.request
         const lines: string[] = []
         if (params.request_context?.trim()) lines.push(params.request_context.trim())
         if (selection.reason === "request_not_found") {
           lines.push(
             "## Request Context Warning",
-            `The requested request_id "${params.request_id}" does not exist in the current root session.`,
+            `The requested request_id "${requestID ?? "missing"}" does not exist in the current root session.`,
             "No other request was substituted. Resolve the exact request ID before relying on request-specific context.",
           )
         } else if (selection.reason === "ambiguous_processing_requests") {
