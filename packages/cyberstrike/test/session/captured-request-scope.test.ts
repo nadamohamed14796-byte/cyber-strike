@@ -4,41 +4,49 @@ import { TargetMemory } from "../../src/target"
 import { checkCapturedRequestScope } from "../../src/session/captured-request-scope"
 import { tmpdir } from "../fixture/fixture"
 
-test("captured request scope uses the persisted program manifest before analysis", async () => {
+test("captured request scope checks the raw concrete path against the persisted manifest", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
     async fn() {
       await TargetMemory.configureScope("https://program-root.example.test", {
-        include: ["https://authorized-app.example.net"],
+        include: ["https://authorized-app.example.net/safe"],
         authorizationSource: "Captured-request scope fixture",
         userConfirmed: true,
       })
 
       const allowed = await checkCapturedRequestScope({
-        origin: "https://authorized-app.example.net",
-        normalizedPath: "/api/v1/profile",
+        scheme: "https",
+        rawRequest: "GET /safe/profile HTTP/1.1\r\nHost: authorized-app.example.net\r\n\r\n",
       })
       expect(allowed.allowed).toBe(true)
-      expect(allowed.url).toBe("https://authorized-app.example.net/api/v1/profile")
+      expect(allowed.url).toBe("https://authorized-app.example.net/safe/profile")
 
-      const outOfScope = await checkCapturedRequestScope({
-        origin: "https://other-app.example.org",
-        normalizedPath: "/api/v1/profile",
+      const outOfScopePath = await checkCapturedRequestScope({
+        scheme: "https",
+        rawRequest: "GET /admin/12345 HTTP/1.1\r\nHost: authorized-app.example.net\r\n\r\n",
       })
-      expect(outOfScope.allowed).toBe(false)
-      expect(outOfScope.reason).toBeTruthy()
+      expect(outOfScopePath.allowed).toBe(false)
+      expect(outOfScopePath.reason).toBeTruthy()
 
-      const missingOrigin = await checkCapturedRequestScope({ normalizedPath: "/api/v1/profile" })
-      expect(missingOrigin.allowed).toBe(false)
-      expect(missingOrigin.reason).toContain("no unambiguous origin")
+      const outOfScopeHost = await checkCapturedRequestScope({
+        scheme: "https",
+        rawRequest: "GET /safe/profile HTTP/1.1\r\nHost: other-app.example.org\r\n\r\n",
+      })
+      expect(outOfScopeHost.allowed).toBe(false)
 
       const originSmuggle = await checkCapturedRequestScope({
-        origin: "https://authorized-app.example.net",
-        normalizedPath: "https://other-app.example.org/api/v1/profile",
+        scheme: "https",
+        rawRequest: "GET https://other-app.example.org/safe/profile HTTP/1.1\r\nHost: authorized-app.example.net\r\n\r\n",
       })
       expect(originSmuggle.allowed).toBe(false)
-      expect(originSmuggle.reason).toContain("changes origin")
+
+      const malformed = await checkCapturedRequestScope({
+        scheme: "https",
+        rawRequest: "not an HTTP request",
+      })
+      expect(malformed.allowed).toBe(false)
+      expect(malformed.reason).toContain("could not be parsed")
     },
   })
 })
