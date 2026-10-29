@@ -442,14 +442,14 @@ export namespace MessageV2 {
      */
     stepCapped: z.boolean().optional(),
     /**
-     * True when the stuck-detector forced a wrap-up turn (1st strike) because the
-     * subagent made several consecutive no-progress steps. Observability only.
+     * True when a loop detector forced a terminal wrap-up after a recovery attempt did
+     * not restore progress. The task tool must treat this as incomplete, not success.
      */
     stuckNudged: z.boolean().optional(),
     /**
-     * True when the stuck-detector terminated the run (2nd strike) because it stayed
-     * stuck after a nudge. Like `stepCapped`, the message looks like a clean stop but
-     * the run did NOT finish — the task tool classifies this as incomplete, not clean.
+     * True when the run could not complete normally after repeated no-progress actions.
+     * The final message may look like a clean stop, but parent tasks must classify it
+     * as incomplete rather than crediting it as a completed mission.
      */
     stuckAborted: z.boolean().optional(),
   }).meta({
