@@ -1,5 +1,5 @@
 ---
-name: src-hunter-payloader
+name: payloader
 description: On-demand payload and testing-reference router for web bug bounty testing. Use only after an evidence-backed vulnerability hypothesis; maps SQLi, XSS, SSRF, SSTI, XXE, API, auth, file, business logic, JWT, WebSocket, and other web classes to local reference files.
 category: web-security
 tags: [src-hunter, payloader, payload-reference, bug-bounty, injection, ssrf, xss, authorization]
