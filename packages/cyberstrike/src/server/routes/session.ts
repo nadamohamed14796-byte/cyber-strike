@@ -1701,8 +1701,8 @@ export const SessionRoutes = lazy(() =>
         // the proxy analyzer. A browser/extension client is not an authorization boundary.
         if (normalized) {
           const scopeDecision = await checkCapturedRequestScope({
-            origin: normalized.origin,
-            normalizedPath: normalized.normalizedPath,
+            rawRequest: body.text,
+            scheme: normalized.scheme,
           })
           if (!scopeDecision.allowed) {
             const pathLabel = normalized.normalizedPath.split("?")[0] || "/"
