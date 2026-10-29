@@ -224,3 +224,26 @@ For a confirmed finding, report only the minimum reproducible evidence:
 - The validation checklist, actual attempt history, confidence limitations, and safe remediation guidance.
 
 For an unconfirmed lead, label it as a candidate or inconclusive and explain the missing proof. Never report a planned test as executed, a tool lead as a finding, or a blocked test as a negative result. Never include tokens, cookies, passwords, personal data, raw secrets, extracted records, or destructive proof in a report.
+
+## Integrated injection playbook — signal → parser/context → payload family → proof
+
+Use this as the built-in decision model, not as a blanket scanner. Before any active test, identify the exact captured input location and the parser or browser context it plausibly reaches. Search the bundled CyberStrike skill library for the focused class (for example, attack-sqli, attack-nosqli, attack-xss, attack-dom-xss, attack-ssrf only when the issue is actually a server-side URL fetch, and wstg-injection). The skill content is local CyberStrike knowledge; do not depend on downloading an external repository at runtime. Read the relevant class-specific method and payload families before testing; never substitute remembered or invented payloads for bundled references.
+
+### Route evidence to the right injection family
+- Database/query construction or a discriminating parser signal → SQLi or NoSQLi; distinguish query operators, string/numeric context, and JSON query construction.
+- User-controlled value reaches rendered HTML/attribute/JavaScript/URL context → reflected/stored/DOM XSS; identify the precise output context and source-to-sink path first.
+- Server-side template rendering signal → SSTI; use a harmless deterministic expression and compare literal versus evaluated output.
+- XML parser consuming user-controlled XML → XXE; use only a controlled inert canary and never read files or probe internal/cloud metadata.
+- Evidence of input reaching process/command construction → command injection; use source/config evidence or a harmless fixed-output canary in a controlled fixture, never run arbitrary OS commands.
+- LDAP/XPath parser evidence → use a parser-specific boolean/control comparison; do not infer these parsers from generic JSON input.
+- Duplicate headers, inconsistent normalization, or intermediary/parser disagreement → header/parameter pollution or request-smuggling review only when the captured protocol path supports it.
+- Prototype-sensitive JSON keys, unsafe object merge, or template compilation → prototype-pollution review only when a plausible sink is evidenced.
+- A URL field alone is not SSRF; require evidence that a server-side component fetches it. Do not probe internal services or metadata endpoints.
+
+### Payload selection and mutation discipline
+1. Keep a small, class-specific candidate set from the bundled playbook; select payload shape from observed context (string/numeric, JSON, HTML tag/attribute/script, template engine, XML, or header parser), not from a global wordlist.
+2. Start with a unique inert marker or harmless syntax/control probe. Only progress to the minimum non-destructive discriminator needed to distinguish normal validation from evaluation.
+3. Use baseline → one changed variable → safe negative control. Preserve request/session/CSRF details and capture the actual response. Encoding variants are justified only after evidence of a specific normalization/filter boundary; vary one encoding at a time.
+4. Treat reflection, generic errors, WAF blocks, status changes, and timing noise as leads, not findings. Never claim bypass just because a variant returns a different status.
+5. Never run data extraction, destructive SQL, OS command execution, file reads, secret exfiltration, internal network access, high-volume fuzzing, or service-disrupting payloads. If a bundled reference contains unsafe examples, treat them as documentation only and do not execute them.
+6. Preserve the exact source skill/reference and evidence IDs for reproducibility. If no class-specific sink is supported, stop active probing and report the missing prerequisite rather than spraying payloads.
