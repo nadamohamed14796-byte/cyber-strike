@@ -665,11 +665,11 @@ export namespace SessionPrompt {
       // tool-call finish on that turn, we'd re-enter here with step > maxSteps — break
       // rather than loop forever. This is the only unconditional terminator.
       if (step > maxSteps) break
-      // A wrap-up turn is forced either by the step-cap (Layer 1) or by the stuck-
-      // detector's 1st-strike nudge (Layer 2). Consume the nudge flag here.
+      // A wrap-up is forced by the hard step cap or by a loop that persisted after recovery.
+      // Consume the terminal-wrap-up flag here.
       const stuckWrapUp = forceWrapUpNext
       forceWrapUpNext = false
-      const recoveryTurn = forceRecoveryNext
+      const recoveryTurn = forceRecoveryNext && !isLastStep && !stuckWrapUp
       forceRecoveryNext = false
       const wrapUp = isLastStep || stuckWrapUp
       msgs = await insertReminders({
@@ -1024,10 +1024,9 @@ export namespace SessionPrompt {
         }
       }
 
-      // A forced wrap-up is the detector's recovery attempt: all ordinary tools were
-      // removed for this turn. If the model still does not finish, do not re-enable them
-      // on the next iteration (primary agents may have no step cap). Terminate this run
-      // with an explicit marker rather than falling back into the same loop.
+      // A forced wrap-up is the terminal backstop after a recovery turn failed to break the
+      // loop. Ordinary tools are disabled for this turn. If the model still does not finish,
+      // terminate with an explicit marker rather than re-entering the same loop.
       if (stuckWrapUp && !modelFinished && !processor.message.error) {
         processor.message.stuckAborted = true
         await Session.updateMessage(processor.message)
