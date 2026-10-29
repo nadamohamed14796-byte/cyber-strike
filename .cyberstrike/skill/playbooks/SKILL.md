@@ -75,9 +75,17 @@ The global routing reference is `00-index.md`. If a route points to a sub-index,
 
 ## Conditional companion references — load only when needed
 
-- **Concrete payload reference:** If the selected playbook does not contain a suitable candidate for the observed input/context, or a specific payload category is needed to close an evidence gap, load the `payloader` skill. Read its `index.md` and then only the matching category file using that skill's returned Base directory and `<skill_files>`. Do not load all payload categories or execute lists wholesale.
-- **Historical HackerOne context:** If a comparable disclosed case would help formulate or falsify a root-cause/impact hypothesis, load `hackerone-disclosed-reports`, read its `index.md`, then read only the relevant weakness file. Historical findings are examples, not evidence or authorization for the current target.
-- A skill search result, index entry, filename, or chain suggestion does not count as reading the content. Confirm the returned `<skill_content>` and explicitly read the exact companion file required for the current question. Do not load companion skills merely because they are available.
+A skill search result, index entry, filename, or chain suggestion does not count as reading the content. Load the named skill when its condition is met, then read the exact file using that skill's returned `Base directory` and `<skill_files>`. Do not load these references on every run.
+
+- **Shared methodology:** Load `src-hunter-methodology` when deciding the next evidence-backed test, prioritizing hypotheses, reviewing false-positive risk, working through a control gap, or checking a permitted low-impact variation after a concrete in-scope request is blocked. Read `00-index.md`, then only the relevant numbered file. Never use bypass guidance to evade scope, authorization, rate limits, monitoring, or program restrictions.
+- **Component fingerprints/default credentials:** Load `src-hunter-dictionaries` only when the target's observed fingerprint or configuration makes a dictionary entry relevant. Read `00-index.md`, then the matching file. Do not spray credentials or test unrelated services.
+- **Industry-specific guidance:** Load `src-hunter-industry` only when the authorized target's observed industry/workflow makes it relevant. Read `00-index.md`, then only `banking-finance.md` or `telecom-isp.md` as appropriate.
+- **Concrete payload reference:** If the selected playbook does not contain a suitable candidate for the observed input/context, load `payloader`. Read `index.md` and then only the matching category file. Do not load or execute payload lists wholesale.
+- **Historical HackerOne context:** If a comparable disclosed case would help formulate or falsify a root-cause/impact hypothesis, load `hackerone-disclosed-reports`, read `index.md`, then only the relevant weakness file. Historical cases are examples, not evidence or authorization for the current target.
+- **Reporting:** Only when a candidate finding has reproducible current-target evidence and is ready for reporting, load `src-hunter-compliance`, read `compliance.md` in full, then load `src-hunter-templates` and read `report-submission.md`. Replace examples with current evidence; do not copy example claims or identifiers.
+- **MCP/tool guidance:** Load `src-hunter-tools` only when a concrete evidence gap requires tool selection/MCP context or a relevant playbook points to it. The index does not prove a tool is installed or registered; verify current runtime availability and schema.
+
+These companion references do not modify or replace CyberStrike's scope manifest, request-level checks, program policy, or active-testing authorization.
 
 ## How to apply the reference
 
