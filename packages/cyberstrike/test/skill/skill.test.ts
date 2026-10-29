@@ -493,30 +493,21 @@ test("representative skills in the full catalog can be loaded into context", asy
 
 
 test("portable release skill catalog takes precedence when the source checkout is unavailable", () => {
-  const portable = Skill.runtimeSkillSources(
-    "/home/test/.local/share/cyberstrike",
-    "/opt/cyberstrike/bin/cyberstrike",
-    false,
-  )
+  const dataDirectory = path.join("/", "home", "test", ".local", "share", "cyberstrike")
+  const executablePath = path.join("/", "opt", "cyberstrike", "bin", "cyberstrike")
+  const portable = Skill.runtimeSkillSources(dataDirectory, executablePath, false)
   expect(portable).toEqual([
-    { directory: "/home/test/.local/share/cyberstrike/skill", priority: -1 },
-    { directory: "/opt/cyberstrike/bin/skill", priority: 1 },
+    { directory: path.join(dataDirectory, "skill"), priority: -1 },
+    { directory: path.join(path.dirname(executablePath), "skill"), priority: 1 },
   ])
 
-  const sourceCheckout = Skill.runtimeSkillSources(
-    "/home/test/.local/share/cyberstrike",
-    "/opt/cyberstrike/bin/cyberstrike",
-    true,
-  )
+  const sourceCheckout = Skill.runtimeSkillSources(dataDirectory, executablePath, true)
   expect(sourceCheckout[1].priority).toBeLessThan(sourceCheckout[0].priority)
 })
 
 test("skill source discovery does not scan an identical catalog path twice", () => {
+  const executablePath = path.join("/", "opt", "cyberstrike", "bin", "cyberstrike")
   expect(
-    Skill.runtimeSkillSources(
-      "/opt/cyberstrike/bin",
-      "/opt/cyberstrike/bin/cyberstrike",
-      false,
-    ),
-  ).toEqual([{ directory: "/opt/cyberstrike/bin/skill", priority: -1 }])
+    Skill.runtimeSkillSources(path.dirname(executablePath), executablePath, false),
+  ).toEqual([{ directory: path.join(path.dirname(executablePath), "skill"), priority: -1 }])
 })
