@@ -87,12 +87,11 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       // hand off an evidence-backed finding to it in background mode without
       // gaining general task-spawning privileges. Scope and request tools remain
       // enforced inside Impact Hunter.
-      const callerAgent = caller && params.subagent_type === "impact-hunter" && params.background === true ? await Agent.get(caller) : undefined
       const impactHandoff = isInternalImpactHandoff({
         subagentType: params.subagent_type,
         background: params.background,
-        caller,
-        callerMode: callerAgent?.mode,
+        caller: caller?.name,
+        callerMode: caller?.mode,
       })
 
       // Skip permission check when user explicitly invoked via @ or command subtask,
