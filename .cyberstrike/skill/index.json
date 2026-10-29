@@ -182,24 +182,14 @@
       "name": "community-tool-selection",
       "description": "Choose and verify a fit-for-purpose external tool, API, dataset, or local helper without duplicating the canonical tool catalog.",
       "verified": "unverified",
-      "category": "information-gathering",
-      "tags": [
-        "--",
-        "tool-selection",
-        "cli-tooling",
-        "recon",
-        "bug-bounty",
-        "tool-preflight"
-      ],
+      "tags": [],
       "tech_stack": [],
       "cwe_ids": [],
-      "prerequisites": [
-        "recon-methodology"
-      ],
       "files": [
         "SKILL.md",
         "TOOLING_CATALOG.md"
-      ]
+      ],
+      "category": "information-gathering"
     },
     {
       "name": "kerberos-attacks",
