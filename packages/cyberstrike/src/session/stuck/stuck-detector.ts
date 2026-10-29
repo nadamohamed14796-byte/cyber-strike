@@ -47,9 +47,9 @@ export class StuckDetector {
   constructor(private readonly cfg: StuckConfig) {}
 
   /**
-   * Feed one completed step. A step counts as progress when at least one non-read-only
-   * tool call succeeds (see signals.isProgressTool). No-progress steps accumulate a streak;
-   * the first threshold triggers a recovery turn, and a repeated stall requests wrap-up.
+   * Feed one completed step. A step is progress when it includes at least one non-read-only
+   * tool call (see signals.isProgressTool). No-progress steps accumulate a streak; the first
+   * threshold triggers a recovery turn, and a repeated stall requests wrap-up.
    */
   observe(step: StepObservation): Verdict {
     if (!this.cfg.enabled) return { kind: "ok" }
