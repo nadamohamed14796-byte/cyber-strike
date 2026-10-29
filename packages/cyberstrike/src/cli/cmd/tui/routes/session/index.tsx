@@ -128,6 +128,13 @@ export function Session() {
       .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   })
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
+  // Extension requests already run inside a child session with the existing
+  // proxy-agent. Make only those sessions interactive; specialist tester
+  // sessions remain read-only in the TUI. The initial captured-request message
+  // records its agent, so this identity survives navigation and process restarts.
+  const proxyAgentSession = createMemo(
+    () => !!session()?.parentID && messages().some((message) => message.role === "user" && message.agent === "proxy-agent"),
+  )
   const permissions = createMemo(() => {
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.permission[x.id] ?? [])
@@ -243,7 +250,10 @@ export function Session() {
   })
 
   useKeyboard((evt) => {
-    if (!session()?.parentID) return
+    // A captured-request Proxy Agent session is an interactive conversation,
+    // not a read-only child-session viewer. Preserve the existing exit shortcut
+    // for all other subagent sessions.
+    if (!session()?.parentID || proxyAgentSession()) return
     if (keybind.match("app_exit", evt)) {
       exit()
     }
@@ -1324,7 +1334,7 @@ export function Session() {
                 <QuestionPrompt request={questions()[0]} />
               </Show>
               <Prompt
-                visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
+                visible={(!session()?.parentID || proxyAgentSession()) && permissions().length === 0 && questions().length === 0}
                 ref={(r) => {
                   prompt = r
                   promptRef.set(r)
