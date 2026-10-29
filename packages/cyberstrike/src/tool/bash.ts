@@ -45,9 +45,9 @@ function isBinaryBuffer(buf: Buffer): boolean {
  * This registry identifies commands to inspect; it is not a phase allowlist.
  */
 const SCANNER_TOOL_NAMES = new Set([
-  "subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains",
+  "subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains", "findomain",
   "nmap", "masscan", "naabu", "httpx", "dnsx",
-  "katana", "gau", "waybackurls", "hakrawler", "gospider",
+  "katana", "gau", "waymore", "waybackurls", "hakrawler", "gospider",
   "paramspider", "curl", "wget", "arjun", "x8",
   "nuclei", "commix", "ssrfmap", "nosqlmap", "crlfuzz", "git-dumper",
   "ffuf", "feroxbuster", "gobuster", "dirsearch", "dirb",
@@ -157,6 +157,13 @@ export function scannerTargets(command: string[], commandText: string): string[]
     }
   }
   const targetFlags = new Set(["-u", "--url", "-target", "--target", "-host", "--host", "-d", "--domain", "-h"])
+  // CLI-specific target flags must never be generalized: for example, -t is a
+  // token flag for github-subdomains but the target flag for findomain.
+  const toolSpecificTargetFlags: Record<string, Set<string>> = {
+    findomain: new Set(["-t", "--target"]),
+    waymore: new Set(["-i", "--input"]),
+  }
+  const currentToolTargetFlags = toolSpecificTargetFlags[scannerName] ?? new Set<string>()
   const addTargetValue = (rawValue: string, allowDomainList: boolean) => {
     const value = stripOuterShellQuotes(rawValue).trim()
     if (!value || value.startsWith("-")) return
@@ -183,23 +190,32 @@ export function scannerTargets(command: string[], commandText: string): string[]
   const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains"].includes(scannerName)
   for (let i = 0; i < command.length; i++) {
     const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
-    if (targetFlags.has(flag)) {
+    if (targetFlags.has(flag) || currentToolTargetFlags.has(flag)) {
       const value = command[i + 1]
       if (!value) continue
       addTargetValue(value, allowDomainList && ["-d", "--domain"].includes(flag))
       continue
     }
-    const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h)=(.+)$/)
-    if (inline) addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
+    const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h|-t|--input|-i)=([^\s].*)$/)
+    if (inline && (targetFlags.has(inline[1]!) || currentToolTargetFlags.has(inline[1]!))) {
+      addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
+    }
   }
   // assetfinder's documented CLI is `assetfinder [--subs-only] <domain>`:
   // its root domain is positional, unlike tools that accept -d/--domain. Without
   // this tool-specific extraction, a valid command reaches the scope gate with
   // no recognized target and is rejected before execution. Any extracted domain
   // still passes the persisted scope matcher below.
-  if (scannerName === "assetfinder") {
-    for (const rawArgument of command.slice(1)) {
-      const argument = stripOuterShellQuotes(rawArgument).trim()
+  if (scannerName === "assetfinder" || scannerName === "gau") {
+    const optionsWithValues = scannerName === "gau"
+      ? new Set(["-o", "--o", "--output", "--blacklist", "--providers", "--from", "--to", "--threads", "--timeout", "--retries"])
+      : new Set<string>()
+    for (let i = 1; i < command.length; i++) {
+      const argument = stripOuterShellQuotes(command[i]!).trim()
+      if (optionsWithValues.has(argument)) {
+        i++
+        continue
+      }
       if (!argument || argument.startsWith("-")) continue
       addTargetValue(argument, false)
     }
@@ -675,12 +691,46 @@ function normalizePassiveLookupDomain(value: string | null | undefined): string 
 
 const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains", "--domains-file", "-targets", "--targets-file"])
 
-async function readTargetListInputs(args: string[], cwd: string): Promise<{ present: boolean; targets: string[] }> {
+async function readTargetListInputs(
+  args: string[],
+  cwd: string,
+  scannerName: string,
+): Promise<{ present: boolean; targets: string[] }> {
   const files: string[] = []
+  // Only interpret these flags as files for the matching tool. In particular,
+  // github-subdomains uses -t for a token, while findomain uses -f for a target
+  // file and waymore accepts either a domain or a file in -i/--input.
+  const toolSpecificListFlags: Record<string, Set<string>> = {
+    findomain: new Set(["-f"]),
+    waymore: new Set(["-i", "--input"]),
+  }
+  const specificListFlags = toolSpecificListFlags[scannerName] ?? new Set<string>()
+  const isHostInput = (value: string) => {
+    const candidate = value.trim().replace(/^\*\./, "")
+    if (/^https?:\/\//i.test(candidate)) {
+      try {
+        const parsed = new URL(candidate)
+        return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password
+      } catch {
+        return false
+      }
+    }
+    return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate) ||
+      /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(candidate)
+  }
   for (let i = 0; i < args.length; i++) {
     const flag = stripOuterShellQuotes(args[i]!).toLowerCase()
-    if (TARGET_LIST_FLAGS.has(flag)) {
+    const isGenericListFlag = TARGET_LIST_FLAGS.has(flag)
+    const isSpecificListFlag = specificListFlags.has(flag)
+    if (isGenericListFlag || isSpecificListFlag) {
       const value = args[i + 1] ? stripOuterShellQuotes(args[i + 1]!) : ""
+      // waymore -i/--input accepts a single domain as well as an input file.
+      // Target extraction handles domains; only treat a non-domain argument as
+      // a file, then fail explicitly if it cannot be read.
+      if (isSpecificListFlag && scannerName === "waymore" && isHostInput(value)) {
+        i++
+        continue
+      }
       if (!value || value.startsWith("-")) {
         throw new Error("Target-list mode requires a readable file path after " + flag + ".")
       }
@@ -688,10 +738,11 @@ async function readTargetListInputs(args: string[], cwd: string): Promise<{ pres
       i++
       continue
     }
-    const inline = [...TARGET_LIST_FLAGS].find((item) => flag.startsWith(item + "="))
+    const inline = [...TARGET_LIST_FLAGS, ...specificListFlags].find((item) => flag.startsWith(item + "="))
     if (inline) {
       const value = stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
       if (!value) throw new Error("Target-list mode requires a readable file path after " + inline + ".")
+      if (specificListFlags.has(inline) && scannerName === "waymore" && isHostInput(value)) continue
       files.push(value)
     }
   }
@@ -902,7 +953,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
   const listedTargets = ["curl", "wget"].includes(scanner)
     ? { present: false, targets: [] as string[] }
-    : await readTargetListInputs(args, cwd)
+    : await readTargetListInputs(args, cwd, scanner)
   if (listedTargets.present) targets = [...new Set([...targets, ...listedTargets.targets])]
 
   // Public read-only research APIs are contacted as providers, but authorization
