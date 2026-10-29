@@ -145,3 +145,16 @@ Verify with `python3 --version`, `jq --version`, `rg --version`, `sha256sum --ve
 
 ### Evidence handling
 Keep original captures private and target-local. Review headers, query strings, form/JSON bodies, cookies, HAR files, screenshots, filenames, logs, source maps, and metadata. A regex scan or manifest validation cannot certify sanitization. Keep one manifest entry per artifact with sanitized path, time, hash, test context, redaction review, and the claim supported. Never store raw secrets or unrelated personal data in Git or global research.
+
+## SRC-Hunter-derived differential proof checklist
+
+For each candidate, capture enough contrast to show the security boundary—not just a successful response:
+- **Baseline:** the expected-valid request from a researcher-controlled account/object.
+- **Negative control:** the same operation with the relevant permission, ownership, token, or state condition intentionally absent or invalid.
+- **Candidate:** change one variable that tests the hypothesis.
+- **Outcome proof:** capture the response and, when relevant, the authoritative state or synthetic data marker showing what actually changed.
+- **Interpretation:** state what the evidence proves, what it does not prove, and any alternative explanation or repeatability limitation.
+
+Use two controlled identities for cross-account authorization checks. Keep samples minimal and synthetic where possible; never bulk-enumerate records to strengthen a report. For timing/race/resource cases, use only program-permitted low-impact tests and report the observed repeatability instead of asserting a fixed success rate. For SSRF, require evidence of a server-side request to a controlled destination; do not treat a callback with no request context as conclusive.
+
+Keep raw artifacts in the authorized target-local evidence store and produce a separate redacted report copy. A manifest, hash, scanner result, or static secret match improves traceability but does not itself prove exploitability.
