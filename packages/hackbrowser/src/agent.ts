@@ -94,9 +94,6 @@ function maybeInjectFault(pagesExplored: number): void {
 // Constants
 // ============================================================
 
-const MAX_STEPS_PER_PAGE = 30 // Max tasks executed per page (loop guard)
-const MAX_TASK_QUEUE_SIZE = 30 // TaskQueue growth cap
-const MAX_UNPLANNED_ITERATIONS = 2 // Max additional LLM calls for unexplored elements
 const OVERLAY_ESCAPE_WAIT = 400
 // After clearing an overlay, wait for transient/loading overlays to actually go away
 // before the safe retry click. Longer than OVERLAY_ESCAPE_WAIT to cover spinner fade-outs.
@@ -855,7 +852,7 @@ async function explorePageWithAI(
   // slides off-screen before it can be clicked. Page-scoped (reset per explorePageWithAI).
   let lastRevealingClick: ClickTask | null = null
 
-  while (taskQueue.length > 0 && steps < MAX_STEPS_PER_PAGE) {
+  while (taskQueue.length > 0) {
     steps++
     const task = taskQueue.shift()!
 
@@ -875,7 +872,7 @@ async function explorePageWithAI(
     }
 
     log.info("executing task", {
-      step: `${steps}/${MAX_STEPS_PER_PAGE}`,
+      step: steps,
       type: task.type,
       label:
         task.type === "form" ? `form(${task.fields.length} fields → ${task.submit.label.slice(0, 30)})` : task.label,
@@ -1011,13 +1008,37 @@ async function explorePageWithAI(
     }
   }
 
-  // 4. Unplanned element check — find actions LLM missed (Aşama 10)
-  // After all tasks complete, detect unexplored interactive elements
-  // and ask LLM for additional plans. Max 2 iterations (loop guard).
-  for (let iteration = 0; iteration < MAX_UNPLANNED_ITERATIONS && steps < MAX_STEPS_PER_PAGE; iteration++) {
+  // 4. Unplanned element check — keep planning while new actionable evidence appears.
+  // There is no fixed per-page task/iteration cap. Stop only when no unexplored
+  // elements remain, the planner has no executable task, or two consecutive
+  // passes show the same unresolved controls and no measurable progress.
+  let previousUnexploredSignature = ""
+  let previousProgressMetric = -1
+  for (let iteration = 0; ; iteration++) {
     const currentElements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
     const unexplored = findUnexploredElements(currentElements, semanticActionsDone, seenKeys, globalState.visitedNav)
     if (unexplored.length === 0) break
+    const signature = unexplored.map((element) => `${element.role}::${element.label}`).sort().join("\\n")
+    const progressMetric = semanticActionsDone.size + seenKeys.size + globalState.visitedNav.size
+    if (signature === previousUnexploredSignature && progressMetric === previousProgressMetric) {
+      const note = `Exploration is incomplete: ${unexplored.length} actionable element(s) remain, but repeated planning made no progress.`
+      log.warn("interactive exploration stalled; remaining elements need follow-up", {
+        url: pageUrl,
+        count: unexplored.length,
+        labels: unexplored.slice(0, 10),
+        iteration,
+      })
+      void csEmit(page, {
+        type: "intelligence",
+        kind: "incomplete-exploration",
+        url: pageUrl,
+        credential: credentialId,
+        note,
+      })
+      break
+    }
+    previousUnexploredSignature = signature
+    previousProgressMetric = progressMetric
 
     log.info("unexplored elements found", {
       count: unexplored.length,
@@ -1036,7 +1057,22 @@ async function explorePageWithAI(
     const additionalPlan = await planUnexploredElements(snap, unexplored, model, usageAcc)
     applyPlanIntelligence(additionalPlan, pageUrl, globalState, credentialId, page) // Aşama 13
 
-    if (additionalPlan.tasks.length === 0) break
+    if (additionalPlan.tasks.length === 0) {
+      const note = `Exploration is incomplete: ${unexplored.length} actionable element(s) remain, but the planner returned no executable tasks.`
+      log.warn("planner returned no tasks for unexplored interactive elements", {
+        url: pageUrl,
+        count: unexplored.length,
+        labels: unexplored.slice(0, 10),
+      })
+      void csEmit(page, {
+        type: "intelligence",
+        kind: "incomplete-exploration",
+        url: pageUrl,
+        credential: credentialId,
+        note,
+      })
+      break
+    }
 
     log.info("additional plan for unexplored elements", { tasks: additionalPlan.tasks.length })
     void csEmit(page, {
@@ -1052,7 +1088,7 @@ async function explorePageWithAI(
 
     // Execute additional tasks
     const additionalQueue: PageTask[] = [...additionalPlan.tasks]
-    while (additionalQueue.length > 0 && steps < MAX_STEPS_PER_PAGE) {
+    while (additionalQueue.length > 0) {
       steps++
       const task = additionalQueue.shift()!
 
@@ -1069,7 +1105,7 @@ async function explorePageWithAI(
       }
 
       log.info("executing additional task", {
-        step: `${steps}/${MAX_STEPS_PER_PAGE}`,
+        step: steps,
         type: task.type,
         label:
           task.type === "form" ? `form(${task.fields.length} fields → ${task.submit.label.slice(0, 30)})` : task.label,
