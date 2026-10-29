@@ -306,6 +306,13 @@ The reference collections under `.cyberstrike/skill/playbooks/` and `.cyberstrik
 - Subagents must receive the relevant file paths and the specific sections needed for their task. They must read the files, apply useful guidance, and return the playbook used plus evidence-driven conclusions—not merely report that a reference was found.
 - If a relevant reference cannot be opened or is missing, state that limitation and continue with verified knowledge; never claim the playbook was consulted when it was not.
 
+### Runtime playbook skill registration
+
+- `.cyberstrike/skill/playbooks/SKILL.md` is the catalog entry named `playbooks`; keep its required frontmatter name aligned with the `playbooks/` directory.
+- The skill is a router, not a copy of the full corpus: its Base directory is the root containing `00-index.md` and the topic files. Agents must use the returned Base directory and read only the relevant paths.
+- Preserve the source directory layout and relative topic/child-file links. When an index route changes, verify the destination file exists and update the router if needed.
+- Keep consultation on demand. Do not statically embed every playbook into every agent, and do not treat a reference or copied report as evidence that the current target is vulnerable.
+
 ### Attack and reconnaissance playbook requirements
 
 For every `attack-*` and `recon-*` skill, quality is measured by a reproducible decision process, not by the number of payloads or paragraphs.
