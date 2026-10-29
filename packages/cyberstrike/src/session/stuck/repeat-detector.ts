@@ -53,21 +53,18 @@ export function toolCallSucceeded(input: {
 
 export class RepeatDetector {
   private readonly counts = new Map<string, number>()
-  private nudged = false
+  private readonly nudgedSignatures = new Set<string>()
 
   /** @param limit occurrences of one signature before the detector reacts (default 3). */
   constructor(private readonly limit: number = 3) {}
 
   /**
-   * Feed the signatures of one completed step's tool calls. Returns the strongest
-   * verdict triggered this step: "nudge" once a signature reaches the limit so the
-   * caller can run a recovery turn with tools available; "abort" if it repeats after
-   * that recovery, so the caller can schedule a terminal wrap-up. "ok" otherwise.
+   * Feed the signatures of one completed step's tool calls. Each exact signature gets
+   * its own recovery opportunity: "nudge" when it first reaches the limit so tools
+   * remain available; "abort" only when that same signature repeats after recovery.
+   * A different tool/argument signature gets its own chance to change strategy.
    */
   observe(signatures: string[]): RepeatVerdict {
-    // A nudge triggered by this step must not turn another signature in the same
-    // step into an abort. Only a nudge from a prior step permits aborting now.
-    const wasNudgedBefore = this.nudged
     let verdict: RepeatVerdict = "ok"
     // Count each distinct signature at most ONCE per step: this detector measures
     // CROSS-turn repetition, so a within-turn burst of k identical calls (already
@@ -76,10 +73,10 @@ export class RepeatDetector {
       const n = (this.counts.get(sig) ?? 0) + 1
       this.counts.set(sig, n)
       if (n >= this.limit) {
-        if (wasNudgedBefore) {
+        if (this.nudgedSignatures.has(sig)) {
           verdict = "abort"
         } else {
-          this.nudged = true
+          this.nudgedSignatures.add(sig)
           if (verdict !== "abort") verdict = "nudge"
         }
       }
@@ -87,10 +84,10 @@ export class RepeatDetector {
     return verdict
   }
 
-  /** Clear all state — call at the start of each subagent run. */
+  /** Clear all state — call after real progress or at the start of a new run. */
   reset(): void {
     this.counts.clear()
-    this.nudged = false
+    this.nudgedSignatures.clear()
   }
 }
 
