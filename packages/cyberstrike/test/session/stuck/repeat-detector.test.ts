@@ -32,6 +32,18 @@ describe("RepeatDetector — cross-turn identical-call loop", () => {
     expect(d.observe(["a"])).toBe("nudge") // a=3
   })
 
+  test("a different repeated signature gets its own recovery before terminal wrap-up", () => {
+    const d = new RepeatDetector(3)
+    d.observe(["a"])
+    d.observe(["a"])
+    expect(d.observe(["a"])).toBe("nudge")
+
+    expect(d.observe(["b"])).toBe("ok")
+    expect(d.observe(["b"])).toBe("ok")
+    expect(d.observe(["b"])).toBe("nudge")
+    expect(d.observe(["b"])).toBe("abort")
+  })
+
   test("empty step is ok", () => {
     const d = new RepeatDetector(3)
     expect(d.observe([])).toBe("ok")
