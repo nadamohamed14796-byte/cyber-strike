@@ -1216,7 +1216,7 @@ export const BashTool = Tool.define("bash", async () => {
           command.push(child.text)
         }
 
-        // Apply request safety and persisted target-scope checks before known scanner binaries start.
+        // Apply request safety and persisted target-scope checks before a target-aware CLI starts, including executables not previously cataloged by name.
         await assertScannerReconGate(command, commandText, cwd)
 
         // not an exhaustive list, but covers most common cases
