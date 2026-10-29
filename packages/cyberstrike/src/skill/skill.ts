@@ -360,7 +360,7 @@ export namespace Skill {
     const catalog = await state()
 
     // Resolve only a canonical exact name (case-insensitive fallback is also exact).
-    let metadata = catalog.skills[name]
+    let metadata: Metadata | undefined = catalog.skills[name]
     if (!metadata) {
       const normalized = name.trim().toLocaleLowerCase("en-US")
       if (!normalized) return undefined
