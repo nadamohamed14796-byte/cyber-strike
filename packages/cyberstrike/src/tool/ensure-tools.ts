@@ -45,7 +45,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   gau: { check: "gau", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/lc/gau/v2/cmd/gau@latest", description: "URL aggregator" },
   waymore: {
     check: "waymore",
-    install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install waymore",
+    install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install git+https://github.com/xnl-h4ck3r/waymore.git",
     description: "Historical URL and archived-response discovery",
   },
   hakrawler: {
