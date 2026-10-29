@@ -516,7 +516,7 @@ test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bun
         )
       }
       if (pathname === "/assets/compressed.js.gz") {
-        return new Response(gzipSync('export function loadCompressed() { return fetch("/api/compressed") }'), {
+        return new Response(new Uint8Array(gzipSync('export function loadCompressed() { return fetch("/api/compressed") }')), {
           status: 200,
           headers: { "content-type": "application/gzip" },
         })
