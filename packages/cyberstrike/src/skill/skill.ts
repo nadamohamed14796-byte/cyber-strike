@@ -360,12 +360,15 @@ export namespace Skill {
     const catalog = await state()
 
     // Resolve only a canonical exact name (case-insensitive fallback is also exact).
-    const exact = catalog.skills[name]
-    const normalized = name.trim().toLocaleLowerCase("en-US")
-    const matches = normalized
-      ? Object.values(catalog.skills).filter((item) => item.name.trim().toLocaleLowerCase("en-US") === normalized)
-      : []
-    const metadata = exact ?? (matches.length === 1 ? matches[0] : undefined)
+    let metadata = catalog.skills[name]
+    if (!metadata) {
+      const normalized = name.trim().toLocaleLowerCase("en-US")
+      if (!normalized) return undefined
+      const matches = Object.values(catalog.skills).filter(
+        (item) => item.name.trim().toLocaleLowerCase("en-US") === normalized,
+      )
+      metadata = matches.length === 1 ? matches[0] : undefined
+    }
     if (!metadata) return undefined
 
     // Hydrate the full body only for the selected skill. Re-check identity and
