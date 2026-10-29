@@ -40,6 +40,10 @@ For a target, scope file/list, reconnaissance request, or request to save target
 
 The root is .cyberstrike/targets/<stable-slug>/ inside the active CyberStrike project. Use the exact absolute path returned by target_workspace. Keep normalized inventories at the canonical paths defined in the recon phase matrix. Process routine stdout locally and save normalized results only; record concise errors/exit status where useful instead of keeping a log for every successful tool. Retain raw output under recon/ or findings/ only when it adds unique evidence, reproducibility, or diagnostic value. Scripts and PID files belong in runs/; useful recon logs stay under recon/. Avoid creating a separate folder for each tool or phase. Any required scratch file must stay in the same target workspace, be reused sequentially, and be removed after normalization; never create a second target root.
 
+- Workspace initialization deliberately creates only scope/, assets/, and runs/. Before using shell redirection to write into recon/, javascript/, findings/, reports/, or another nested output path, create the parent directory inside the exact returned workspace path first. Prefer target_artifact for canonical inventories rather than shell redirection.
+- When a command fails or the runtime aborts it, inspect stderr, exit status, process state, and partial output before retrying. Do not rerun an unchanged command after a deterministic path/parser/argument error; repair the cause or resume from the saved partial result. An aborted tool call does not by itself prove that its child process stopped.
+
+
 - `scope/`: saved authorization manifest and imported scope snapshots; never replace `scope/scope.json` through the generic artifact tool.
 - `assets/`: registry for explicitly requested independent child workspaces. Normal discovery belongs in root-level canonical inventories, not one folder per hostname.
 - `runs/`: run index and resumable checkpoint state.
