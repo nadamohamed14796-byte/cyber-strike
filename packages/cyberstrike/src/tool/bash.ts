@@ -292,11 +292,12 @@ function hasTargetListInputArgument(args: string[]): boolean {
 export function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
 
-  // In a pipeline, commandText contains neighboring commands too. Never borrow
-  // an upstream seed URL as proof of the downstream command's actual stdin
-  // targets; parse this argv and literal producers below.
-  if (!commandText.includes("|")) {
-    for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>`]+/gi)) {
+  // commandText may represent a larger shell statement or pipeline, not just
+  // this AST command. Only use it as a URL fallback when it contains one
+  // invocation; otherwise a URL from a neighboring command could falsely mark
+  // a local command (for example cd) as a scanner. Parsed argv remains primary.
+  if (!/(?:&&|\|\||[|;\r\n])/.test(commandText)) {
+    for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
       addNormalizedTarget(candidates, match[0])
     }
   }
