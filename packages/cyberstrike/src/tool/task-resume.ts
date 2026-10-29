@@ -12,3 +12,19 @@ export function assertTaskResumeScope(task: ResumableTaskSession, parentSessionI
     throw new Error("Cannot resume task " + task.id + ": it does not belong to the current parent session.")
   }
 }
+
+/** Narrow permission bypass for in-scope, non-blocking Impact Hunter escalation only. */
+export function isInternalImpactHandoff(input: {
+  subagentType: string
+  background?: boolean
+  caller?: string
+  callerMode?: "subagent" | "primary" | "all"
+}) {
+  return (
+    input.subagentType === "impact-hunter" &&
+    input.background === true &&
+    input.caller !== undefined &&
+    input.caller !== "impact-hunter" &&
+    input.callerMode === "subagent"
+  )
+}
