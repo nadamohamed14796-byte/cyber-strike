@@ -58,3 +58,17 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop when scope or authorization is unclear, the resource does not belong to a test identity, a comparison would expose another person's data, a state change is not reversible, or no useful safe test remains. Do not bypass these conditions by switching tools or guessing identifiers.
+
+## Integrated BOLA/IDOR playbook — object × action × owner × tenant
+
+Do not treat ID manipulation as the entire test. First correlate the observed identifier with an actual resource and expected ownership boundary using captured requests, JavaScript/API schemas, response links, and known test fixtures. Then map the operation: read/list, update, delete, export/download, attachment, invite/share, nested child object, GraphQL node/edge, or bulk request.
+
+Use this comparison order when authorized:
+- Owner identity reads its own controlled object (positive baseline).
+- Another explicitly authorized test identity reads its own controlled object (identity/session control).
+- Cross-owner access to the other controlled object (the actual horizontal authorization check).
+- If indicated by evidence, compare tenant boundaries, nested parent/child ownership, object properties, exports/downloads, and alternate API versions/transports independently.
+
+IDs may be sequential, UUIDs, slugs, opaque references, arrays, or nested values; this is a classification list, not permission to enumerate or guess IDs. Use only identifiers already observed or objects created for the engagement. Test one relevant identifier at a time, preserve valid session/CSRF context, and use read-only operations first. State-changing tests require disposable test-owned fixtures and explicit authorization.
+
+A BOLA/IDOR finding requires the response to demonstrate access to a protected test-owned object or an unauthorized state change, with the owner baseline and negative/control comparison ruling out public data, cache leakage, stale sessions, and expected sharing. An echoed ID, generic 200, missing UI button, or error difference is not proof. Never access unrelated users' records or perform bulk collection. If no authorized owner/non-owner comparison exists, retain INCONCLUSIVE / NEEDS REVIEW and name the missing prerequisite.
