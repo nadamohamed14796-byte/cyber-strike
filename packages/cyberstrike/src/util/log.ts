@@ -106,18 +106,14 @@ export namespace Log {
       if (!info?.isFile()) continue
       files.push({ path: filepath, mtimeMs: info.mtimeMs, size: info.size })
     }
-    files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.path.localeCompare(b.path))
+    files.sort((a, b) => a.mtimeMs - b.mtimeMs || a.path.localeCompare(b.path))
     let totalBytes = files.reduce((sum, file) => sum + file.size, 0)
-    let kept = 0
+    let retainedCount = files.length
     for (const file of files) {
-      const exceedsCount = kept >= MAX_LOG_FILES
-      const exceedsBytes = totalBytes > MAX_TOTAL_LOG_BYTES
-      if (!exceedsCount && !exceedsBytes) {
-        kept++
-        continue
-      }
+      if (retainedCount <= MAX_LOG_FILES && totalBytes <= MAX_TOTAL_LOG_BYTES) break
       await fs.unlink(file.path).catch(() => {})
       totalBytes -= file.size
+      retainedCount--
     }
   }
 
