@@ -122,7 +122,7 @@ export namespace SkillIndex {
     return undefined
   }
 
-  function toEntry(skill: Skill.Info): Entry {
+  function toEntry(skill: Skill.Metadata): Entry {
     return {
       name: skill.name,
       description: skill.description,
