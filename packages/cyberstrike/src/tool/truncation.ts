@@ -13,6 +13,12 @@ export namespace Truncate {
   export const GLOB = path.join(DIR, "*")
   const RETENTION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
   const HOUR_MS = 60 * 60 * 1000
+  // Generated tool-output artifacts are temporary; bound individual and total disk usage.
+  export const MAX_OUTPUT_FILE_BYTES = 8 * 1024 * 1024
+  export const MAX_TOTAL_OUTPUT_BYTES = 128 * 1024 * 1024
+  const TOOL_OUTPUT_PREFIX = "tool_"
+  type OutputFile = { name: string; filepath: string; size: number; createdAt: number }
+  let storageQueue: Promise<void> = Promise.resolve()
 
   export type Result = { content: string; truncated: false } | { content: string; truncated: true; outputPath: string }
 
