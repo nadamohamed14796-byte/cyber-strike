@@ -43,3 +43,33 @@ For non-confirmed outcomes, record the hypothesis, exact tests performed, eviden
 
 ## Completion contract
 Return a concise outcome summary: status; strongest proven impact (or why none is proven); tests and controls performed; evidence/report IDs; chain hops confirmed/disproven/unresolved; severity rationale if reportable; and exact remaining blockers. Do not say “fully tested” when branches were blocked or not run.
+
+## SRC-Hunter-derived hypothesis expansion
+
+Use this section to broaden evidence-led investigation; it does not replace the existing scope guard, tool policy, or validation contract.
+
+### Select the next test from observed signals
+- Start from an actual request, response, JavaScript-derived route, role difference, state transition, or captured artifact. Do not turn a keyword, endpoint name, status code, version string, or static secret-like string into a confirmed vulnerability.
+- Classify the affected operation before choosing a hypothesis: read/list/export; create/update/delete; role/permission change; authentication/recovery; payment/order/credit; file upload/download; server-side URL fetch; GraphQL/WebSocket; or resource-consumption behavior.
+- Select the smallest relevant existing specialist skill/playbook. For API routes, consider object-level authorization (BOLA/IDOR), function-level authorization, property authorization/mass assignment, authentication/session, rate/resource controls, and business invariants separately. For URL-consuming features consider SSRF only when server-side fetching is evidenced. For JS findings, correlate route + parameter + caller/request + auth context before handing off.
+- For each hypothesis record: observed trigger, security invariant, actor and controlled fixture, one changed variable, expected secure behavior, expected vulnerable signal, negative/disconfirming control, evidence location, and safe stop condition.
+- Prefer the lowest-risk test that can distinguish the hypothesis. Use researcher-controlled accounts and synthetic objects; do not enumerate real users, extract bulk data, use exposed credentials, execute destructive actions, or create real financial/message side effects.
+
+### Control-gap matrix
+For a sensitive operation, check only controls relevant to its semantics:
+- Read/export: authentication, object/tenant ownership, field-level disclosure, pagination/export bounds.
+- Create/update/delete: authentication, object ownership, server-controlled fields, state-transition validation, CSRF where browser credentials and a meaningful state change apply.
+- Roles/permissions: function-level authorization and authoritative persisted role state.
+- Login/recovery/MFA: identity binding, token lifecycle, replay, expiry, and low-impact rate controls.
+- Payments/orders/credits: server-side price/amount, ownership, idempotency, and legal state transitions; use disposable/test fixtures only.
+- URL fetch/import/preview: server-side request evidence, destination validation, redirect handling, and safe controlled callback; do not probe internal/cloud metadata by default.
+- Upload/download/path: authorization, canonicalized path/storage boundary, content handling, and access to a controlled canary only.
+- GraphQL/WebSocket: per-operation and per-field authorization, subscription context, and bounded resource use.
+
+A successful HTTP status alone does not prove a missing control. Compare a baseline and a controlled negative case, then verify the relevant state or data boundary with the minimum necessary evidence.
+
+### Chain decision
+When an initial weakness suggests a stronger impact, propose one next hop at a time. Every hop must have a concrete trigger and prerequisite, an in-scope destination, a separate proof criterion, and a disconfirming control. Keep chain confidence separate from finding confidence and severity. Never report a hypothetical terminal impact; preserve the original finding and attach verified evidence to the chain. If the next hop is blocked, unsafe, out of scope, or unsupported by current signals, record that exact state and continue other independent work.
+
+### Evidence quality gate
+Before marking confirmed, require the exact request/response or equivalent artifact, test identity/context, baseline vs changed condition, observable security-boundary violation, and a short explanation of what each artifact proves. Record reproducibility and limitations honestly. Redact credentials and personal data in report copies; keep originals only in the authorized target-local evidence store. Do not claim a source-hunter playbook, tool, or MCP server is available unless CyberStrike's actual tool registry confirms it.
