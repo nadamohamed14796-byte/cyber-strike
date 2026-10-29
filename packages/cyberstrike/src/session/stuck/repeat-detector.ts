@@ -170,6 +170,8 @@ export class FailedToolStreakDetector {
   private streak = 0
   private readonly signatures = new Set<string>()
   private recoveryRequired = false
+  private recoveryCycles = 0
+  private readonly maxRecoveries = 2
 
   constructor(private readonly limit: number = 4) {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("limit must be a positive safe integer")
@@ -185,10 +187,11 @@ export class FailedToolStreakDetector {
 
     const current = new Set(failed.map((call) => toolSig(call.tool, call.input)))
     if (this.recoveryRequired) {
-      // Only terminate when recovery repeats the same failed call pattern. A genuinely
-      // different tool/argument signature gets a fresh chance to make progress.
       const alternatives = [...current].filter((signature) => !this.signatures.has(signature))
-      if (!alternatives.length) return "abort"
+      // A changed method gets a chance to run after the first recovery. If it also
+      // fails after the second recovery cycle, stop this path and let the orchestrator
+      // continue independent work instead of endlessly generating novel failed calls.
+      if (!alternatives.length || this.recoveryCycles >= this.maxRecoveries) return "abort"
       this.streak = 1
       this.signatures.clear()
       for (const signature of alternatives) this.signatures.add(signature)
@@ -199,6 +202,8 @@ export class FailedToolStreakDetector {
     this.streak++
     for (const signature of current) this.signatures.add(signature)
     if (this.streak < this.limit) return "ok"
+    if (this.recoveryCycles >= this.maxRecoveries) return "abort"
+    this.recoveryCycles++
     this.recoveryRequired = true
     return "nudge"
   }
@@ -207,5 +212,6 @@ export class FailedToolStreakDetector {
     this.streak = 0
     this.signatures.clear()
     this.recoveryRequired = false
+    this.recoveryCycles = 0
   }
 }
