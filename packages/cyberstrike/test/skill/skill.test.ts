@@ -51,6 +51,9 @@ Instructions here.
       const testSkill = skills.find((s) => s.name === "test-skill")
       expect(testSkill).toBeDefined()
       expect(testSkill!.description).toBe("A test skill for verification.")
+      expect("content" in testSkill!).toBe(false)
+      const hydrated = await Skill.get("test-skill")
+      expect(hydrated?.content).toContain("Instructions here.")
       // Models sometimes change identifier casing; only a unique exact-name
       // match ignoring case should be accepted (never fuzzy substring matching).
       expect((await Skill.get("TEST-SKILL"))?.name).toBe("test-skill")
