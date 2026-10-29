@@ -48,27 +48,42 @@ describe("IngestQueue.enqueue", () => {
     })
   })
 
-  test("runs tasks sequentially in enqueue order", async () => {
+  test("runs independent tasks concurrently for the same session", async () => {
     await withInstance(async () => {
       const sid = "s2"
-      const order: number[] = []
-      const a = defer()
-      const b = defer()
+      const releaseA = defer()
+      const releaseB = defer()
+      const started: string[] = []
+      const finished: string[] = []
       IngestQueue.enqueue(sid, async () => {
-        await a.promise
-        order.push(1)
+        started.push("a")
+        await releaseA.promise
+        finished.push("a")
       })
       IngestQueue.enqueue(sid, async () => {
-        await b.promise
-        order.push(2)
+        started.push("b")
+        await releaseB.promise
+        finished.push("b")
       })
       expect(IngestQueue.pendingCount(sid)).toBe(2)
-      b.resolve() // even if b ready first, must wait for a
-      await new Promise((r) => setTimeout(r, 5))
-      expect(order).toEqual([])
-      a.resolve()
       await new Promise((r) => setTimeout(r, 10))
-      expect(order).toEqual([1, 2])
+      expect(started.sort()).toEqual(["a", "b"])
+      releaseB.resolve()
+      releaseA.resolve()
+      await new Promise((r) => setTimeout(r, 10))
+      expect(finished.sort()).toEqual(["a", "b"])
+      expect(IngestQueue.pendingCount(sid)).toBe(0)
+    })
+  })
+
+  test("tracks intake while normalization is in progress", async () => {
+    await withInstance(async () => {
+      const sid = "track-intake"
+      const work = defer()
+      const tracked = IngestQueue.track(sid, () => work.promise, sid)
+      expect(IngestQueue.pendingCount(sid)).toBe(1)
+      work.resolve()
+      await tracked
       expect(IngestQueue.pendingCount(sid)).toBe(0)
     })
   })
@@ -188,13 +203,15 @@ describe("IngestQueue.pause / resume", () => {
 })
 
 describe("IngestQueue parent-child controls", () => {
-  test("captured requests use one parent queue while each task runs in its child session", async () => {
+  test("captured request child analyses run concurrently and share only parent queue controls", async () => {
     await withInstance(async () => {
-      const parent = "parent-serial-ingest"
-      const childA = "child-serial-ingest-a"
-      const childB = "child-serial-ingest-b"
+      const parent = "parent-parallel-ingest"
+      const childA = "child-parallel-ingest-a"
+      const childB = "child-parallel-ingest-b"
       const firstStarted = defer()
+      const secondStarted = defer()
       const releaseFirst = defer()
+      const releaseSecond = defer()
       const order: string[] = []
 
       IngestQueue.enqueue(parent, async () => {
@@ -205,16 +222,21 @@ describe("IngestQueue parent-child controls", () => {
       await firstStarted.promise
 
       IngestQueue.enqueue(parent, async () => {
+        secondStarted.resolve()
+        await releaseSecond.promise
         order.push(childB)
       }, parent)
 
-      await new Promise((r) => setTimeout(r, 10))
+      await secondStarted.promise
       expect(order).toEqual([])
       expect(IngestQueue.pendingCount(parent)).toBe(2)
 
+      releaseSecond.resolve()
       releaseFirst.resolve()
       await new Promise((r) => setTimeout(r, 20))
-      expect(order).toEqual([childA, childB])
+      expect(order).toHaveLength(2)
+      expect(order).toContain(childA)
+      expect(order).toContain(childB)
       expect(IngestQueue.pendingCount(parent)).toBe(0)
     })
   })
@@ -368,6 +390,30 @@ describe("Single live analysis transcript entry", () => {
       expect(texts).toHaveLength(1)
       expect(texts[0]).toContain("GET /second")
       expect(texts[0]).not.toContain("GET /first")
+
+      await IngestSummary.updateLiveNotice({
+        sessionID: session.id,
+        live: first,
+        text: "STALE earlier request output",
+      })
+      const afterStaleWrite = await Session.messages({ sessionID: session.id })
+      const afterStaleText = afterStaleWrite.flatMap((message) => message.parts)
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+      expect(afterStaleText).toHaveLength(1)
+      expect(afterStaleText[0]).toContain("GET /second")
+      expect(afterStaleText[0]).not.toContain("STALE earlier request output")
+
+      await IngestSummary.updateLiveNotice({
+        sessionID: session.id,
+        live: second,
+        text: "Latest request /second remains visible",
+      })
+      const afterCurrentWrite = await Session.messages({ sessionID: session.id })
+      const afterCurrentText = afterCurrentWrite.flatMap((message) => message.parts)
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+      expect(afterCurrentText[0]).toContain("Latest request /second remains visible")
       await Session.remove(session.id)
     })
   })

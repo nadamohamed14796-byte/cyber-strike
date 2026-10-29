@@ -1670,7 +1670,20 @@ export const SessionRoutes = lazy(() =>
         }
 
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
-        const isHTTPRequest = looksLikeHTTPRequest(body.text, Boolean(body.scheme || body.response))
+        // Malformed/truncated browser captures still carry metadata. Never let them
+        // fall through into the active parent chat prompt as ordinary text.
+        const hasCaptureMetadata = Boolean(
+          body.scheme ||
+            body.response ||
+            body.credential_id ||
+            body.credential ||
+            body.trigger_element ||
+            body.element_roles?.length ||
+            body.ui_context ||
+            body.page_url ||
+            body.page_visited_by?.length,
+        )
+        const isHTTPRequest = looksLikeHTTPRequest(body.text, hasCaptureMetadata)
 
         // Scope-check captured HTTP traffic BEFORE normalization: Normalize.run may
         // update endpoint templates and invoke the Tier-3 model. Out-of-scope input
@@ -1718,7 +1731,10 @@ export const SessionRoutes = lazy(() =>
           const session = await Session.create({})
           sessionID = session.id
         }
-        const normalized = await runNormalize(body, sessionID, ingestDryRun)
+        const activeSessionID = sessionID
+        const normalized = isHTTPRequest
+          ? await IngestQueue.track(activeSessionID, () => runNormalize(body, activeSessionID, ingestDryRun), activeSessionID)
+          : await runNormalize(body, activeSessionID, ingestDryRun)
 
         // Never route a malformed extension capture into the ordinary parent-chat
         // branch. That fallback writes into the active text window and can hijack

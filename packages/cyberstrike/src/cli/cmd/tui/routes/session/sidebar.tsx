@@ -41,6 +41,15 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return out
   })
   const requests = createMemo(() => sync.data.request[props.sessionID] ?? [])
+  const requestStatusCounts = createMemo(() => {
+    const all = requests()
+    return {
+      queued: all.filter((r) => r.status === "queued").length,
+      processing: all.filter((r) => r.status === "processing").length,
+      processed: all.filter((r) => r.status === "processed").length,
+      failed: all.filter((r) => r.status === "failed").length,
+    }
+  })
   // Group endpoints by host for sidebar — narrow column can't fit
   // method+host+path on one line, so we render the host once per group
   // and let each row use the full width for its path.
@@ -198,13 +207,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
             <Show when={(queueStatus()?.pending ?? 0) > 0 || queueStatus()?.paused}>
               <box>
                 <text fg={theme.text}>
-                  <b>Ingest Queue</b>
+                  <b>Request Queue</b>
                 </text>
                 <text fg={queueStatus()?.paused ? theme.warning : theme.success}>
                   {queueStatus()?.paused ? "⏸ Paused" : "● Running"}
                 </text>
                 <Show when={(queueStatus()?.pending ?? 0) > 0}>
-                  <text fg={theme.textMuted}>{queueStatus()!.pending} pending</text>
+                  <text fg={theme.textMuted}>{queueStatus()!.pending} request(s) queued or preparing</text>
                 </Show>
                 <text fg={theme.info}>{queueStatus()?.paused ? "/qresume" : "/qpause"}</text>
               </box>
@@ -507,9 +516,12 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     <text fg={theme.text}>{expanded.requests ? "▼" : "▶"}</text>
                   </Show>
                   <text fg={theme.text}>
-                    <b>Endpoints</b>
+                    <b>Requests</b>
                   </text>
                 </box>
+                <text fg={theme.textMuted} wrapMode="word">
+                  {requestStatusCounts().queued} queued · {requestStatusCounts().processing} analyzing · {requestStatusCounts().processed} done · {requestStatusCounts().failed} failed
+                </text>
                 <Show when={requests().length <= 2 || expanded.requests}>
                   <For each={requestsByHost()}>
                     {([host, rows]) => (
@@ -532,10 +544,11 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                                         queued: theme.textMuted,
                                         processing: theme.warning,
                                         processed: theme.success,
+                                        failed: theme.error,
                                       }[r.status] ?? theme.text,
                                   }}
                                 >
-                                  •
+                                  {r.status === "queued" ? "◌" : r.status === "processing" ? "●" : r.status === "processed" ? "✓" : "✗"}
                                 </text>
                                 <text fg={theme.accent} flexShrink={0}>
                                   {r.method}
@@ -549,6 +562,20 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                                   </text>
                                 </Show>
                               </box>
+                              <text
+                                fg={
+                                  {
+                                    queued: theme.textMuted,
+                                    processing: theme.warning,
+                                    processed: theme.success,
+                                    failed: theme.error,
+                                  }[r.status] ?? theme.text
+                                }
+                                wrapMode="none"
+                                style={{ paddingLeft: 4 }}
+                              >
+                                {r.status === "queued" ? "Queued" : r.status === "processing" ? "Analyzing" : r.status === "processed" ? "Processed" : "Failed"}
+                              </text>
                               {/* Observed values tree — fetched on expand */}
                               <Show when={expandedEp[r.id] && r.key_hash}>
                                 <For each={sync.data.request_observation[r.key_hash!]?.params ?? []}>

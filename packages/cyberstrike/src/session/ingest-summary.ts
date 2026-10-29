@@ -103,6 +103,24 @@ export namespace IngestSummary {
   }
 
   const activeLiveNotices = new Map<string, LiveNotice>()
+  // Serialize only changes to the single parent-side live panel, not request analyses.
+  const liveNoticeLocks = new Map<string, Promise<void>>()
+
+  async function withLiveNoticeLock<T>(sessionID: string, run: () => Promise<T>): Promise<T> {
+    const previous = liveNoticeLocks.get(sessionID) ?? Promise.resolve()
+    let release!: () => void
+    const current = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    liveNoticeLocks.set(sessionID, current)
+    await previous
+    try {
+      return await run()
+    } finally {
+      release()
+      if (liveNoticeLocks.get(sessionID) === current) liveNoticeLocks.delete(sessionID)
+    }
+  }
 
   /** Create one parent-transcript entry that can be updated as the subagent streams.
    * Keeping one stable part per captured request makes the live analysis visible
@@ -114,20 +132,47 @@ export namespace IngestSummary {
     text: string
     requestAnalysis: Omit<RequestAnalysis, "status">
   }): Promise<LiveNotice> {
-    const startedAt = Date.now()
-    // Keep exactly one parent-chat analysis entry per session. The queue is
-    // sequential, so each newly active request replaces the previous entry
-    // instead of leaving a transcript full of completed request notices.
-    const previous = activeLiveNotices.get(input.sessionID)
-    if (previous) {
-      const live: LiveNotice = {
-        ...previous,
-        startedAt,
-        requestAnalysis: input.requestAnalysis,
+    return withLiveNoticeLock(input.sessionID, async () => {
+      const startedAt = Date.now()
+      // Keep one stable parent-chat analysis entry per session. A small lock prevents
+      // concurrent captures from creating competing parent messages.
+      const previous = activeLiveNotices.get(input.sessionID)
+      if (previous) {
+        const live: LiveNotice = {
+          ...previous,
+          startedAt,
+          requestAnalysis: input.requestAnalysis,
+        }
+        await Session.updatePart({
+          id: live.partID,
+          messageID: live.messageID,
+          sessionID: input.sessionID,
+          type: "text",
+          text: input.text,
+          time: { start: startedAt },
+          metadata: {
+            kind: KIND,
+            notice: true,
+            live: true,
+            requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
+          },
+        })
+        activeLiveNotices.set(input.sessionID, live)
+        return live
       }
+      const messageID = Identifier.ascending("message")
+      const partID = Identifier.ascending("part")
+      await Session.updateMessage({
+        id: messageID,
+        role: "user",
+        sessionID: input.sessionID,
+        time: { created: startedAt },
+        agent: input.agent,
+        model: input.model,
+      })
       await Session.updatePart({
-        id: live.partID,
-        messageID: live.messageID,
+        id: partID,
+        messageID,
         sessionID: input.sessionID,
         type: "text",
         text: input.text,
@@ -139,36 +184,10 @@ export namespace IngestSummary {
           requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
         },
       })
+      const live = { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
       activeLiveNotices.set(input.sessionID, live)
       return live
-    }
-    const messageID = Identifier.ascending("message")
-    const partID = Identifier.ascending("part")
-    await Session.updateMessage({
-      id: messageID,
-      role: "user",
-      sessionID: input.sessionID,
-      time: { created: startedAt },
-      agent: input.agent,
-      model: input.model,
     })
-    await Session.updatePart({
-      id: partID,
-      messageID,
-      sessionID: input.sessionID,
-      type: "text",
-      text: input.text,
-      time: { start: startedAt },
-      metadata: {
-        kind: KIND,
-        notice: true,
-        live: true,
-        requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
-      },
-    })
-    const live = { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
-    activeLiveNotices.set(input.sessionID, live)
-    return live
   }
 
   /** Update the same visible transcript entry while the captured request is analyzed. */
@@ -179,7 +198,12 @@ export namespace IngestSummary {
     completed?: boolean
     status?: RequestAnalysisStatus
   }): Promise<void> {
-    await Session.updatePart({
+    await withLiveNoticeLock(input.sessionID, async () => {
+      const active = activeLiveNotices.get(input.sessionID)
+      // A previous request may finish after a newer request becomes the visible focus.
+      // Re-check inside the lock so stale streaming/final writes cannot win a race.
+      if (active && active.requestAnalysis.requestID !== input.live.requestAnalysis.requestID) return
+      await Session.updatePart({
       id: input.live.partID,
       messageID: input.live.messageID,
       sessionID: input.sessionID,
@@ -198,6 +222,7 @@ export namespace IngestSummary {
           status: input.status ?? "analyzing",
         },
       },
+      })
     })
   }
 
