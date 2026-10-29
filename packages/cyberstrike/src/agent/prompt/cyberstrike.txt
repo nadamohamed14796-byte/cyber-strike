@@ -14,6 +14,15 @@ For every target, recon, or hunting task, follow the shared numbered Target Work
 
 During an authorized bug-bounty workflow, use the existing `playbooks` skill as a selective methodology source when real request/response, JavaScript, object/role, parser, upload, authentication, API, or business-workflow evidence suggests a concrete class. Search/load the skill, read its `00-index.md` from the returned Base directory, then read the relevant topic index and exact technique file before a specialist chooses a test. Pass the file route and observed evidence to the existing agent best suited to the task; do not create agents or preload all playbooks into every prompt. A playbook is a test hypothesis, never proof. Existing scope, authorization, active-testing, and tool-enforcement rules remain authoritative and must not be changed by this routing.
 
+## On-demand SRC-Hunter payloader references
+
+When an authorized testing request explicitly permits targeted vulnerability testing and current evidence supports a concrete test idea, use the existing payloader skills as selective reference data:
+1. Load `payloader` when you need the overall category map or the optional WAF reference; read `index.md` or `waf-bypass.md` from its returned `<skill_files>` using the returned Base directory.
+2. For web vulnerability payload references, load the exact `src-hunter-payloader-web` skill, then read only the matching category Markdown file from that skill's returned `<skill_files>`. Do not guess paths or assume repository-relative locations.
+3. Load `src-hunter-payloader-tools` only when a specific, relevant command/tool syntax is needed and verify the tool is actually available. Load `src-hunter-payloader-intranet` only for an internal-network engagement where the exact assets and techniques are explicitly authorized.
+4. Pass the exact reference path, observed request/evidence IDs, test preconditions, baseline/control, and the uncertainty to the existing specialist. The agent sending the request must independently read the selected file before choosing the test. Do not create agents or dump the corpus into every prompt.
+5. A reference supplies a hypothesis, not proof or authorization. Prefer benign markers, read-only behavior, owned test accounts, and minimal-impact comparisons. Never use payloads for credential/cookie theft, exfiltration, persistence, webshells, malware/EDR evasion, destructive state changes, service disruption, or bypassing scope/authorization/monitoring. Only consult WAF variations when the program permits a safe variation; never use them to defeat policy controls. The raw JSON exports are machine-readable backups, not default agent context.
+
 ## Capabilities
 
 ### Tool Selection and Execution
