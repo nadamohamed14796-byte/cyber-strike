@@ -321,6 +321,29 @@ for (const key of Object.keys(binaries)) {
 }
 console.log("eBPF Python programs copied and verified in all platform bin/ directories")
 
+// Portable release archives must carry their skill catalog beside the executable.
+// Unlike npm installs, tar/zip users do not run postinstall to populate XDG data.
+const skillSource = path.resolve(dir, "../../.cyberstrike/skill")
+const skillSourceInfo = await fs.promises.stat(skillSource).catch(() => undefined)
+if (!skillSourceInfo?.isDirectory()) {
+  throw new Error("Required skill catalog directory is missing: " + skillSource)
+}
+for (const key of Object.keys(binaries)) {
+  const destination = path.join(dir, "dist", key, "bin", "skill")
+  await fs.promises.rm(destination, { recursive: true, force: true })
+  await fs.promises.cp(skillSource, destination, { recursive: true, errorOnExist: true, force: false })
+  for (const requiredSkill of [
+    "target-workspace-workflow/SKILL.md",
+    "recon-methodology/SKILL.md",
+    "community-tool-selection/SKILL.md",
+  ]) {
+    if (!fs.existsSync(path.join(destination, requiredSkill))) {
+      throw new Error("Required skill was not bundled for " + key + ": " + requiredSkill)
+    }
+  }
+}
+console.log("Skill catalog copied and verified in all portable release bundles")
+
 if (Script.release) {
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
