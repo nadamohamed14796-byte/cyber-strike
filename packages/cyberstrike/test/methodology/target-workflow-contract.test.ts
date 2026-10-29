@@ -22,3 +22,15 @@ test("missing tools are installed by exact name and are not silently substituted
   expect(contract).toContain("Do not spend time hunting for a substitute")
   expect(contract).toContain("mark that method blocked")
 })
+
+
+test("primary workflow steps have unique numbering and closeout comes after investigation", () => {
+  const primarySteps = [...contract.matchAll(/^\s*(\d+)\.\s/gm)].map((match) => match[1])
+  expect(new Set(primarySteps).size).toBe(primarySteps.length)
+  expect(contract.indexOf("6. **Chain skills and delegate only from evidence.")).toBeGreaterThan(
+    contract.indexOf("5. **Goal and stop condition:"),
+  )
+  expect(contract.indexOf("9. **Verify, report, and close cleanly.")).toBeGreaterThan(
+    contract.indexOf("8a. **Reconcile coverage before finishing."),
+  )
+})
