@@ -61,12 +61,12 @@ export namespace Truncate {
     return result
   }
 
-  async function listOutputFiles(): Promise<OutputFile[]> {
-    const entries = await fs.readdir(DIR, { withFileTypes: true }).catch(() => [])
+  async function listOutputFiles(directory = DIR): Promise<OutputFile[]> {
+    const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => [])
     const files: OutputFile[] = []
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.startsWith(TOOL_OUTPUT_PREFIX)) continue
-      const filepath = path.join(DIR, entry.name)
+      const filepath = path.join(directory, entry.name)
       const info = await fs.stat(filepath).catch(() => undefined)
       if (!info?.isFile()) continue
       let idTimestamp = 0
@@ -85,9 +85,9 @@ export namespace Truncate {
     return files
   }
 
-  async function cleanupUnlocked(): Promise<void> {
+  async function cleanupUnlocked(directory = DIR): Promise<void> {
     const cutoff = Date.now() - RETENTION_MS
-    const files = await listOutputFiles()
+    const files = await listOutputFiles(directory)
     let retained = files.filter((file) => file.createdAt >= cutoff)
     for (const file of files) {
       if (file.createdAt >= cutoff) continue
@@ -102,8 +102,8 @@ export namespace Truncate {
     }
   }
 
-  export async function cleanup() {
-    await serializeStorage(cleanupUnlocked)
+  export async function cleanup(directory = DIR) {
+    await serializeStorage(() => cleanupUnlocked(directory))
   }
 
   function boundedStoredOutput(text: string): { content: string; truncated: boolean; originalBytes: number } {
