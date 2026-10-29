@@ -340,34 +340,35 @@ Use this skill.
         fn: async () => {
           try {
             const tool = await SkillTool.init()
-          const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+            const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
 
-          const search = await tool.execute(
-            { action: "search", query: "src-hunter-payloader-web", limit: 10 },
-            ctx,
-          )
-          expect(search.output).toContain("src-hunter-payloader-web")
-          expect(search.output).toContain("Search Results")
-
-          const loaded = await tool.execute(
-            { action: "load", name: "src-hunter-payloader-web" },
-            ctx,
-          )
-          const webDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader", "by-category", "web")
-          const reference = path.resolve(webDir, "xss跨站脚本.md")
-          expect(loaded.title).toBe("Loaded skill: src-hunter-payloader-web")
-          expect(loaded.output).toContain("Read the exact category file before choosing a test.")
-          expect(loaded.output).toContain(`Base directory for this skill: ${pathToFileURL(webDir).href}`)
-          expect(loaded.output).toContain(`<file>${reference}</file>`)
-          expect(loaded.output).not.toContain("PAYLOADER_RUNTIME_READ_MARKER")
-          expect(SkillContext.isLoaded("src-hunter-payloader-web")).toBe(true)
-
-          const rootLoaded = await tool.execute({ action: "load", name: "payloader" }, ctx)
-          const rootDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader")
-          expect(rootLoaded.output).toContain("Payload index")
-            expect(rootLoaded.output).toContain(
-              `<file>${path.resolve(rootDir, "index.md")}</file>`,
+            const search = await tool.execute(
+              { action: "search", query: "src-hunter-payloader-web", limit: 10 },
+              ctx,
             )
+            expect(search.output).toContain("src-hunter-payloader-web")
+            expect(search.output).toContain("Search Results")
+
+            const loaded = await tool.execute(
+              { action: "load", name: "src-hunter-payloader-web" },
+              ctx,
+            )
+            const webDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader", "by-category", "web")
+            const reference = path.resolve(webDir, "xss跨站脚本.md")
+            expect(loaded.title).toBe("Loaded skill: src-hunter-payloader-web")
+            expect(loaded.output).toContain("Read the exact category file before choosing a test.")
+            expect(loaded.output).toContain(`Base directory for this skill: ${pathToFileURL(webDir).href}`)
+            expect(loaded.output).toContain(`<file>${reference}</file>`)
+            expect(loaded.output).not.toContain("PAYLOADER_RUNTIME_READ_MARKER")
+            expect(await Bun.file(reference).text()).toContain("PAYLOADER_RUNTIME_READ_MARKER")
+            expect(SkillContext.isLoaded("src-hunter-payloader-web")).toBe(true)
+
+            const rootLoaded = await tool.execute({ action: "load", name: "payloader" }, ctx)
+            const rootDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader")
+            const indexPath = path.resolve(rootDir, "index.md")
+            expect(rootLoaded.title).toBe("Loaded skill: payloader")
+            expect(rootLoaded.output).toContain(`<file>${indexPath}</file>`)
+            expect(await Bun.file(indexPath).text()).toContain("Payload index")
           } finally {
             SkillContext.clear()
           }
