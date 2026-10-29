@@ -55,14 +55,64 @@ export namespace Truncate {
     })
   }
 
-  export async function cleanup() {
-    const cutoff = Identifier.timestamp(Identifier.create("tool", false, Date.now() - RETENTION_MS))
-    const glob = new Bun.Glob("tool_*")
-    const entries = await Array.fromAsync(glob.scan({ cwd: DIR, onlyFiles: true })).catch(() => [] as string[])
+  function serializeStorage<T>(action: () => Promise<T>): Promise<T> {
+    const result = storageQueue.then(action, action)
+    storageQueue = result.then(() => undefined, () => undefined)
+    return result
+  }
+
+  async function listOutputFiles(): Promise<OutputFile[]> {
+    const entries = await fs.readdir(DIR, { withFileTypes: true }).catch(() => [])
+    const files: OutputFile[] = []
     for (const entry of entries) {
-      if (Identifier.timestamp(entry) >= cutoff) continue
-      await fs.unlink(path.join(DIR, entry)).catch(() => {})
+      if (!entry.isFile() || !entry.name.startsWith(TOOL_OUTPUT_PREFIX)) continue
+      const filepath = path.join(DIR, entry.name)
+      const info = await fs.stat(filepath).catch(() => undefined)
+      if (!info?.isFile()) continue
+      const idTimestamp = Identifier.timestamp(entry.name)
+      files.push({
+        name: entry.name,
+        filepath,
+        size: info.size,
+        createdAt: Number.isFinite(idTimestamp) && idTimestamp > 0 ? idTimestamp : info.mtimeMs,
+      })
     }
+    return files
+  }
+
+  async function cleanupUnlocked(): Promise<void> {
+    const cutoff = Date.now() - RETENTION_MS
+    const files = await listOutputFiles()
+    let retained = files.filter((file) => file.createdAt >= cutoff)
+    for (const file of files) {
+      if (file.createdAt >= cutoff) continue
+      await fs.unlink(file.filepath).catch(() => {})
+    }
+    let totalBytes = retained.reduce((sum, file) => sum + file.size, 0)
+    retained.sort((a, b) => a.createdAt - b.createdAt || a.name.localeCompare(b.name))
+    while (totalBytes > MAX_TOTAL_OUTPUT_BYTES && retained.length > 0) {
+      const oldest = retained.shift()!
+      await fs.unlink(oldest.filepath).catch(() => {})
+      totalBytes -= oldest.size
+    }
+  }
+
+  export async function cleanup() {
+    await serializeStorage(cleanupUnlocked)
+  }
+
+  function boundedStoredOutput(text: string): { content: string; truncated: boolean; originalBytes: number } {
+    const original = Buffer.from(text, "utf-8")
+    if (original.byteLength <= MAX_OUTPUT_FILE_BYTES) {
+      return { content: text, truncated: false, originalBytes: original.byteLength }
+    }
+    const notice = "\n\n[CyberStrike disk safeguard: saved output capped at " + MAX_OUTPUT_FILE_BYTES + " bytes; original was " + original.byteLength + " bytes. Beginning and end retained.]\n\n"
+    const available = MAX_OUTPUT_FILE_BYTES - Buffer.byteLength(notice, "utf-8")
+    const headBytes = Math.floor(available * 0.7)
+    const tailBytes = available - headBytes
+    const head = original.subarray(0, headBytes).toString("utf-8")
+    const tail = original.subarray(original.byteLength - tailBytes).toString("utf-8")
+    return { content: head + notice + tail, truncated: true, originalBytes: original.byteLength }
   }
 
   function hasTaskTool(agent?: Agent.Info): boolean {
