@@ -51,10 +51,25 @@ export namespace SessionProcessor {
         while (true) {
           try {
             let currentText: MessageV2.TextPart | undefined
+            let pendingTextDelta = ""
+            let pendingTextChunks = 0
+            const flushTextDelta = async () => {
+              if (!currentText || !pendingTextDelta) return
+              await Session.updatePartDelta({
+                sessionID: currentText.sessionID,
+                messageID: currentText.messageID,
+                partID: currentText.id,
+                field: "text",
+                delta: pendingTextDelta,
+              })
+              pendingTextDelta = ""
+              pendingTextChunks = 0
+            }
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
             const stream = await LLM.stream(streamInput)
 
             for await (const value of stream.fullStream) {
+              if (value.type !== "text-delta") await flushTextDelta()
               input.abort.throwIfAborted()
               switch (value.type) {
                 case "start":
@@ -318,14 +333,10 @@ export namespace SessionProcessor {
                 case "text-delta":
                   if (currentText) {
                     currentText.text += value.text
+                    pendingTextDelta += value.text
+                    pendingTextChunks++
                     if (value.providerMetadata) currentText.metadata = value.providerMetadata
-                    await Session.updatePartDelta({
-                      sessionID: currentText.sessionID,
-                      messageID: currentText.messageID,
-                      partID: currentText.id,
-                      field: "text",
-                      delta: value.text,
-                    })
+                    if (pendingTextChunks >= 8 || pendingTextDelta.length >= 64) await flushTextDelta()
                   }
                   break
 
