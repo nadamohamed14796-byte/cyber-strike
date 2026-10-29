@@ -79,7 +79,7 @@ export namespace Log {
       const value = typeof msg === "string" ? msg : String(msg)
       const incomingBytes = Buffer.byteLength(value, "utf-8")
       if (logBytesWritten + incomingBytes > MAX_LOG_FILE_BYTES) {
-        const marker = "\\n[CyberStrike log limit reached; later log entries omitted to protect disk space.]\\n"
+        const marker = String.fromCharCode(10) + "[CyberStrike log limit reached; later log entries omitted to protect disk space.]" + String.fromCharCode(10)
         const markerBytes = Buffer.byteLength(marker, "utf-8")
         if (logBytesWritten + markerBytes <= MAX_LOG_FILE_BYTES) {
           writer.write(marker)
