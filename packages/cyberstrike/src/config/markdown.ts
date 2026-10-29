@@ -69,10 +69,13 @@ export namespace ConfigMarkdown {
 
   export async function parse(filePath: string) {
     const template = await Bun.file(filePath).text()
+    return parseContent(template, filePath)
+  }
 
+  /** Parse an already-read Markdown file so catalog discovery does not read each skill twice. */
+  export async function parseContent(template: string, filePath: string) {
     try {
-      const md = matter(template)
-      return md
+      return matter(template)
     } catch {
       try {
         return matter(fallbackSanitization(template))
@@ -80,7 +83,7 @@ export namespace ConfigMarkdown {
         throw new FrontmatterError(
           {
             path: filePath,
-            message: `${filePath}: Failed to parse YAML frontmatter: ${err instanceof Error ? err.message : String(err)}`,
+            message: filePath + ": Failed to parse YAML frontmatter: " + (err instanceof Error ? err.message : String(err)),
           },
           { cause: err },
         )
