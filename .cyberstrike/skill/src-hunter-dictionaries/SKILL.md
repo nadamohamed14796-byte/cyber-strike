@@ -7,6 +7,8 @@ tags: [src-hunter, dictionaries, fingerprint, default-credentials, middleware]
 
 # SRC-Hunter dictionaries
 
+## When to load
+
 Load this skill only after target evidence matches a component or configuration pattern. Read `00-index.md` and then the smallest relevant reference:
 - `chinese-srcfingerprints.md` for observed component fingerprints.
 - `default-credentials-cn.md` only when the program permits a narrowly targeted default-credential check.
