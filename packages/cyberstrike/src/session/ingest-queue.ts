@@ -18,6 +18,39 @@ export namespace IngestQueue {
     return data
   })
 
+  // Reserve ordering synchronously at intake, before awaited request setup.
+  // The actual queue reservation is created only when this ticket reaches the head.
+  const intakeOrder = Instance.state(() => ({} as Record<string, Promise<void>>))
+
+  export interface IntakeOrderReservation {
+    previous: Promise<void>
+    release(): void
+  }
+
+  export function reserveOrder(key: string): IntakeOrderReservation {
+    const chains = intakeOrder()
+    const previous = chains[key] ?? Promise.resolve()
+    let resolveSlot!: () => void
+    let released = false
+    const slot = new Promise<void>((resolve) => {
+      resolveSlot = resolve
+    })
+    const chain = previous.then(() => slot)
+    chains[key] = chain
+
+    return {
+      previous,
+      release() {
+        if (released) return
+        released = true
+        resolveSlot()
+        void chain.then(() => {
+          if (chains[key] === chain) delete chains[key]
+        })
+      },
+    }
+  }
+
   function getOrInit(sessionID: string): State {
     let s = state()[sessionID]
     if (!s) {
