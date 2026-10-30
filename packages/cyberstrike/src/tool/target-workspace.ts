@@ -636,36 +636,12 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           }
           parent = ancestor
         }
-        let candidate: URL
-        try { candidate = new URL(assetURL) } catch { throw new Error("Asset URL must be an absolute HTTP(S) URL.") }
-        if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) {
-          throw new Error("Asset URL must be a credential-free HTTP(S) URL.")
-        }
-        const observedURL = candidate.origin
+        const observedURL = await TargetMemory.recordAssetObservation(
+          parent,
+          assetURL,
+          params.asset_type as TargetAssetType | undefined,
+        )
         const registryPath = path.join(parent.workspacePath, "assets", "registry.json")
-        let registry: { schemaVersion?: number; parentTargetID?: string; targetURL?: string; updatedAt?: string; assets?: unknown[]; observations?: Array<{ url: string; type?: string; observedAt?: string; status?: string }> } = {}
-        try {
-          const info = await fs.lstat(registryPath)
-          if (!info.isFile() || info.isSymbolicLink()) throw new Error("Asset registry is not a regular file.")
-          registry = JSON.parse(await fs.readFile(registryPath, "utf-8"))
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-        }
-        const observations = Array.isArray(registry.observations) ? registry.observations : []
-        const existing = observations.find((item) => item.url === observedURL)
-        const nextObservations = existing
-          ? observations.map((item) => item.url === observedURL ? { ...item, type: params.asset_type ?? item.type, status: "observed" } : item)
-          : [...observations, { url: observedURL, type: params.asset_type ?? "host", observedAt: new Date().toISOString(), status: "observed" }]
-        registry = {
-          ...registry,
-          schemaVersion: registry.schemaVersion ?? 2,
-          parentTargetID: parent.id,
-          targetURL: parent.targetURL,
-          updatedAt: new Date().toISOString(),
-          assets: Array.isArray(registry.assets) ? registry.assets : [],
-          observations: nextObservations,
-        }
-        await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\n")
         return {
           title: "Asset added to root inventory",
           output: [
