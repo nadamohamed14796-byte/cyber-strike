@@ -1314,7 +1314,11 @@ export namespace TargetMemory {
       if (!await parentChainAuthorizes(new URL(normalized.targetURL), parent)) {
         throw new Error("The selected parent scope and its ancestors do not authorize this child target.")
       }
-    } else {
+    } else if (!normalized.hostname.startsWith("*.")) {
+      // A wildcard URL is a legacy program-scope identity, not a concrete
+      // asset beneath an existing host. Keep it as a root policy container;
+      // otherwise an overlapping exact-host grant can accidentally absorb it
+      // as a child and prevent it from becoming the canonical program ledger.
       parent = await findAuthorizedParent(new URL(normalized.targetURL).origin)
     }
     const requestedAssetType = parent ? guessAssetType(normalized.hostname, options.assetType) : "target"
