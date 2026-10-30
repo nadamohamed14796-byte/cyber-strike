@@ -42,8 +42,14 @@ export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
     const context: Record<string, unknown> = {}
 
     const allRequests = Request.get(sessionID)
-    // The endpoint being tested now = the single request in 'processing' (serial queue).
-    const currentReq = allRequests.find((r) => r.status === "processing") ?? allRequests.at(-1)
+    // Prefer the active FIFO item. If the broker is between turns, select the
+    // oldest queued capture rather than allRequests.at(-1), which is the newest
+    // request and caused batches to appear to start at request 10. Only fall back
+    // to the latest completed item when no work is pending.
+    const currentReq =
+      allRequests.find((request) => request.status === "processing") ??
+      allRequests.find((request) => request.status === "queued") ??
+      allRequests.at(-1)
 
     // 1. RECENT (inline): objects + functions linked to THIS request — bounded per-request,
     //    constant in session size. The substrate (schema + cross-credential values) inline so
