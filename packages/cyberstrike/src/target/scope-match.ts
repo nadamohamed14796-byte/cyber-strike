@@ -210,7 +210,7 @@ function matchJavaScriptFileScope(rawTarget: string, identifier: string, allowEi
     targetURL.username || targetURL.password || scopeURL.username || scopeURL.password
   ) return { matches: false, reason: "JavaScript file scope and target must be credential-free HTTP(S) URLs" }
   const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(scopeURL.pathname)
-  const sourceMapFile = allowSourceMap && /\.map$/i.test(scopeURL.pathname)
+  const sourceMapFile = /\.map$/i.test(scopeURL.pathname) && (allowSourceMap || /\.(?:js|mjs|cjs)\.map$/i.test(scopeURL.pathname))
   if (!scriptFile && !sourceMapFile) {
     return { matches: false, reason: "JavaScript scope must identify one exact script or source-map file" }
   }
