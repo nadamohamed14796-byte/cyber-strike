@@ -487,7 +487,7 @@ test("serializes concurrent target-note writes and rebuilds notes.md from SQLite
   })
 })
 
-test("serializes concurrent asset-registry updates without dropping attached assets", async () => {
+test("serializes concurrent asset-registry updates without dropping attached assets or observations", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -503,17 +503,35 @@ test("serializes concurrent asset-registry updates without dropping attached ass
         "https://static.asset-registry.example.test",
         "https://auth.asset-registry.example.test",
       ]
+      const observedURLs = [
+        "https://media.asset-registry.example.test",
+        "https://docs.asset-registry.example.test",
+        "https://metrics.asset-registry.example.test",
+        "https://media.asset-registry.example.test",
+      ]
 
-      await Promise.all(assetURLs.map((assetURL) =>
-        TargetMemory.attachAsset(configured.workspace.targetURL, assetURL),
-      ))
+      await Promise.all([
+        ...assetURLs.map((assetURL) =>
+          TargetMemory.attachAsset(configured.workspace.targetURL, assetURL),
+        ),
+        ...observedURLs.map((assetURL) =>
+          TargetMemory.recordAssetObservation(configured.workspace, assetURL),
+        ),
+      ])
 
       const registryPath = path.join(configured.workspace.workspacePath, "assets", "registry.json")
       const registry = JSON.parse(await fs.readFile(registryPath, "utf-8")) as {
         assets: Array<{ targetURL: string; workspaceID: string }>
+        observations: Array<{ url: string; type?: string; observedAt?: string; status?: string }>
       }
       expect(registry.assets.map((asset) => asset.targetURL).sort()).toEqual([...assetURLs].sort())
       expect(new Set(registry.assets.map((asset) => asset.workspaceID)).size).toBe(assetURLs.length)
+      expect(registry.observations.map((item) => item.url).sort()).toEqual([
+        "https://docs.asset-registry.example.test",
+        "https://media.asset-registry.example.test",
+        "https://metrics.asset-registry.example.test",
+      ])
+      expect(registry.observations).toHaveLength(3)
 
       const notes = await fs.readFile(path.join(configured.workspace.workspacePath, "notes.md"), "utf-8")
       for (const assetURL of assetURLs) expect(notes).toContain(assetURL)
