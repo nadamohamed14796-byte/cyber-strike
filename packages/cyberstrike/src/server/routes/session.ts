@@ -435,14 +435,14 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
   const truncatedRawRequest = req.raw_request ?? `${req.method} ${req.normalized_path} HTTP/1.1`
   let childSessionID: string | undefined
   let failureReason: string | undefined
-  // A request becomes processed only after agent processing and summary
-  // persistence both complete. Failed work stays visible and is not auto-replayed.
+  // A request is processed only after agent work and evidence persistence complete.
+  // Failed work remains visible in the request inventory and is not auto-replayed.
   let finalStatus: "processed" | "failed" = "failed"
   try {
     // Mark the dequeued request active immediately so queue waiters never open panels.
     Request.updateStatus({ id: req.id, status: "processing" })
-    // Preserve the normal model preference order while opening the panel before
-    // configuration/session startup, so those failures still have visible status.
+    // Resolve the configured Proxy Agent model before starting the broker turn.
+    // Startup failures remain visible through the persisted request status.
     const proxyAgent = await Agent.get(agentName)
     if (!proxyAgent || proxyAgent.mode === "primary") {
       throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
@@ -488,52 +488,52 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
         reason: emptyStatic ? "confirmed-empty-static-html" : "exact-processed-repeat",
       })
     } else {
-    // Respect ordered user permission overrides, but never fail silently.
-    const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
-    if (taskPermission !== "allow") {
-      throw new Error(
-        `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
-      )
-    }
-    const config = await Config.get()
-    const before = IngestSummary.snapshot(sessionID)
-    // Render at dequeue so Observed Values includes observations accrued while waiting.
-    const promptText = buildPrompt()
-    log.info("captured request prompt prepared", {
-      sessionID,
-      analysisSessionID,
-      requestID: req.id,
-      promptBytes: Buffer.byteLength(promptText, "utf8"),
-      rawRequestBytes: Buffer.byteLength(req.raw_request ?? "", "utf8"),
-      responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
-      rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
-      responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
-    })
-    const agentResult = await SessionPrompt.prompt({
-      sessionID: analysisSessionID,
-      agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
-      model,
-      // Match TaskTool's subagent runtime: specialist delegation remains
-      // available only when the proxy-agent's permission profile allows it.
-      tools: {
-        todowrite: false,
-        todoread: false,
-        ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
-      },
-      // Keep the broker's prior request turns so discoveries can be
-      // correlated across captures. The exact current request_id is
-      // carried in this new user turn and delegated explicitly by Task.
-      parts: [{ type: "text", text: promptText }],
-    })
-    // SessionPrompt.prompt can resolve with an assistant message carrying
-    // an error, stuck-abort, or step-cap marker instead of throwing.
-    // Do not turn those incomplete runs into a successful ingest status.
-    const agentInfo = agentResult.info
-    const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
-    const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
-    const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
-    const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
-    if (agentIncomplete) {
+      // Respect ordered user permission overrides, but never fail silently.
+      const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
+      if (taskPermission !== "allow") {
+        throw new Error(
+          `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
+        )
+      }
+      const config = await Config.get()
+      const before = IngestSummary.snapshot(sessionID)
+      // Render at dequeue so Observed Values includes observations accrued while waiting.
+      const promptText = buildPrompt()
+      log.info("captured request prompt prepared", {
+        sessionID,
+        analysisSessionID,
+        requestID: req.id,
+        promptBytes: Buffer.byteLength(promptText, "utf8"),
+        rawRequestBytes: Buffer.byteLength(req.raw_request ?? "", "utf8"),
+        responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
+        rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
+        responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
+      })
+      const agentResult = await SessionPrompt.prompt({
+        sessionID: analysisSessionID,
+        agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
+        model,
+        // Match TaskTool's subagent runtime: specialist delegation remains
+        // available only when the proxy-agent's permission profile allows it.
+        tools: {
+          todowrite: false,
+          todoread: false,
+          ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
+        },
+        // Keep the broker's prior request turns so discoveries can be
+        // correlated across captures. The exact current request_id is
+        // carried in this new user turn and delegated explicitly by Task.
+        parts: [{ type: "text", text: promptText }],
+      })
+      // SessionPrompt.prompt can resolve with an assistant message carrying
+      // an error, stuck-abort, or step-cap marker instead of throwing.
+      // Do not turn those incomplete runs into a successful ingest status.
+      const agentInfo = agentResult.info
+      const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
+      const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
+      const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
+      const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
+      if (agentIncomplete) {
     }
     await IngestSummary.write({
       // The persistent broker must not receive a synthetic user turn
