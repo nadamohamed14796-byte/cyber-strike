@@ -91,7 +91,7 @@ export function assertTaskResumeScope(task: ResumableTaskSession, parentSessionI
   }
 }
 
-/** Narrow permission bypass for in-scope, non-blocking Impact Hunter escalation only. */
+/** Narrow permission bypass for background Impact Hunter escalation only. */
 export function isInternalImpactHandoff(input: {
   subagentType: string
   background?: boolean
@@ -103,6 +103,6 @@ export function isInternalImpactHandoff(input: {
     input.background === true &&
     input.caller !== undefined &&
     input.caller !== "impact-hunter" &&
-    input.callerMode === "subagent"
+    input.callerMode !== undefined
   )
 }
