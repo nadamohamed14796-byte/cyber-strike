@@ -139,7 +139,8 @@ export function Prompt(props: PromptProps) {
     () =>
       !!props.sessionID &&
       !!sync.session.get(props.sessionID)?.parentID &&
-      (sync.session.get(props.sessionID)?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
+      (sync.session.get(props.sessionID)?.title === "Agent Proxy" ||
+        sync.session.get(props.sessionID)?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         lastUserMessage()?.agent === "proxy-agent"),
   )
   const activeAgentName = () => (isProxyAgentSession() ? "proxy-agent" : local.agent.current().name)
