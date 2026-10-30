@@ -6,7 +6,8 @@ import { Skill } from "../../src/skill/skill"
 
 test("every exact skill load referenced by an agent prompt exists and can be hydrated", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
-  const promptRoot = path.join(repoRoot, "src", "agent", "prompt")
+  const packageRoot = path.resolve(import.meta.dir, "../..")
+  const promptRoot = path.join(packageRoot, "src", "agent", "prompt")
   // Use Node's directory traversal instead of Bun.Glob's absolute-path mode.
   // On the CI runner that mode yields a NUL-suffixed cwd and fs.readFile fails
   // before the referenced-skill checks can run.
