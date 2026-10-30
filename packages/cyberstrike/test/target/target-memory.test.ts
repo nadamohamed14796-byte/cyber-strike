@@ -209,6 +209,30 @@ test("scheme-less URL scope preserves its path and does not authorize sibling pa
   })
 })
 
+test("normalizes explicit JavaScript asset URLs as exact file scopes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://program.example.test", {
+        include: ["https://cdn.example.test/assets/app.js?v=123", "Source Map: https://cdn.example.test/assets/app.js.map?hash=abc"],
+        authorizationSource: "Operator-confirmed JavaScript asset list",
+        authorizationReference: "https://program.example.test/policy",
+      })
+      expect(configured.scope.scopeItems).toEqual([
+        "JavaScript: https://cdn.example.test/assets/app.js",
+        "JavaScript: https://cdn.example.test/assets/app.js.map",
+      ])
+      expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js?v=456")).allowed).toBe(true)
+      expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js")).allowed).toBe(false)
+      expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js.map?cache=2")).allowed).toBe(true)
+      expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js.map")).allowed).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("persists an explicit target scope with authorization provenance and exclusions", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
