@@ -89,6 +89,15 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://api.att.com:9443/", entries)).toEqual([])
   })
 
+  test("indexes bare host/path grants as URL constraints", () => {
+    const entries = ["api.example.com/v1"]
+    expect(matchingScopeItems("https://api.example.com/v1", entries)).toEqual(entries)
+    expect(matchingScopeItems("https://api.example.com/v1/users", entries)).toEqual(entries)
+    expect(matchingScopeItems("https://api.example.com/v10/users", entries)).toEqual([])
+    expect(matchingScopeItems("https://other.example.com/v1", entries)).toEqual([])
+    expect(matchingScopeItems("https://api.example.com/admin", entries)).toEqual([])
+  })
+
   test("matches IPv4 CIDRs and refuses addresses outside the range", () => {
     const entries = ["192.0.2.0/24"]
     expect(matchingScopeItems("https://192.0.2.17/", entries)).toEqual(["192.0.2.0/24"])
