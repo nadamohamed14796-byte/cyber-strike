@@ -9,6 +9,7 @@ export interface EmptyStaticResponseInput {
   responseStatus?: number
   responseContentType?: string
   responseSize?: number
+  contentLength?: string
   htmlSource?: string
   rawRequest?: string
   bodyHash?: string
@@ -43,6 +44,10 @@ export function isConfirmedEmptyStaticHTML(input: EmptyStaticResponseInput): boo
   if (!input.responseContentType?.toLowerCase().includes("text/html")) return false
   if (input.htmlSource === undefined || input.responseSize === undefined) return false
   if (Buffer.byteLength(input.htmlSource, "utf8") !== input.responseSize) return false
+  if (input.contentLength !== undefined) {
+    const declaredLength = Number.parseInt(input.contentLength, 10)
+    if (!Number.isFinite(declaredLength) || declaredLength !== input.responseSize) return false
+  }
   if (input.bodyHash || input.queryHash || input.protocol || input.operation) return false
   if (requestHasQueryOrBody(input.rawRequest)) return false
   if (input.triggerElement || input.elementRoles?.length) return false
