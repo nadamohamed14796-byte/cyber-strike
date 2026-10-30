@@ -221,7 +221,7 @@ test("normalizes explicit JavaScript asset URLs as exact file scopes", async () 
       })
       expect(configured.scope.scopeItems).toEqual([
         "JavaScript: https://cdn.example.test/assets/app.js",
-        "JavaScript: https://cdn.example.test/assets/app.js.map",
+        "Source Map: https://cdn.example.test/assets/app.js.map",
       ])
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js?v=456")).allowed).toBe(true)
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js")).allowed).toBe(false)
