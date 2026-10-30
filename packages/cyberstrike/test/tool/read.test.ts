@@ -171,6 +171,7 @@ describe("tool.read env file permissions", () => {
         directory: tmp.path,
         fn: async () => {
           const agent = await Agent.get(agentName)
+          if (!agent) throw new Error(`Test agent "${agentName}" is not registered.`)
           let askedForEnv = false
           const ctxWithPermissions = {
             ...ctx,
