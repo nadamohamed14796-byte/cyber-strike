@@ -506,6 +506,16 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
+                log.info("captured request prompt prepared", {
+                  sessionID,
+                  analysisSessionID,
+                  requestID: req.id,
+                  promptBytes: Buffer.byteLength(promptText, "utf8"),
+                  rawRequestBytes: Buffer.byteLength(req.raw_request ?? "", "utf8"),
+                  responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
+                  rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
+                  responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
+                })
                 // Mirror only the subagent's visible text output into this stable parent
                 // transcript entry. Tool internals and hidden reasoning are not copied.
                 // This lets the user watch the request being analyzed without opening a
