@@ -307,7 +307,7 @@ describe("session.llm.stream", () => {
           agent,
           system: ["You are a helpful assistant."],
           abort: new AbortController().signal,
-          messages: [{ role: "user", content: "Hello" }],
+          messages: [{ role: "user", content: "Run a test" }],
           tools: {
             probe: tool({
               description: "A test tool used to verify tool calling is enabled",
@@ -334,7 +334,7 @@ describe("session.llm.stream", () => {
         expect(body.temperature).toBe(0.4)
         expect(body.top_p).toBe(0.8)
         expect(body.stream).toBe(true)
-        expect(body.tool_choice).toBe("auto")
+        expect(body.tool_choice).toBe("required")
         expect(body.messages).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
