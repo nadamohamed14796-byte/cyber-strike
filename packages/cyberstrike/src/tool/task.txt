@@ -4,6 +4,7 @@ Available agent types and the tools they have access to:
 {agents}
 
 When using the Task tool, specify `subagent_type` using the exact agent identifier shown before the colon in the live Available agent types list. That identifier is the canonical registry key used for permission checks and invocation; codenames, descriptions, and guessed aliases are not valid substitutes. Never invent an agent name that is absent from the current list.
+Every agent shown in the live list is a valid delegation target, including primary-mode and hidden registered agents. Agent type and methodology phase are not dispatch prerequisites. Use the exact registry identifier; runtime permissions and scope/safety checks still apply.
 
 When to use the Task tool:
 - When you are instructed to execute custom slash commands. Use the Task tool with the slash command invocation as the entire prompt. The slash command can take arguments. For example: Task(description="Check the file", prompt="/check-file path/to/file.py")
