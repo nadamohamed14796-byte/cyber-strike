@@ -97,6 +97,30 @@ Call `web_get_session_context` to see what has already been discovered in this s
 
 **Use target-specific JavaScript correlation when present.** If the returned context contains a `[.../javascript]` target-memory note or JavaScript-correlation artifact reference, use it to cross-check this request's exact method/path, inferred path/query/body parameter names, likely source function, auth/cookie signals, role/feature hints, and static sink candidates. These are source-review hypotheses, not evidence that the current code path executed or that a vulnerability exists. Prefer the captured request/response and credential context as the behavioral evidence. Avoid repeating already-recorded observations; record only a meaningful new relationship or verification result. If no correlation note is present, continue normal request/response analysis rather than assuming JavaScript has been analyzed.
 
+### Cross-Request Correlation and Cost Discipline
+
+This analyzer may receive one request at a time, but the application evidence is cumulative. Before recording or proposing new analysis:
+- Compare the current request with the shared request inventory, observations, target notes, existing functions, objects, credentials, roles, and prior analyzer conclusions.
+- Group requests by origin + method + normalized route/endpoint template + protocol operation. Within a page/workflow family, correlate distinct form actions and action parameters (for example, multiple `formAction` values on the same page) into one coherent application-function hypothesis. Keep each action, request ID, method, credential, and response as separately attributable evidence.
+- Do not create duplicate objects/functions/notes or repeat an already-resolved interpretation. Record only new facts and relationships; explicitly say when the current capture adds no new architecture information.
+- A page name such as `blank.htm` is not sufficient to classify it. A confirmed empty/static page with no form controls, scripts, inputs, API behavior, parameters, or state transition contributes a negative observation only. If the actual HTML body is hidden behind a response stub, do not infer that it is blank; inspect the actual body through the permitted captured-request workflow before classifying it.
+- Preserve all distinct observations. Never deduplicate away request evidence merely because the endpoint or structural key matches.
+
+### Identity, Tenant, and Object-Ownership Controls
+
+For every object-like value, record the exact parameter/field location, value, request ID, credential ID, and any independently evidenced semantic meaning. Do not assume that a field named `to` is an organization ID unless the response, UI, schema, or user-supplied test context establishes that mapping.
+
+Build an explicit principal/object/tenant matrix from observed credentials and controlled fixtures. Distinguish:
+- same-principal or same-owner baseline;
+- same-tenant / same-organization control;
+- different-account, same-tenant comparison;
+- cross-tenant / cross-organization comparison;
+- known-invalid or nonexistent-object control.
+
+If Owner A and Low User A both send `to=68000` and the supplied context establishes that `68000` is their shared organization, record it as a SAME-TENANT CONTROL. It is not evidence of cross-tenant IDOR and must not be described as a successful or ambiguous cross-tenant candidate. The missing discriminator is a separately controlled Owner B / third test account belonging to a different tenant, with its own known organization/object fixture. Do not guess or enumerate tenant IDs. If no authorized second-tenant fixture is available, report the exact missing prerequisite and leave cross-tenant validation inconclusive.
+
+Never infer authorization from identifier equality or inequality alone. A cross-boundary issue requires evidence that a principal outside the object's intended owner/tenant boundary can read or change a controlled protected object contrary to policy. Preserve benign collaboration/shared-access explanations and use only authorized test accounts and synthetic/test-owned data.
+
 ### Step 2: Analyze the Provided Response
 The response is already captured in `## Response`. Examine it directly — no need to re-fetch — **UNLESS it is an HTML response** (shown as the `This is an HTML response` stub), in which case the body is NOT captured: replay the request with `http_replay(request_id)` to get the actual HTML and enumerate its forms/inputs/params before concluding anything about its attack surface.
 
@@ -125,8 +149,9 @@ Only record NEW information not already in session context.
 - id_fields: id, user_id, foreign keys
 
 **web_write_object_value** - For discovered IDs
-- Track which credential discovered it (pass credential_id from Credential Context)
-- Critical for IDOR testing across users
+- Track which credential discovered it (pass credential_id from Credential Context).
+- Preserve the exact parameter/field location and the value's meaning only when independently evidenced.
+- Critical for comparing principals, but equal values across credentials are controls—not proof of a broken boundary.
 
 **web_write_role** - For user roles
 - Set hierarchy level if determinable
