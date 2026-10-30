@@ -188,7 +188,7 @@ describe("Methodology — Prerequisites", () => {
     })
   })
 
-  test("blocked phase with deliverables emits a blocking ordering violation", async () => {
+  test("blocked phase with deliverables emits a non-blocking ordering warning", async () => {
     await Instance.provide({
       directory: projectRoot,
       fn: async () => {
@@ -219,7 +219,7 @@ describe("Methodology — Prerequisites", () => {
           expect.arrayContaining([
             expect.objectContaining({
               gate: "methodology_ordering",
-              severity: "blocking",
+              severity: "warning",
               message: expect.stringContaining('Input Validation Testing'),
             }),
           ]),
