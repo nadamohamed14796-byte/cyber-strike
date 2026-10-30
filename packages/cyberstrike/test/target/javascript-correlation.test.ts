@@ -845,9 +845,9 @@ test("parses captured version-3 source maps and analyzes embedded source content
     file: "app.js",
     sources: ["src/profile.ts", "src/render.ts"],
     sourcesContent: [
-      'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }
+      `export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }
 export async function verifyEmailToken(token) { return fetch("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ token }) }) }
-const verifyButton = <button onClick={verifyEmailToken}>Verify</button>',
+const verifyButton = <button onClick={verifyEmailToken}>Verify</button>`,
       'function renderUser(value) { document.body.innerHTML = value }\nconst api_key = "' + secret + '";',
     ],
     names: [],
@@ -871,6 +871,9 @@ const verifyButton = <button onClick={verifyEmailToken}>Verify</button>',
     sourceMapSourcesContentAvailable: true,
   })
   expect(profileSource?.analysis?.requests.some((request) => request.path === "/api/profiles/{profileId}")).toBe(true)
+  expect(profileSource?.analysis?.functions.some((fn) => fn.name === "verifyEmailToken" && fn.callSites?.some((site) => site.kind === "ui-event-binding"))).toBe(true)
+  expect(profileSource?.analysis?.workflowSignals?.some((signal) => signal.kind === "email-verification-flow" && signal.functionName === "verifyEmailToken")).toBe(true)
+  expect(profileSource?.analysis?.requests.some((request) => request.sourceFunction === "verifyEmailToken" && request.method === "POST" && request.path === "/api/auth/email/verify" && request.bodyParameters.includes("token"))).toBe(true)
   expect(renderSource?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
   expect(JSON.stringify(files)).toContain("src/profile.ts")
   expect(JSON.stringify(files)).not.toContain(secret)

@@ -1436,7 +1436,6 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
 }
 
 function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): string[] {
-function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): string[] {
   const signals = [...(graph.javascriptAnalysis.workflowSignals ?? [])].sort((a, b) =>
     a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line || a.kind.localeCompare(b.kind),
   )
