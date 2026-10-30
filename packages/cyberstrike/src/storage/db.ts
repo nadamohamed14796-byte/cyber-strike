@@ -127,7 +127,7 @@ export namespace Database {
         }
       }
 
-      if (entry.name === "20261030210000_request-html-source" && tableExists(sqlite, "request")) {
+      if (entry.name === "20261030210000_request-analysis-preflight" && tableExists(sqlite, "request")) {
         const columns = tableColumns(sqlite, "request")
         if (columns.has("empty_static_html")) {
           const addEmptyStaticHTML = /ALTER TABLE request ADD COLUMN empty_static_html INTEGER NOT NULL DEFAULT 0;/i
