@@ -33,6 +33,7 @@ import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { shouldRestoreFailedSubmission, submissionFailureMessage } from "./submission"
+import { requestIDFromPromptText } from "@/tool/task-resume"
 
 export type PromptProps = {
   sessionID?: string
@@ -652,6 +653,16 @@ export function Prompt(props: PromptProps) {
     }
     const variant = activeVariant()
     const agentName = activeAgentName()
+    const lastBrokerUserMessage = lastUserMessage()
+    const activeBrokerRequestID =
+      isProxyAgentSession() && lastBrokerUserMessage
+        ? requestIDFromPromptText(
+            (sync.data.part[lastBrokerUserMessage.id] ?? [])
+              .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
+              .map((part) => part.text)
+              .join("\\n"),
+          )
+        : undefined
 
     if (store.mode === "shell") {
       void sdk.client.session.shell({
@@ -695,6 +706,15 @@ export function Prompt(props: PromptProps) {
           })),
       }).catch((error) => handleSubmissionFailure("Slash command", error, submittedPrompt, sessionID))
     } else {
+      const promptText = activeBrokerRequestID
+        ? [
+            "## Current request",
+            `- request_id: ${activeBrokerRequestID}`,
+            "- source: TUI",
+            "",
+            inputText,
+          ].join("\\n")
+        : inputText
       void sdk.client.session
         .prompt({
           sessionID,
@@ -707,7 +727,7 @@ export function Prompt(props: PromptProps) {
             {
               id: Identifier.ascending("part"),
               type: "text",
-              text: inputText,
+              text: promptText,
             },
             ...nonTextParts.map((x) => ({
               id: Identifier.ascending("part"),
