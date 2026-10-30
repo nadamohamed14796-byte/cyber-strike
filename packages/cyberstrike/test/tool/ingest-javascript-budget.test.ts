@@ -663,3 +663,41 @@ test("processes the complete JavaScript worklist without a file-count cap, decom
     server.stop(true)
   }
 }, 60_000)
+
+test("JavaScript ingestion resolves an app subdomain to the canonical program workspace", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+        include: ["*.example.test"],
+        authorizationSource: "Local wildcard JavaScript workspace fixture",
+        authorizationReference: "https://example.test/security-policy",
+      })
+      // Simulate a legacy duplicate root left by an older release.
+      await TargetMemory.configureScope("https://www.example.test", {
+        include: ["www.example.test"],
+        authorizationSource: "Legacy exact-host workspace fixture",
+        authorizationReference: "https://example.test/security-policy",
+      })
+
+      const tool = await IngestJavaScriptURLsTool.init()
+      const result = await tool.execute({
+        target_url: "https://app.example.test",
+        urls: [],
+        source: "unit-test-subdomain-root-resolution",
+        force_refresh: false,
+      }, toolContext("ses_js_canonical_subdomain_test"))
+
+      const metadata = result.metadata as Record<string, unknown>
+      expect(metadata.workspace).toBe(wildcard.workspace.workspacePath)
+      expect(metadata.manifest_path).toBe(
+        path.join(wildcard.workspace.workspacePath, "javascript", "asset-manifest.json"),
+      )
+      // Historical rows are preserved, but the app host never creates or writes
+      // to another workspace once the canonical root has been resolved.
+      expect(TargetMemory.list()).toHaveLength(2)
+    },
+  })
+})
+
