@@ -2797,7 +2797,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       } catch {}
     }
     const workspaces = Database.use((db) => {
-      const rows: typeof TargetWorkspaceTable.$inferSelect[] = []
+      const rows: Array<typeof TargetWorkspaceTable.$inferSelect> = []
       const candidates = [...workspaceCandidates]
       for (let offset = 0; offset < candidates.length; offset += 500) {
         rows.push(
