@@ -546,14 +546,18 @@ export namespace Session {
 
   export function root(sessionID: string): string {
     let current = sessionID
-    for (let i = 0; i < 10; i++) {
+    const visited = new Set<string>()
+    while (true) {
+      if (visited.has(current)) {
+        throw new Error(`Session parent cycle detected while resolving root for ${sessionID}`)
+      }
+      visited.add(current)
       const row = Database.use((db) =>
         db.select({ parent_id: SessionTable.parent_id }).from(SessionTable).where(eq(SessionTable.id, current)).get(),
       )
       if (!row?.parent_id) return current
       current = row.parent_id
     }
-    return current
   }
 
   export const children = fn(Identifier.schema("session"), async (parentID) => {
@@ -593,18 +597,31 @@ export namespace Session {
   // you pass the main session or any subagent within it.
   export const usage = fn(Identifier.schema("session"), async (sessionID) => {
     const rootID = root(sessionID)
-    // Collect the whole subtree by parent_id only — the tree relationship is the
-    // source of truth and children always share the root's project, so no project
-    // filter is needed (and root() doesn't filter either). Depth is 1 in practice
-    // (subagents can't spawn subagents); the bounded BFS is just future-proofing.
+    // Aggregate the full descendant tree. Subagents may delegate recursively,
+    // so do not cap nesting depth or the number of child sessions. Batch parent
+    // IDs to stay below SQLite's bind-parameter limit and de-duplicate defensively.
     const ids = [rootID]
+    const visited = new Set<string>(ids)
     let frontier = [rootID]
-    for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
-      const next = Database.use((db) =>
-        db.select({ id: SessionTable.id }).from(SessionTable).where(inArray(SessionTable.parent_id, frontier)).all(),
-      ).map((r) => r.id)
-      ids.push(...next)
-      frontier = next
+    while (frontier.length > 0) {
+      const discovered = Database.use((db) => {
+        const result: string[] = []
+        for (let offset = 0; offset < frontier.length; offset += 500) {
+          const parentIDs = frontier.slice(offset, offset + 500)
+          result.push(
+            ...db
+              .select({ id: SessionTable.id })
+              .from(SessionTable)
+              .where(inArray(SessionTable.parent_id, parentIDs))
+              .all()
+              .map((row) => row.id),
+          )
+        }
+        return result
+      })
+      frontier = [...new Set(discovered)].filter((id) => !visited.has(id))
+      for (const id of frontier) visited.add(id)
+      ids.push(...frontier)
     }
     const rows = Database.use((db) =>
       db.select({ data: MessageTable.data }).from(MessageTable).where(inArray(MessageTable.session_id, ids)).all(),
