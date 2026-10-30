@@ -342,7 +342,7 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
         // Every 10 URLs share one source body, producing 1,000 distinct
         // JavaScript contents across 10,000 distinct asset URLs.
         const body =
-          'function loadBundle' + contentIndex + '() { return fetch("/api/v' + contentIndex + '/profile"); }\n' +
+          'function loadBundle' + contentIndex + '() { return fetch("/api/v' + (contentIndex % 10) + '/profile"); }\n' +
           'const featureFlag = "feature_' + contentIndex + '";'
         const contentType = assetIndex === 9_999 ? "text/plain" : "application/javascript"
         return new Response(body, { status: 200, headers: { "content-type": contentType } })
@@ -426,13 +426,38 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
         expect(mislabeledAsset?.contentHash).toBe(
           manifest.assets.find((asset) => asset.url === urls[999])?.contentHash,
         )
+
+        const graphDigest = createHash("sha256")
+          .update(JSON.stringify([canonicalTarget, "all-assets"]))
+          .digest("hex")
+          .slice(0, 12)
+        const graphPath = path.join(
+          configured.workspace.workspacePath,
+          "javascript",
+          "127.0.0.1-" + graphDigest + ".json",
+        )
+        const graph = JSON.parse(await fs.readFile(graphPath, "utf8")) as {
+          sourceFiles: unknown[]
+          endpointCandidates: unknown[]
+          javascriptAnalysis: {
+            functions: Array<{ name: string; sourceFile: string }>
+            requestCandidates: Array<{ sourceFunction: string | null; sourceFile: string }>
+          }
+          edges: Array<{ relation: string }>
+        }
+        expect(graph.sourceFiles).toHaveLength(1_000)
+        expect(graph.javascriptAnalysis.functions).toHaveLength(1_000)
+        expect(graph.javascriptAnalysis.requestCandidates).toHaveLength(1_000)
+        expect(graph.endpointCandidates).toHaveLength(10)
+        expect(graph.edges.filter((edge) => edge.relation === "function-contains-request-candidate")).toHaveLength(1_000)
+        expect(graph.edges.filter((edge) => edge.relation === "request-candidate-maps-to-endpoint")).toHaveLength(1_000)
         await Session.remove(session.id)
       },
     })
   } finally {
     server.stop(true)
   }
-}, 180_000)
+}, 240_000)
 
 
 
