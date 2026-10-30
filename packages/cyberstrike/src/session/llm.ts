@@ -179,6 +179,17 @@ export namespace LLM {
     // callable tools remain after permission filtering.
     const activeTools = Object.keys(tools).filter((name) => name !== "invalid" && name !== "_noop")
     const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
+    if (activeTools.length > 0) {
+      const toolExecutionContract = [
+        "## Tool Execution Contract",
+        "You have real executable tools available in this turn.",
+        "When the task requires inspecting files, running commands, searching or fetching data, testing a target, or changing project state, call the appropriate tool instead of only describing what should be done.",
+        "After receiving a tool result, inspect it and call the next required tool when the task is not complete. Do not ask the user to continue routine multi-step work.",
+        "Use plain text for explanation or the final response only when no further tool action is needed.",
+        "Never claim an operation succeeded without its tool result. Preserve all permission, authorization, and scope restrictions.",
+      ].join("\\n")
+      system[0] = [system[0], toolExecutionContract].filter(Boolean).join("\\n\\n")
+    }
     l.info("tool availability", {
       available: Object.keys(tools).length,
       active: activeTools.length,
