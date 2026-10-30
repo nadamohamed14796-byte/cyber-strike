@@ -1720,7 +1720,7 @@ export const SessionRoutes = lazy(() =>
       ),
       async (c) => {
         const body = c.req.valid("json")
-        let sessionID = body.sessionID
+        let requestedSessionID = body.sessionID
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         // Malformed/truncated browser captures still carry metadata. Never let them
         // fall through into the active parent chat prompt as ordinary text.
@@ -1741,15 +1741,15 @@ export const SessionRoutes = lazy(() =>
         // still resolving session/scope/normalization prerequisites.
         const capturedRequestID = isHTTPRequest ? Identifier.ascending("request") : undefined
         const intakeOrder =
-          isHTTPRequest && sessionID ? IngestQueue.reserveOrder(sessionID) : undefined
+          isHTTPRequest && requestedSessionID ? IngestQueue.reserveOrder(requestedSessionID) : undefined
         let intakeOrderReleased = false
 
         try {
-          if (sessionID) {
+          if (requestedSessionID) {
             try {
-              await Session.get(sessionID)
+              await Session.get(requestedSessionID)
             } catch {
-              sessionID = undefined
+              requestedSessionID = undefined
             }
           }
 
@@ -1772,14 +1772,14 @@ export const SessionRoutes = lazy(() =>
               : "(unresolved URL)"
             const malformed = scopeDecision.reason === "captured request could not be parsed into a concrete URL" ||
               scopeDecision.reason === "captured request URL is invalid"
-            if (sessionID) {
+            if (requestedSessionID) {
               await IngestSummary.notice(
-                sessionID,
+                sessionID: requestedSessionID,
                 `Captured request rejected before analysis: ${methodLabel} ${pathLabel} — it was not stored or analyzed. Reason: ${scopeDecision.reason}.`,
-              ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID, error: String(error) }))
+              ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID: requestedSessionID, error: String(error) }))
             }
             log.info("captured HTTP request rejected before normalization", {
-              sessionID,
+              sessionID: requestedSessionID,
               method: methodLabel,
               path: pathLabel,
               status: malformed ? 400 : 403,
@@ -1795,11 +1795,9 @@ export const SessionRoutes = lazy(() =>
           }
         }
 
-        if (!sessionID) {
-          const session = await Session.create({})
-          sessionID = session.id
-        }
-        const activeSessionID = sessionID
+        const activeSessionID = requestedSessionID ?? (await Session.create({})).id
+        // Use an immutable, definitely-present session ID throughout the async work.
+        const sessionID = activeSessionID
         let captureReservation: IngestQueue.Reservation | undefined
         let reservationTransferred = false
         try {
