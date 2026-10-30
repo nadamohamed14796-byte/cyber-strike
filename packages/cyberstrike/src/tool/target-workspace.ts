@@ -133,11 +133,11 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         // closed when an exact workspace is unconfigured, excluded, or ambiguous.
         const decision = await TargetMemory.checkURLScope(requestedURL)
         if (decision.workspace) {
-          if (!decision.allowed) {
+          if (!decision.allowed && decision.scope?.status === "configured") {
             return {
               title: "Target not initialized: existing scope does not authorize this URL",
               output: "No child workspace was created. The URL maps to an existing workspace, but the saved scope decision is: " + decision.reason + ". Reuse the canonical workspace and do not treat this URL as authorized.",
-              metadata: { initialized: false, found: true, saved: false, reason: "scope_denied", target_id: decision.workspace.id, target_url: requestedURL, workspace: decision.workspace.workspacePath, scope_configured: decision.scope?.status === "configured" } as TargetWorkspaceMetadata,
+              metadata: { initialized: false, found: true, saved: false, reason: "scope_denied", target_id: decision.workspace.id, target_url: requestedURL, workspace: decision.workspace.workspacePath, scope_configured: true } as TargetWorkspaceMetadata,
             }
           }
           workspace = decision.workspace
