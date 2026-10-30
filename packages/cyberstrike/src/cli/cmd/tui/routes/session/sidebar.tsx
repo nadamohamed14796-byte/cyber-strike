@@ -63,9 +63,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return out
   })
   const requests = createMemo(() => sync.data.request[props.sessionID] ?? [])
-  const extensionQueueRequests = createMemo(() =>
-    requests().slice().sort((a, b) => a.id.localeCompare(b.id)).filter((item) => item.status === "processing" || item.status === "queued"),
-  )
+  // Show every request received by the Extension Agent as a cumulative number.
+  // Completed requests remain represented; no active/waiting status is exposed.
+  const extensionQueueRequests = createMemo(() => requests().slice().sort((a, b) => a.id.localeCompare(b.id)))
   const enterProxyBroker = () => {
     const child = proxyBroker()
     if (child) navigate({ type: "session", sessionID: child.id })
