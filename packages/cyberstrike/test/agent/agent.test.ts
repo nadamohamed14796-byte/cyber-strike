@@ -138,17 +138,21 @@ test("returns default native agents when no config", async () => {
   })
 })
 
-test("direct captured-request analyzer has background Impact Hunter handoff guidance", async () => {
+test("direct captured-request analyzer uses the single automatic Impact Hunter handoff", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
       const agent = await Agent.get("proxy-analyzer")
       expect(agent).toBeDefined()
-      expect(agent?.prompt).toContain("## Impact Hunter Handoff")
-      expect(agent?.prompt).toContain("background: true")
-      // The special background handoff is guarded in TaskTool at execution time.
+      expect(agent?.prompt).toContain("## Impact Hunter Escalation")
+      expect(agent?.prompt).toContain("report_vulnerability")
+      expect(agent?.prompt).toContain("automatically starts or resumes")
+      expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
+      expect(agent?.prompt).not.toContain("start a separate impact-hunter")
+      // General task spawning stays denied; report_vulnerability owns the narrow handoff.
       expect(evalPerm(agent, "task")).toBe("deny")
+      expect(evalPerm(agent, "report_vulnerability")).toBe("allow")
     },
   })
 })
