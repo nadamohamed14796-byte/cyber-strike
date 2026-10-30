@@ -1081,7 +1081,7 @@ export namespace Agent {
     // agents have no skill permission and are intentionally excluded.
     for (const [id, agent] of Object.entries(result)) {
       if (["compaction", "title", "summary", "normalize-request"].includes(id)) continue
-      if (PermissionNext.evaluate("skill", "*", agent.permission).action !== "allow") continue
+      if (PermissionNext.evaluate("skill", "*", agent.permission).action === "deny") continue
       agent.prompt = [PROMPT_RUNTIME_DISCOVERY, agent.prompt].filter(Boolean).join("\n\n---\n\n")
     }
 
