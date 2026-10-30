@@ -662,6 +662,8 @@ export namespace Agent {
             web_write_function: "allow",
             web_update_credential_claims: "allow",
             validate_finding: "allow",
+            chain_link: "allow",
+            validate_chain: "allow",
             verification_attempt: "allow",
             false_positive_memory: "allow",
             report_vulnerability: "allow",
