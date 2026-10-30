@@ -1977,7 +1977,12 @@ export namespace TargetMemory {
       const wildcardRoot = isRootScopeContainer && baseHostname.startsWith("*.")
       const childExactHost = exactHost && workspace.parentTargetID !== null
       const sameWorkspaceDNSFamily = exactHost || isDNSDescendant
-      if ((!isRootScopeContainer || sameWorkspaceDNSFamily) &&
+      // Root workspaces are policy containers: a configured host wildcard is
+      // authoritative for every HTTP(S) origin on that hostname family. Do not
+      // let the workspace URL's own scheme silently narrow a wildcard grant;
+      // matchingScopeItems below still enforces the actual host/path/port policy.
+      // Exact-host roots and child workspaces retain their origin boundaries.
+      if ((!isRootScopeContainer || exactHost) &&
           (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port)) continue
       // A child workspace is a boundary for its own host/subtree, not a second
       // program-wide policy container. Do not let an unrelated explicit entry in
