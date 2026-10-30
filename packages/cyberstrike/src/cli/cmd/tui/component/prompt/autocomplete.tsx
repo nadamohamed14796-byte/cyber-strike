@@ -340,7 +340,7 @@ export function Autocomplete(props: {
           onSelect: () => {
             insertPart(agent.name, {
               type: "agent",
-              name: agent.name,
+              name: agent.id,
               source: {
                 start: 0,
                 end: 0,

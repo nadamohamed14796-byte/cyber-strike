@@ -124,7 +124,11 @@ export function Prompt(props: PromptProps) {
     // Real Proxy Agent child sessions must still restore proxy-agent for replies.
     const isSubagentSession = !!sync.session.get(props.sessionID)?.parentID
     return messages.filter((message) => message.role === "user").filter((message) => {
-      const messageAgent = local.agent.list().find((agent) => agent.name === message.agent)
+      const candidates = local.agent.list()
+      const messageAgent = candidates.find((agent) => agent.id === message.agent) ??
+        (candidates.filter((agent) => agent.name === message.agent).length === 1
+          ? candidates.find((agent) => agent.name === message.agent)
+          : undefined)
       if (!isSubagentSession && messageAgent?.mode === "subagent") return false
       return !(sync.data.part[message.id] ?? []).some((part) => {
         const metadata = (part as unknown as { metadata?: { requestAnalysis?: unknown } }).metadata
@@ -143,7 +147,7 @@ export function Prompt(props: PromptProps) {
         sync.session.get(props.sessionID)?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         lastUserMessage()?.agent === "proxy-agent"),
   )
-  const activeAgentName = () => (isProxyAgentSession() ? "proxy-agent" : local.agent.current().name)
+  const activeAgentName = () => (isProxyAgentSession() ? "proxy-agent" : local.agent.current().id)
   const activeModel = () => {
     if (isProxyAgentSession()) {
       const model = lastUserMessage()?.model
@@ -193,7 +197,7 @@ export function Prompt(props: PromptProps) {
       syncedSessionID = sessionID
 
       // Only set agent if it's a primary agent (not a subagent)
-      const isPrimaryAgent = local.agent.list().some((x) => x.name === msg.agent)
+      const isPrimaryAgent = local.agent.list().some((x) => x.id === msg.agent || x.name === msg.agent)
       if (msg.agent && isPrimaryAgent) {
         local.agent.set(msg.agent)
         if (msg.model) local.model.set(msg.model)
@@ -850,7 +854,7 @@ export function Prompt(props: PromptProps) {
   const highlight = createMemo(() => {
     if (keybind.leader) return theme.border
     if (store.mode === "shell") return theme.primary
-    return local.agent.color(local.agent.current().name)
+    return local.agent.color(local.agent.current().id)
   })
 
   const showVariant = createMemo(() => {
@@ -870,7 +874,7 @@ export function Prompt(props: PromptProps) {
   })
 
   const spinnerDef = createMemo(() => {
-    const color = local.agent.color(local.agent.current().name)
+    const color = local.agent.color(local.agent.current().id)
     return {
       frames: createFrames({
         color,

@@ -39,7 +39,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const [store, setStore] = createStore<{
         current?: string
       }>({
-        current: list()[0]?.name,
+        current: list()[0]?.id,
       })
       return {
         list,
@@ -47,19 +47,26 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         current() {
           const visible = all()
           if (visible.length === 0) return undefined
-          return visible.find((x) => x.name === store.current) ?? list()[0] ?? visible[0]
+          const selected = visible.find((x) => x.id === store.current)
+          if (selected) return selected
+          const legacy = visible.filter((x) => x.name === store.current)
+          return (legacy.length === 1 ? legacy[0] : undefined) ?? list()[0] ?? visible[0]
         },
-        set(name: string | undefined) {
+        set(id: string | undefined) {
           const visible = all()
           if (visible.length === 0) {
             setStore("current", undefined)
             return
           }
-          if (name && visible.some((x) => x.name === name)) {
-            setStore("current", name)
+          const matches = id ? visible.filter((x) => x.name === id) : []
+          const selected = id
+            ? visible.find((x) => x.id === id) ?? (matches.length === 1 ? matches[0] : undefined)
+            : undefined
+          if (selected) {
+            setStore("current", selected.id)
             return
           }
-          setStore("current", list()[0]?.name ?? visible[0].name)
+          setStore("current", list()[0]?.id ?? visible[0].id)
         },
         move(direction: 1 | -1) {
           const available = list()
@@ -67,12 +74,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             setStore("current", undefined)
             return
           }
-          let next = available.findIndex((x) => x.name === store.current) + direction
+          let next = available.findIndex((x) => x.id === store.current) + direction
           if (next < 0) next = available.length - 1
           if (next >= available.length) next = 0
           const value = available[next]
           if (!value) return
-          setStore("current", value.name)
+          setStore("current", value.id)
           if (value.model)
             setModel({
               providerID: value.model.providerID,
@@ -128,7 +135,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         const a = agent.current()
         if (!a) return undefined
         const key = getFirstValidModel(
-          () => ephemeral.model[a.name],
+          () => ephemeral.model[a.id],
           () => a.model,
           fallbackModel,
         )
@@ -165,7 +172,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         batch(() => {
           const currentAgent = agent.current()
           const next = model ?? fallbackModel()
-          if (currentAgent) setEphemeral("model", currentAgent.name, next)
+          if (currentAgent) setEphemeral("model", currentAgent.id, next)
           if (model) models.setVisibility(model, true)
           if (options?.recent && model) models.recent.push(model)
         })

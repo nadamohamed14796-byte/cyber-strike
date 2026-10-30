@@ -39,7 +39,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const [agentStore, setAgentStore] = createStore<{
         current: string
       }>({
-        current: agents()[0].name,
+        current: agents()[0]?.id ?? "",
       })
       const { theme } = useTheme()
       const colors = createMemo(() => [
@@ -56,28 +56,35 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents()
         },
         current() {
-          return agents().find((x) => x.name === agentStore.current)!
+          const all = agents()
+          return all.find((x) => x.id === agentStore.current) ??
+            (all.filter((x) => x.name === agentStore.current).length === 1
+              ? all.find((x) => x.name === agentStore.current)!
+              : all[0]!)
         },
         set(name: string) {
-          if (!agents().some((x) => x.name === name))
+          const all = agents()
+          const matches = all.filter((x) => x.name === name)
+          const selected = all.find((x) => x.id === name) ?? (matches.length === 1 ? matches[0] : undefined)
+          if (!selected)
             return toast.show({
               variant: "warning",
-              message: `Agent not found: ${name}`,
+              message: `Agent not found or display name is ambiguous: ${name}`,
               duration: 3000,
             })
-          setAgentStore("current", name)
+          setAgentStore("current", selected.id)
         },
         move(direction: 1 | -1) {
           batch(() => {
-            let next = agents().findIndex((x) => x.name === agentStore.current) + direction
+            let next = agents().findIndex((x) => x.id === agentStore.current) + direction
             if (next < 0) next = agents().length - 1
             if (next >= agents().length) next = 0
             const value = agents()[next]
-            setAgentStore("current", value.name)
+            setAgentStore("current", value.id)
           })
         },
         color(name: string) {
-          const index = visibleAgents().findIndex((x) => x.name === name)
+          const index = visibleAgents().findIndex((x) => x.id === name || x.name === name)
           if (index === -1) return colors()[0]
           const agent = visibleAgents()[index]
 
@@ -211,7 +218,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         const a = agent.current()
         return (
           getFirstValidModel(
-            () => modelStore.model[a.name],
+            () => modelStore.model[a.id],
             () => a.model,
             fallbackModel,
           ) ?? undefined

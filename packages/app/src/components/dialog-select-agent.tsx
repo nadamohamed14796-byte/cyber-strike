@@ -20,6 +20,7 @@ export function DialogSelectAgent() {
     return visible.map((a) => {
       const idx = primary.findIndex((p) => p.name === a.name)
       return {
+        id: a.id,
         name: a.name,
         description: a.description ?? "",
         mode: a.mode,
@@ -31,8 +32,8 @@ export function DialogSelectAgent() {
   const primary = createMemo(() => items().filter((a) => a.mode !== "subagent"))
 
   const currentItem = createMemo(() => {
-    const name = local.agent.current()?.name
-    return items().find((a) => a.name === name)
+    const id = local.agent.current()?.id
+    return items().find((a) => a.id === id)
   })
 
   return (
@@ -49,7 +50,7 @@ export function DialogSelectAgent() {
           autofocus: true,
         }}
         emptyMessage="No agents found"
-        key={(x) => x?.name ?? ""}
+        key={(x) => x?.id ?? ""}
         items={items}
         current={currentItem()}
         filterKeys={["name", "description", "mode"]}
@@ -58,15 +59,15 @@ export function DialogSelectAgent() {
           if (a.mode === "subagent" && b.mode !== "subagent") return 1
           return a.name.localeCompare(b.name)
         }}
-        onMove={(x) => setHoveredName(x?.name ?? "")}
+        onMove={(x) => setHoveredName(x?.id ?? "")}
         onSelect={(x) => {
           if (!x) return
-          local.agent.set(x.name)
+          local.agent.set(x.id)
           dialog.close()
         }}
       >
         {(item) => {
-          const hovered = () => item.name === hoveredName()
+          const hovered = () => item.id === hoveredName()
           return (
             <div
               class="w-full flex items-center gap-3"
@@ -84,7 +85,7 @@ export function DialogSelectAgent() {
               <div class="flex flex-col gap-0.5 min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="truncate capitalize">{item.name}</span>
-                  {item.name === currentItem()?.name && (
+                  {item.id === currentItem()?.id && (
                     <span class="text-11-regular text-text-weaker">{language.t("dialog.agent.current")}</span>
                   )}
                 </div>
