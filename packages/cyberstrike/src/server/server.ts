@@ -255,7 +255,7 @@ export namespace Server {
             directory,
             init: InstanceBootstrap,
             async fn() {
-              recoverPendingRequests()
+              await recoverPendingRequests()
               return next()
             },
           })
