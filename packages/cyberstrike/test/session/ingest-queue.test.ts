@@ -857,7 +857,7 @@ describe("Request.findEquivalentProcessed", () => {
   test("uses the full response digest when the HTML model preview is only a stub", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "request-html-response-digest-test" })
-      const rawRequest = "GET /app HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\n"
+      const rawRequest = "GET /app HTTP/1.1\r\nHost: example.test\r\n\r\n"
       const create = (html: string) => {
         const item = Request.add({
           sessionID: session.id,
