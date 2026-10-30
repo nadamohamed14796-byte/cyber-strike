@@ -6,6 +6,7 @@ import { Agent, assertEmbeddedSkillAvailable } from "../../src/agent/agent"
 import { Skill } from "../../src/skill"
 import { SkillIndex } from "../../src/skill/index-engine"
 import { PermissionNext } from "../../src/permission/next"
+import { ToolRegistry } from "../../src/tool/registry"
 
 // Helper to evaluate permission for a tool with wildcard pattern
 function evalPerm(agent: Agent.Info | undefined, permission: string): PermissionNext.Action | undefined {
@@ -254,6 +255,21 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       const testers = await Promise.all(testerNames.map((name) => Agent.get(name)))
       const orchestrator = await Agent.get("proxy-agent")
       const analyzer = await Agent.get("proxy-analyzer")
+      const impactHunter = await Agent.get("impact-hunter")
+      const registeredTools = new Set(await ToolRegistry.ids())
+      const sharedContextTools = ["skill", "read", "target_note", "target_notes_read"] as const
+      for (const tool of [...sharedContextTools, "target_workspace"] as const) {
+        expect(registeredTools.has(tool), "shared context tool " + tool + " must be registered").toBe(true)
+      }
+      for (const agent of [orchestrator, analyzer, impactHunter, ...testers]) {
+        for (const tool of sharedContextTools) {
+          expect(evalPerm(agent, tool), String(agent?.name) + " must be able to use " + tool).toBe("allow")
+        }
+      }
+      expect(evalPerm(orchestrator, "target_workspace")).toBe("allow")
+      expect(evalPerm(analyzer, "target_workspace")).toBe("deny")
+      expect(evalPerm(impactHunter, "target_workspace")).toBe("deny")
+      for (const tester of testers) expect(evalPerm(tester, "target_workspace")).toBe("deny")
       expect(orchestrator).toBeDefined()
       expect(analyzer).toBeDefined()
       expect(orchestrator?.mode).toBe("all")
