@@ -1,10 +1,13 @@
 import { Identifier } from "../id/id"
+import { Database, and, count, eq, notInArray } from "../storage/db"
+import {
+  WebFunctionTable,
+  WebObjectTable,
+  WebRoleTable,
+  WebCredentialTable,
+  VulnerabilityTable,
+} from "./session.sql"
 import { Session } from "."
-import { WebFunction } from "./web/web-function"
-import { WebObject } from "./web/web-object"
-import { WebRole } from "./web/web-role"
-import { WebCredential } from "./web/web-credential"
-import { Vulnerability } from "./vulnerability"
 
 export namespace IngestSummary {
   export const KIND = "ingest-summary"
@@ -18,13 +21,25 @@ export namespace IngestSummary {
   }
 
   export function snapshot(sessionID: string): Snapshot {
-    return {
-      functions: WebFunction.get(sessionID).length,
-      objects: WebObject.get(sessionID).length,
-      roles: WebRole.get(sessionID).length,
-      credentials: WebCredential.get(sessionID).length,
-      vulnerabilities: Vulnerability.confirmed(sessionID).length,
-    }
+    // Snapshot is called before and after every captured request. Use SQL COUNTs
+    // rather than materializing every evidence row just to read array lengths;
+    // large proxy histories otherwise allocate the full evidence inventory twice
+    // per request even though only five integers are needed.
+    return Database.use((db) => ({
+      functions: db.select({ value: count() }).from(WebFunctionTable)
+        .where(eq(WebFunctionTable.session_id, sessionID)).get()?.value ?? 0,
+      objects: db.select({ value: count() }).from(WebObjectTable)
+        .where(eq(WebObjectTable.session_id, sessionID)).get()?.value ?? 0,
+      roles: db.select({ value: count() }).from(WebRoleTable)
+        .where(eq(WebRoleTable.session_id, sessionID)).get()?.value ?? 0,
+      credentials: db.select({ value: count() }).from(WebCredentialTable)
+        .where(eq(WebCredentialTable.session_id, sessionID)).get()?.value ?? 0,
+      vulnerabilities: db.select({ value: count() }).from(VulnerabilityTable)
+        .where(and(
+          eq(VulnerabilityTable.session_id, sessionID),
+          notInArray(VulnerabilityTable.status, ["duplicate", "false_positive"]),
+        )).get()?.value ?? 0,
+    }))
   }
 
   const LABELS: Record<keyof Snapshot, string> = {
