@@ -21,9 +21,7 @@ describe("methodology is not an agent dispatch gate", () => {
 
   test("session prompting retains no phase-dependent agent context", async () => {
     const promptSource = await Bun.file(`${import.meta.dir}/../../src/session/prompt.ts`).text()
-    expect(promptSource).toContain("if (shouldInjectMethodologyContext(lastUser.agent))")
-    const routingSource = await Bun.file(`${import.meta.dir}/../../src/session/methodology-context-routing.ts`).text()
-    expect(routingSource).toContain("return false")
+    expect(promptSource).not.toContain("MethodologyContext.generate")
   })
 
   test("captured requests are sent to the Proxy Agent without a Recon-phase precondition", async () => {
