@@ -54,7 +54,7 @@ import { ResearchContext, promptResearchSignals } from "@/learning/research-cont
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
-import { isProgressTool, toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
+import { isNativeSubagentRun, isProgressTool, toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
 import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector, toolCallSucceeded } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
@@ -1064,7 +1064,7 @@ export namespace SessionPrompt {
         // The coarse no-progress heuristic is limited to native subagents; it was
         // disabled after measured false positives. Identical-call detection below is
         // precise and applies to primary and subagent runs alike.
-        if (agent.mode === "subagent" && agent.native === true) {
+        if (isNativeSubagentRun({ agent, session })) {
           const verdict = stuckDetector.observe({ toolCalls })
           if (verdict.kind === "nudge") {
             forceRecoveryNext = true
@@ -1176,7 +1176,7 @@ export namespace SessionPrompt {
     // per step. Past a small threshold, execute() short-circuits with a feedback result
     // instead of running the duplicate. Gated to native subagents (the proxy pipeline) so
     // interactive/primary agents are untouched. Same keying as the doom_loop check.
-    const suppressDuplicates = input.agent.mode === "subagent" && input.agent.native === true
+    const suppressDuplicates = isNativeSubagentRun({ agent: input.agent, session: input.session })
     const DUP_SUPPRESS_THRESHOLD = 3
     const sigCounts = new Map<string, number>()
 
