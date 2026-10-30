@@ -4,7 +4,6 @@ import { useSync } from "@/context/sync"
 
 type CapturedRequestRow = {
   id: string
-  status?: "queued" | "processing" | "processed" | "failed" | string
 }
 
 const PROXY_BROKER_TITLES = new Set([
@@ -42,11 +41,9 @@ export function CapturedRequestAnalysisPanel() {
     ),
   )
 
-  // Only active/waiting queue slots are represented in Main. Completed and
-  // failed request details stay in the Agent Proxy child session history.
-  const queueRequests = createMemo(() =>
-    requests().filter((item) => item.status === "processing" || item.status === "queued"),
-  )
+  // This is a cumulative received-request counter, not a live queue view.
+  // Keep every captured request visible as a stable number after it finishes.
+  const queueRequests = requests
 
   function enterAgentProxy() {
     const childID = brokerSession()?.id
