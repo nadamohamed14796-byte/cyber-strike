@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import path from "node:path"
 import fs from "node:fs/promises"
-import { and, asc, desc, eq, inArray, isNull } from "../storage/db"
+import { and, asc, count, desc, eq, inArray, isNull, notInArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { redactTargetNoteLine, redactTargetNoteSecrets } from "./redact"
@@ -2865,16 +2865,49 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     const programRoot = lineage[0] ?? selected
 
     const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.floor(maxNotes)) : 8
-    // Fetch the full small target-local note set before ranking; applying LIMIT in SQL
-    // first would discard older but still critical confirmed/disproven conclusions.
-    const selectedAssetNotes = Database.use((db) =>
-      db
-        .select()
-        .from(TargetNoteTable)
-        .where(eq(TargetNoteTable.target_id, selected.id))
-        .all()
-        .map(mapNote),
-    )
+    // Prompt context is a bounded preview. Keep a priority lane for confirmed/
+    // disproven notes, then fill with the newest remaining notes. Canonical notes and
+    // revisions remain untouched and are pageable via target_notes_read.
+    const MAX_CONTEXT_NOTES_PER_GROUP = 500
+    function readContextNotes(targetIDs: string[], limit: number): { notes: TargetNote[]; omitted: number } {
+      if (targetIDs.length === 0 || limit <= 0) return { notes: [], omitted: 0 }
+      return Database.use((db) => {
+        let total = 0
+        const ids = [...new Set(targetIDs)]
+        const priority: (typeof TargetNoteTable.$inferSelect)[] = []
+        const priorityLimit = Math.ceil(limit / 2)
+        for (let offset = 0; offset < ids.length; offset += 500) {
+          const batch = ids.slice(offset, offset + 500)
+          total += db.select({ value: count() }).from(TargetNoteTable)
+            .where(inArray(TargetNoteTable.target_id, batch)).get()?.value ?? 0
+          const remaining = priorityLimit - priority.length
+          if (remaining <= 0) continue
+          priority.push(...db.select().from(TargetNoteTable)
+            .where(and(
+              inArray(TargetNoteTable.target_id, batch),
+              inArray(TargetNoteTable.status, ["confirmed", "disproven"]),
+            ))
+            .orderBy(desc(TargetNoteTable.time_updated))
+            .limit(remaining).all())
+        }
+        const priorityIDs = priority.map((note) => note.id)
+        const recent: (typeof TargetNoteTable.$inferSelect)[] = []
+        for (let offset = 0; offset < ids.length && priority.length + recent.length < limit; offset += 500) {
+          const batch = ids.slice(offset, offset + 500)
+          const remaining = limit - priority.length - recent.length
+          const query = db.select().from(TargetNoteTable).where(
+            priorityIDs.length
+              ? and(inArray(TargetNoteTable.target_id, batch), notInArray(TargetNoteTable.id, priorityIDs))
+              : inArray(TargetNoteTable.target_id, batch),
+          ).orderBy(desc(TargetNoteTable.time_updated)).limit(remaining)
+          recent.push(...query.all())
+        }
+        const rows = [...priority, ...recent]
+        return { notes: rows.map(mapNote), omitted: Math.max(0, total - rows.length) }
+      })
+    }
+    const selectedNoteRead = readContextNotes([selected.id], MAX_CONTEXT_NOTES_PER_GROUP)
+    const selectedAssetNotes = selectedNoteRead.notes
     // Keep the living investigation notes and the append-only experiment history distinct.
     // The ranked summary set must not crowd out the recent journal when a session resumes.
     const allJournalNotes = selectedAssetNotes
@@ -2887,16 +2920,10 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     const currentAssetNotes = selectedAssetNotes.filter((note) => !note.tags.includes("journal"))
     const primaryNotes = rankNotesForContext(currentAssetNotes, noteLimit)
     const omittedPrimaryNoteCount = Math.max(0, currentAssetNotes.length - primaryNotes.length)
-    const parentNoteInventory = programRoot.id === selected.id
-      ? []
-      : Database.use((db) =>
-          db
-            .select()
-            .from(TargetNoteTable)
-            .where(eq(TargetNoteTable.target_id, programRoot.id))
-            .all()
-            .map(mapNote),
-        )
+    const parentNoteRead = programRoot.id === selected.id
+      ? { notes: [] as TargetNote[], omitted: 0 }
+      : readContextNotes([programRoot.id], MAX_CONTEXT_NOTES_PER_GROUP)
+    const parentNoteInventory = parentNoteRead.notes
     const parentCurrentInventory = parentNoteInventory.filter((note) => !note.tags.includes("journal"))
     const parentJournalInventory = parentNoteInventory
       .filter((note) => note.tags.includes("journal"))
@@ -2911,24 +2938,8 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     const intermediateIDs = lineage
       .filter((item) => item.id !== programRoot.id && item.id !== selected.id)
       .map((item) => item.id)
-    const ancestorNoteInventory = intermediateIDs.length === 0
-      ? []
-      : Database.use((db) => {
-          // Keep every ancestor note while staying under SQLite's bind-parameter budget.
-          const notes: TargetNote[] = []
-          for (let offset = 0; offset < intermediateIDs.length; offset += 500) {
-            const ids = intermediateIDs.slice(offset, offset + 500)
-            notes.push(
-              ...db
-                .select()
-                .from(TargetNoteTable)
-                .where(inArray(TargetNoteTable.target_id, ids))
-                .all()
-                .map(mapNote),
-            )
-          }
-          return notes
-        })
+    const ancestorNoteRead = readContextNotes(intermediateIDs, MAX_CONTEXT_NOTES_PER_GROUP)
+    const ancestorNoteInventory = ancestorNoteRead.notes
     const ancestorCurrentInventory = ancestorNoteInventory.filter((note) => !note.tags.includes("journal"))
     const ancestorJournalInventory = ancestorNoteInventory
       .filter((note) => note.tags.includes("journal"))
@@ -2937,10 +2948,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     const ancestorJournalNotes = ancestorJournalInventory.slice(0, noteLimit)
     const omittedAncestorNoteCount = Math.max(0, ancestorCurrentInventory.length - ancestorNotes.length)
     const omittedAncestorJournalCount = Math.max(0, ancestorJournalInventory.length - ancestorJournalNotes.length)
+    const omittedDatabaseNoteCount =
+      selectedNoteRead.omitted + parentNoteRead.omitted + ancestorNoteRead.omitted
     const omittedNoteCount =
       omittedPrimaryNoteCount + omittedJournalNoteCount +
       omittedParentNoteCount + omittedParentJournalCount +
-      omittedAncestorNoteCount + omittedAncestorJournalCount
+      omittedAncestorNoteCount + omittedAncestorJournalCount + omittedDatabaseNoteCount
 
     // Walk the entire registered asset tree iteratively: no arbitrary asset-count or
     // nesting-depth truncation, and the visited set makes malformed cycles harmless.
@@ -2994,7 +3007,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       "Reuse the run's saved setup scope_check decision for the canonical target/workspace; do not call scope_check again for each selected asset, URL, or request. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must enforce the persisted scope internally for every outbound URL, including exclusions and ancestor scopes.",
       "Memory completeness: this is a prioritized context preview, not proof that omitted notes or assets do not exist. Use target_notes_read to search and page through saved notes before concluding that a prior observation or experiment is absent.",
       ...(omittedNoteCount > 0 ? [
-        "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " selected-asset current notes, " + omittedJournalNoteCount + " selected-asset journal entries, " + omittedParentNoteCount + " program/root current notes, " + omittedParentJournalCount + " program/root journal entries, " + omittedAncestorNoteCount + " intermediate-ancestor current notes, and " + omittedAncestorJournalCount + " intermediate-ancestor journal entries were not included in this prompt. They remain saved. Read each omitted workspace separately using target_notes_read with target_url values: " + [selected.targetURL, ...(programRoot.id === selected.id ? [] : [programRoot.targetURL]), ...lineage.filter((item) => item.id !== programRoot.id && item.id !== selected.id).map((item) => item.targetURL)].join(", ") + ". Page through results until has_more_notes is false; set include_history=true for current-note revisions.",
+        "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " selected-asset current notes, " + omittedJournalNoteCount + " selected-asset journal entries, " + omittedParentNoteCount + " program/root current notes, " + omittedParentJournalCount + " program/root journal entries, " + omittedAncestorNoteCount + " intermediate-ancestor current notes, " + omittedAncestorJournalCount + " intermediate-ancestor journal entries, and " + omittedDatabaseNoteCount + " additional notes outside the bounded prompt preview were not included. All remain saved. Read each omitted workspace using target_notes_read with target_url values: " + [selected.targetURL, ...(programRoot.id === selected.id ? [] : [programRoot.targetURL]), ...lineage.filter((item) => item.id !== programRoot.id && item.id !== selected.id).map((item) => item.targetURL)].join(", ") + ". Page through results until has_more_notes is false; set include_history=true for current-note revisions.",
       ] : []),
       "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
