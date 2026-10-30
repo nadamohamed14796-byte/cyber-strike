@@ -333,6 +333,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const exactTargetKey = TargetMemory.normalize(params.target_url).targetKey
     const exactRootContainer = Boolean(
       exactWorkspace &&
+      exactWorkspace.parentTargetID === null &&
       exactWorkspace.targetKey === exactTargetKey &&
       resolution.excludeMatches.length === 0 &&
       (!resolution.workspace || resolution.workspace.id === exactWorkspace.id),
