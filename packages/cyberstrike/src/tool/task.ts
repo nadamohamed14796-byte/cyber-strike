@@ -17,12 +17,15 @@ import { Observation } from "../session/observation"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
+import { Methodology } from "../methodology/methodology"
 import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
   requestIDFromRecentPromptTexts,
   shouldInferSessionRequestID,
   selectTaskRequestContext,
+  proxyTesterMethodologyPhase,
+  proxyTesterMethodologyBlock,
 } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
@@ -86,6 +89,29 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
       const config = await Config.get()
+      const agent = await Agent.get(params.subagent_type)
+      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+
+      // Enforce methodology prerequisites at the actual dispatch boundary. The
+      // phase is computed from the root session's persisted evidence, so a proxy
+      // tester cannot be started merely because its skill was discoverable or
+      // because the caller explicitly selected it.
+      const requiredPhase = proxyTesterMethodologyPhase(params.subagent_type)
+      if (requiredPhase) {
+        const methodology = Methodology.computeState(Session.root(ctx.sessionID))
+        const block = proxyTesterMethodologyBlock(params.subagent_type, methodology.phases)
+        if (block) {
+          return {
+            title: `Dispatch blocked — ${params.subagent_type}`,
+            output: [
+              `The ${params.subagent_type} specialist cannot start while methodology phase "${block.phase}" is blocked or unavailable.`,
+              `Reason: ${block.reason}`,
+              "Complete the upstream prerequisites for this target scope, then dispatch the specialist again.",
+            ].join("\n"),
+            metadata: { sessionId: "", model: { providerID: "", modelID: "" }, outcome: "clean" as const },
+          }
+        }
+      }
 
       // Impact Hunter is a designated internal escalation path. Any subagent may
       // hand off an evidence-backed finding to it in background mode without
@@ -128,9 +154,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           },
         })
       }
-
-      const agent = await Agent.get(params.subagent_type)
-      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
       // Ordinary primary-agent tasks have no session-bound captured request;
       // avoid scanning the main transcript unless a subagent is delegating.
