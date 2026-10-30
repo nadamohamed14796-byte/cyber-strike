@@ -9,7 +9,7 @@ import {
   shouldInferSessionRequestID,
   proxyTesterMethodologyBlock,
   proxyTesterMethodologyPhase,
-  shouldEnforceProxyTesterMethodology,
+  shouldRunProxyTesterPassiveOnly,
 } from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
@@ -163,9 +163,11 @@ test("proxy tester IDs map to existing methodology phases and blocked phases sto
 })
 
 
-test("Extension Proxy can dispatch specialists for passive triage before methodology phases initialize", () => {
-  expect(shouldEnforceProxyTesterMethodology("proxy-agent")).toBe(false)
-  expect(shouldEnforceProxyTesterMethodology("cyberstrike")).toBe(true)
-  expect(shouldEnforceProxyTesterMethodology("proxy-tester-idor")).toBe(true)
-  expect(shouldEnforceProxyTesterMethodology(undefined)).toBe(true)
+test("blocked Extension Proxy specialist dispatch is passive-only and other callers remain blocked", () => {
+  const block = { phase: "authorization_testing", reason: "upstream evidence missing" }
+  expect(shouldRunProxyTesterPassiveOnly("proxy-agent", block)).toBe(true)
+  expect(shouldRunProxyTesterPassiveOnly("cyberstrike", block)).toBe(false)
+  expect(shouldRunProxyTesterPassiveOnly("proxy-tester-idor", block)).toBe(false)
+  expect(shouldRunProxyTesterPassiveOnly(undefined, block)).toBe(false)
+  expect(shouldRunProxyTesterPassiveOnly("proxy-agent", undefined)).toBe(false)
 })

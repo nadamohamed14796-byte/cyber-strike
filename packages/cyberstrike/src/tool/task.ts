@@ -28,7 +28,7 @@ import {
   selectTaskRequestContext,
   proxyTesterMethodologyPhase,
   proxyTesterMethodologyBlock,
-  shouldEnforceProxyTesterMethodology,
+  shouldRunProxyTesterPassiveOnly,
 } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
@@ -100,18 +100,23 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // tester cannot be started merely because its skill was discoverable or
       // because the caller explicitly selected it.
       const requiredPhase = proxyTesterMethodologyPhase(params.subagent_type)
-      if (requiredPhase && shouldEnforceProxyTesterMethodology(callerID)) {
+      let passiveTriageBlock: { phase: string; reason: string } | undefined
+      if (requiredPhase) {
         const methodology = Methodology.computeState(Session.root(ctx.sessionID))
         const block = proxyTesterMethodologyBlock(params.subagent_type, methodology.phases)
         if (block) {
-          return {
-            title: `Dispatch blocked — ${params.subagent_type}`,
-            output: [
-              `The ${params.subagent_type} specialist cannot start while methodology phase "${block.phase}" is blocked or unavailable.`,
-              `Reason: ${block.reason}`,
-              "Complete the upstream prerequisites for this target scope, then dispatch the specialist again.",
-            ].join("\n"),
-            metadata: { sessionId: "", model: { providerID: "", modelID: "" }, outcome: "clean" as const },
+          if (shouldRunProxyTesterPassiveOnly(callerID, block)) {
+            passiveTriageBlock = block
+          } else {
+            return {
+              title: \`Dispatch blocked — \${params.subagent_type}\`,
+              output: [
+                \`The \${params.subagent_type} specialist cannot start while methodology phase "\${block.phase}" is blocked or unavailable.\`,
+                \`Reason: \${block.reason}\`,
+                "Complete the upstream prerequisites for this target scope, then dispatch the specialist again.",
+              ].join("\n"),
+              metadata: { sessionId: "", model: { providerID: "", modelID: "" }, outcome: "clean" as const },
+            }
           }
         }
       }
@@ -282,6 +287,17 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       using _ = defer(() => ctx.abort.removeEventListener("abort", cancel))
 
       let prompt = params.prompt
+      if (passiveTriageBlock) {
+        prompt =
+          [
+            "## PASSIVE-ONLY TRIAGE — ACTIVE TESTING IS BLOCKED",
+            \`Methodology phase: \${passiveTriageBlock.phase}\`,
+            \`Exact blocker: \${passiveTriageBlock.reason}\`,
+            "Inspect only the already captured request/response, saved session context, local source/evidence, and existing target notes. Do not send or replay HTTP requests, inject probes, launch scanners/crawlers, run network-capable shell commands, mutate application state, or report a vulnerability.",
+            "Return the concrete evidence, the best-supported hypothesis, what is still unknown, and the exact prerequisites that must be completed before an active test can run. This task is passive triage only.",
+            "",
+          ].join("\n") + "\n" + prompt
+      }
       // Cross-cutting handoff contract: every subagent receives the same routing
       // rule, regardless of which specialized prompt it was loaded from.
       if (params.subagent_type !== "impact-hunter") {
@@ -417,6 +433,47 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // single source.
       const promptParts = await SessionPrompt.resolvePromptParts(prompt)
 
+      // A methodology-blocked Proxy dispatch is still useful for passive
+      // hypothesis preparation, but the child must not receive tools capable of
+      // active requests, scans, shell/network execution, or state mutation. Include
+      // built-in, custom, and known lazy MCP tools in the deny map by default.
+      const passiveTools = passiveTriageBlock
+        ? new Set([
+            "read",
+            "glob",
+            "grep",
+            "codesearch",
+            "websearch",
+            "skill",
+            "web_get_session_context",
+            "web_get_request_detail",
+            "web_get_detail",
+            "web_get_vulnerabilities",
+            "web_get_vuln_detail",
+            "target_note",
+            "target_notes_read",
+            "research_knowledge",
+            "correlate_javascript",
+            "memory_search",
+            "memory_read",
+            "memory_context",
+          ])
+        : undefined
+      let passiveToolOverrides: Record<string, boolean> = {}
+      if (passiveTools) {
+        const [{ ToolRegistry }, { LazyToolRegistry }] = await Promise.all([
+          import("./registry"),
+          import("./lazy-registry"),
+        ])
+        const knownToolIDs = new Set([
+          ...(await ToolRegistry.ids()),
+          ...LazyToolRegistry.getAll().map((tool) => tool.id),
+          ...LazyToolRegistry.getLoaded().map((tool) => tool.id),
+        ])
+        passiveToolOverrides = Object.fromEntries(
+          [...knownToolIDs].filter((id) => !passiveTools.has(id)).map((id) => [id, false]),
+        )
+      }
       const promptInput = {
         messageID,
         sessionID: session.id,
@@ -428,6 +485,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         tools: {
           todowrite: false,
           todoread: false,
+          ...passiveToolOverrides,
           ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
         },
         parts: promptParts,

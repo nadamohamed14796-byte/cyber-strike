@@ -42,8 +42,11 @@ export function proxyTesterMethodologyPhase(agentID: string): string | undefined
  * initialized that active-testing phase. Scope/authorization checks remain in
  * the specialist tools; this only disables the premature Task-spawn gate.
  */
-export function shouldEnforceProxyTesterMethodology(callerAgentID?: string): boolean {
-  return callerAgentID !== "proxy-agent"
+export function shouldRunProxyTesterPassiveOnly(
+  callerAgentID: string | undefined,
+  block: { phase: string; reason: string } | undefined,
+): boolean {
+  return callerAgentID === "proxy-agent" && block !== undefined
 }
 
 export function proxyTesterMethodologyBlock(
