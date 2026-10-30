@@ -7,7 +7,7 @@ import { resolveVisitedBy } from "../server/routes/session"
 
 const description = `Get detailed information for a specific HTTP request by ID.
 
-Returns the full HTTP request including headers, body, and response data for a single endpoint.
+Returns the full HTTP request including headers, body, and response data for a single endpoint. It also includes observed values across sibling request shapes for the same operation, so different formAction/body values can be correlated without merging their request records.
 
 Use this when you need to examine a specific request in detail (e.g., to analyze parameters for testing).
 Set include_ui_context to true to also get UI form context (field names, types, hidden params) — useful for mass assignment and injection testing.
@@ -81,6 +81,18 @@ export const WebGetRequestDetailTool = Tool.define("web_get_request_detail", {
       const tree = Observation.endpointTree(sessionID, request.key_hash)
       if (tree.params.length > 0) {
         detail.observed_values = { credentials: tree.credentials, params: tree.params }
+      }
+    }
+
+    // Operation-level values include sibling request shapes whose body values
+    // differ (for example, distinct formAction values) but belong to the same
+    // method + origin + normalized route + protocol operation.
+    const operationTree = Observation.operationTreeForRequest(sessionID, request.id)
+    if (operationTree && operationTree.keyHashes.length > 1) {
+      detail.related_operation_values = {
+        key_hashes: operationTree.keyHashes,
+        credentials: operationTree.credentials,
+        params: operationTree.params,
       }
     }
 
