@@ -1,6 +1,7 @@
 ---
 name: wstg-recon-config
 description: WSTG reconnaissance, configuration, error handling, and cryptography testing techniques
+category: information-gathering
 tags: [recon, config, headers, tls, wstg]
 version: "1.0"
 ---
