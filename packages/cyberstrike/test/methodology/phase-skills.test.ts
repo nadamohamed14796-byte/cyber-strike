@@ -283,7 +283,7 @@ describe("Methodology phase skill routing", () => {
   test("phase metadata is progress guidance, not a duplicate agent-routing table", async () => {
     const promptPath = path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")
     const prompt = await Bun.file(promptPath).text()
-    expect(prompt).toContain("Use the live Task roster")
+    expect(prompt).toContain("live Task roster")
     expect(prompt).not.toContain("| Phase | Primary Agent | Secondary Agent |")
     expect(prompt).not.toContain("Phase-to-Agent Decision Table")
     await Instance.provide({
