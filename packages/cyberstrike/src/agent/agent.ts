@@ -240,7 +240,7 @@ export namespace Agent {
     const result: Record<string, Info> = {
       cyberstrike: {
         name: "cyberstrike",
-        description: "The default CyberStrike agent. AI-powered offensive security with full tool access.",
+        description: "The default CyberStrike agent. AI-powered offensive security using the tools registered and permitted for the current session.",
         prompt: `${PROMPT_METHODOLOGY_COMMON}\n\n${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_CYBERSTRIKE}`,
         options: {},
         permission: PermissionNext.merge(
