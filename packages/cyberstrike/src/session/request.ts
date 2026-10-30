@@ -546,7 +546,7 @@ export namespace Request {
     )
     if (!current || current.response_status == null || current.response_size == null) return undefined
 
-    // A truncated text preview is not enough to establish exact response equality.
+    // Require a digest of the complete captured body; a capped preview is insufficient.
     if (current.response_body_hash == null) return undefined
 
     const candidates = Database.use((db) =>
