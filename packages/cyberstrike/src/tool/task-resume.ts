@@ -14,61 +14,6 @@ export type TaskRequestContextSelection<T> = {
   reason?: "request_not_found" | "ambiguous_processing_requests"
 }
 
-const PROXY_TESTER_METHODOLOGY_PHASE = {
-  "proxy-tester-idor": "authorization_testing",
-  "proxy-tester-authz": "authorization_testing",
-  "proxy-tester-authn": "authentication_testing",
-  "proxy-tester-injection": "input_validation",
-  "proxy-tester-file-attacks": "input_validation",
-  "proxy-tester-business-logic": "business_logic",
-  "proxy-tester-mass-assignment": "api_security",
-  "proxy-tester-ssrf": "api_security",
-  "proxy-tester-llm": "api_security",
-} as const
-
-/**
- * Active proxy specialists must not be spawned while their persisted
- * methodology phase is blocked. The analyzer is deliberately not part of this
- * map: passive request/architecture analysis remains available while active
- * testing prerequisites are incomplete.
- */
-export function proxyTesterMethodologyPhase(agentID: string): string | undefined {
-  return PROXY_TESTER_METHODOLOGY_PHASE[agentID as keyof typeof PROXY_TESTER_METHODOLOGY_PHASE]
-}
-
-/**
- * The persistent Extension Proxy must be able to dispatch an evidence-selected
- * specialist for passive triage even while the Main Recon methodology has not
- * initialized that active-testing phase. Scope/authorization checks remain in
- * the specialist tools; this only disables the premature Task-spawn gate.
- */
-export function shouldRunProxyTesterPassiveOnly(
-  callerAgentID: string | undefined,
-  block: { phase: string; reason: string } | undefined,
-): boolean {
-  return callerAgentID === "proxy-agent" && block !== undefined
-}
-
-export function proxyTesterMethodologyBlock(
-  agentID: string,
-  phases: readonly { id: string; status: string; blockReason?: string }[],
-): { phase: string; reason: string } | undefined {
-  const phaseID = proxyTesterMethodologyPhase(agentID)
-  if (!phaseID) return undefined
-  const phase = phases.find((item) => item.id === phaseID)
-  if (!phase) {
-    return {
-      phase: phaseID,
-      reason: "This testing phase is not applicable to the current target scope or has not been initialized.",
-    }
-  }
-  if (phase.status !== "blocked") return undefined
-  return {
-    phase: phaseID,
-    reason: phase.blockReason || "Upstream methodology prerequisites are incomplete.",
-  }
-}
-
 /**
  * Recover the exact captured request ID from a session's persisted user prompt.
  * Read only known identity sections so an unrelated mention of "Request ID"
