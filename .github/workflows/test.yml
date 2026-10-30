@@ -41,6 +41,7 @@ jobs:
         run: |
           python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --self-test
           python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --strict-links
+          python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --self-test
           python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --strict
           bun run packages/cyberstrike/script/generate-registry.ts
           git diff --exit-code -- .cyberstrike/skill/index.json || { git --no-pager diff -- .cyberstrike/skill/index.json; exit 1; }
