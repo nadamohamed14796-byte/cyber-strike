@@ -86,12 +86,12 @@ const USER_CONFIRMED_SCOPE_LIST_SOURCE = USER_CONFIRMED_SCOPE_PREFIX + ": comple
 function confirmedScopeCandidate(input: string): URL | undefined {
   const value = input.trim()
   if (!value) return undefined
-  const typedJavaScript = value.match(/^(javascript|js|source[ \t]+map)[ \t]*:[ \t]*(.+)$/i)
+  const typedJavaScript = value.match(/^(javascript(?:[ \t]+(?:file|url))?|js(?:[ \t]+(?:file|url))?|script[ \t]+file|source[ \t]+map)[ \t]*:[ \t]*(.+)$/i)
   const identifier = typedJavaScript?.[2] ?? value
   const explicitScriptURL = /^https?:\/\//i.test(identifier)
   if (typedJavaScript || (explicitScriptURL && /\.(?:js|mjs|cjs|jsx|map)(?:[?#]|$)/i.test(identifier))) {
     try {
-      const url = new URL(identifier.startsWith("http") ? identifier : "https://" + identifier)
+      const url = new URL(/^https?:\/\//i.test(identifier) ? identifier : "https://" + identifier)
       const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(url.pathname)
       const sourceMapFile = Boolean(typedJavaScript && /^source[ \t]+map$/i.test(typedJavaScript[1]) && /\.map$/i.test(url.pathname))
       if (
