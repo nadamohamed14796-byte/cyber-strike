@@ -4,6 +4,7 @@ import { stream } from "hono/streaming"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 import { Session } from "../../session"
+import { Identifier } from "../../id/id"
 import { Instance } from "../../project/instance"
 import { Bus } from "../../bus"
 import { NamedError } from "@cyberstrike-io/util/error"
@@ -1743,6 +1744,9 @@ export const SessionRoutes = lazy(() =>
             body.page_visited_by?.length,
         )
         const isHTTPRequest = looksLikeHTTPRequest(body.text, hasCaptureMetadata)
+        // Stamp arrival order before asynchronous authorization, session lookup,
+        // broker creation, and normalization. This ID orders restart recovery.
+        const capturedRequestID = isHTTPRequest ? Identifier.ascending("request") : undefined
 
         // Scope-check captured HTTP traffic BEFORE normalization: Normalize.run may
         // update endpoint templates and invoke the Tier-3 model. Out-of-scope input
@@ -1842,21 +1846,8 @@ export const SessionRoutes = lazy(() =>
         // the observed origin is already represented by the captured request metadata.
 
         if (normalized) {
-          const isDuplicate = Request.exists({
-            sessionID,
-            method: normalized.method,
-            normalizedPath: normalized.normalizedPath,
-            origin: normalized.origin,
-            bodyHash: normalized.bodyHash,
-            queryHash: normalized.queryKeyHash,
-            opKeyHash: normalized.opKeyHash,
-            keyHash: normalized.keyHash,
-          })
-
-          // Record per-credential observed values on EVERY ingest — including
-          // dedup skips, because the whole point is capturing which values which
-          // credential used on an already-known endpoint (IDOR/BFLA substrate).
-          // Append-only + idempotent, so safe to call on every path.
+          // Keep observations endpoint-scoped for cross-request/credential reasoning,
+          // while every individual capture gets its own analysis record.
           const recordObservation = (requestID?: string) =>
             Observation.observe({
               sessionID,
@@ -1868,127 +1859,12 @@ export const SessionRoutes = lazy(() =>
               slots: normalized.observedParams,
             })
 
-          const refreshJavaScriptCorrelation = async (
-            capture: ReturnType<typeof Request.captureJavaScriptSource>,
-            refreshEvenIfAlreadyCaptured = false,
-            forceForSourceMap = false,
-          ) => {
-            if ((!capture && !forceForSourceMap) || !normalized.origin || (!forceForSourceMap && !capture?.captured && !refreshEvenIfAlreadyCaptured)) return
-            try {
-              const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
-              const scopeDecision = await TargetMemory.checkURLScope(observedURL)
-              if (!scopeDecision.allowed || !scopeDecision.workspace) {
-                log.info("JavaScript/source-map correlation skipped by persisted scope", {
-                  sessionID,
-                  requestID: capture?.requestID ?? req?.id,
-                  reason: scopeDecision.reason,
-                })
-                return
-              }
-              const correlation = await JavaScriptCorrelation.build({
-                sessionID,
-                targetURL: scopeDecision.workspace.targetURL,
-              })
-              log.info("JavaScript source version correlated after request dedup", {
-                sessionID,
-                requestID: capture?.requestID ?? req?.id,
-                contentHash: capture?.contentHash ?? null,
-                targetID: scopeDecision.workspace.id,
-                sourceFiles: correlation.graph.sourceFiles.length,
-                endpointCandidates: correlation.graph.endpointCandidates.length,
-                graphPath: correlation.graphPath,
-              })
-            } catch (error) {
-              log.warn("automatic correlation of a changed JavaScript source version failed", {
-                sessionID,
-                requestID: capture?.requestID ?? req?.id,
-                error: error instanceof Error ? error.message : String(error),
-              })
-            }
-          }
 
-          if (isDuplicate) {
-            // Structural dedup must not permanently suppress a request whose previous
-            // analysis failed. Retry that persisted row exactly once; active/completed
-            // requests remain deduplicated so high-volume traffic does not spam the LLM.
-            const existingRequest = normalized.keyHash
-              ? Request.findByKeyHash(sessionID, normalized.keyHash)
-              : undefined
-            const retriedRequest = existingRequest?.status === "failed"
-              ? Request.retryFailed(sessionID, existingRequest.id)
-              : undefined
-            if (retriedRequest) {
-              const retryTask = () =>
-                analyzeCapturedRequest({
-                  sessionID,
-                  req: retriedRequest,
-                  model: body.model,
-                  buildPrompt: () => buildPersistedRequestPrompt(sessionID, retriedRequest),
-                })
-              if (captureReservation) {
-                IngestQueue.enqueueReserved(captureReservation, retryTask)
-                reservationTransferred = true
-              } else {
-                const brokerSession = await getOrCreateProxyBrokerSession({
-                  parentSessionID: activeSessionID,
-                })
-                IngestQueue.enqueue(brokerSession.id, retryTask)
-              }
-            }
-
-            // Even without an analysis retry, preserve a changed JavaScript body
-            // and per-credential observations for this known endpoint identity.
-            const javascriptCapture = Request.captureJavaScriptSource({
-              sessionID,
-              method: normalized.method,
-              normalizedPath: normalized.normalizedPath,
-              response: body.response,
-              keyHash: normalized.keyHash,
-              bodyHash: normalized.bodyHash,
-              queryHash: normalized.queryKeyHash,
-              opKeyHash: normalized.opKeyHash,
-              origin: normalized.origin,
-              scheme: normalized.scheme,
-              host: normalized.host,
-              port: normalized.port,
-              pageUrl: body.page_url,
-            })
-            recordObservation(retriedRequest?.id ?? existingRequest?.id ?? javascriptCapture?.requestID)
-            await refreshJavaScriptCorrelation(javascriptCapture, false, isSourceMapResponse(undefined, normalized.normalizedPath))
-            log.info(retriedRequest ? "failed duplicate request requeued for analysis" : "duplicate request skipped", {
-              sessionID,
-              requestID: retriedRequest?.id ?? existingRequest?.id ?? javascriptCapture?.requestID ?? null,
-              previousStatus: existingRequest?.status ?? null,
-              status: retriedRequest?.status ?? existingRequest?.status ?? "unknown",
-              method: normalized.method,
-              path: normalized.normalizedPath,
-              javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
-            })
-            if (retriedRequest) {
-              await IngestSummary.notice(
-                sessionID,
-                `Extension request received again: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — previous analysis had failed, so request ${retriedRequest.id} was requeued automatically.`,
-              ).catch((error) => log.warn("parent retry notice failed", { sessionID, error: String(error) }))
-            } else {
-              await IngestSummary.notice(
-                sessionID,
-                `Extension request already known (deduplicated): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — active/completed analysis was not duplicated; new credential observations and JavaScript response versions were retained.`,
-              ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
-            }
-            c.status(202)
-            return c.json({
-              sessionID,
-              skipped: !retriedRequest,
-              retried: Boolean(retriedRequest),
-              requestID: retriedRequest?.id ?? existingRequest?.id,
-              status: retriedRequest?.status ?? existingRequest?.status,
-              javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
-            })
-          }
           // Preserve the exact browser-captured request for web_get_request_detail,
           // replay, and Impact Hunter handoff. Prompt injection is bounded separately
           // in task.ts, so truncating persisted evidence here would be irreversible.
           const req = Request.add({
+            id: capturedRequestID,
             sessionID,
             method: normalized.method,
             normalizedPath: normalized.normalizedPath,
@@ -2016,43 +1892,11 @@ export const SessionRoutes = lazy(() =>
             keyHash: normalized.keyHash,
           })
 
-          // Race-duplicate: a concurrent ingest won the atomic key_hash upsert
-          // between our exists() check and this insert. Treat exactly like a
-          // duplicate — no row was created, so skip the LLM enqueue, but still
-          // record the observation (the values are evidence regardless).
           if (!req) {
-            const javascriptCapture = Request.captureJavaScriptSource({
-              sessionID,
-              method: normalized.method,
-              normalizedPath: normalized.normalizedPath,
-              response: body.response,
-              keyHash: normalized.keyHash,
-              bodyHash: normalized.bodyHash,
-              queryHash: normalized.queryKeyHash,
-              opKeyHash: normalized.opKeyHash,
-              origin: normalized.origin,
-              scheme: normalized.scheme,
-              host: normalized.host,
-              port: normalized.port,
-              pageUrl: body.page_url,
-            })
-            recordObservation(javascriptCapture?.requestID)
-            // Request.add already persisted this capture inside its transaction.
-            // Force a read-back correlation even if the helper's insert is now a no-op.
-            await refreshJavaScriptCorrelation(javascriptCapture, true, isSourceMapResponse(undefined, normalized.normalizedPath))
-            await IngestSummary.notice(
-              sessionID,
-              `Extension request received (deduplicated race): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request analysis was not duplicated; captured evidence was retained.`,
-            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
-            c.status(202)
-            return c.json({
-              sessionID,
-              skipped: true,
-              javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
-            })
+            throw new Error("Captured HTTP request could not be persisted as an independent analysis item.")
           }
 
-          // New endpoint shape: record the first observation, linked to the row.
+          // Record this transaction's observed values without merging its request row.
           recordObservation(req.id)
 
           // Build the prompt as a thunk so the `## Observed Values` block reflects the
