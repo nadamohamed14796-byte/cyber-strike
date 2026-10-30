@@ -820,6 +820,58 @@ describe("Request processing outcome persistence", () => {
   })
 })
 
+describe("Request.findEquivalentProcessed", () => {
+  test("reuses only an exact completed capture for the same credential and access context", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-equivalent-analysis-test" })
+      const rawRequest = "GET /api/profile HTTP/1.1\\r\\nHost: example.test\\r\\nAccept: application/json\\r\\n\\r\\n"
+      const create = (credentialID: string, body: string, roles: string[] = ["member"]) => {
+        const item = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/api/profile",
+          origin: "https://example.test",
+          credentialID,
+          rawRequest,
+          bodyHash: "no-body",
+          queryHash: "no-query",
+          keyHash: "same-profile-shape",
+          elementRoles: roles,
+          response: {
+            status: 200,
+            headers: { "content-type": "application/json" },
+            body,
+          },
+        })
+        if (!item) throw new Error("request fixture was not inserted")
+        return item
+      }
+
+      const owner = create("credential-owner", '{"id":1,"name":"Owner"}')
+      Request.updateStatus({ id: owner.id, status: "processed" })
+      const ownerRepeat = create("credential-owner", '{"id":1,"name":"Owner"}')
+      const lowUser = create("credential-low", '{"id":1,"name":"Owner"}')
+      const changedResponse = create("credential-owner", '{"id":1,"name":"Changed"}')
+      const changedRole = create("credential-owner", '{"id":1,"name":"Owner"}', ["admin"])
+
+      expect(Request.findEquivalentProcessed(ownerRepeat)?.id).toBe(owner.id)
+      expect(Request.findEquivalentProcessed(lowUser)).toBeUndefined()
+      expect(Request.findEquivalentProcessed(changedResponse)).toBeUndefined()
+      expect(Request.findEquivalentProcessed(changedRole)).toBeUndefined()
+
+      // The second credential and every distinct capture remain independent rows.
+      expect(Request.get(session.id).map((item) => item.id)).toEqual([
+        owner.id,
+        ownerRepeat.id,
+        lowUser.id,
+        changedResponse.id,
+        changedRole.id,
+      ])
+      await Session.remove(session.id)
+    })
+  })
+})
+
 describe("Request.retryFailed", () => {
   test("requeues a failed request once and refuses queued or processed requests", async () => {
     await withInstance(async () => {
