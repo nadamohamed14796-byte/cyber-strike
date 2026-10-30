@@ -44,7 +44,8 @@ Every SKILL.md starts with YAML frontmatter between `---` markers.
 | `category`       | string   | Domain category (see Categories below)                        |
 | `version`        | string   | Semver version (e.g., `"1.0.0"`)                              |
 | `author`         | string   | Author identifier (e.g., `cyberstrike-official`)              |
-| `tags`           | string[] | Searchable keywords                                           |
+| `tags`           | string[] | Searchable keywords and backward-compatible signal aliases   |
+| `signals`        | string[] | Named observed-behavior or evidence signals used for exact runtime routing |
 | `owasp_id`       | string   | OWASP test ID (e.g., `WSTG-INPV-05`)                          |
 | `cis_id`         | string   | CIS benchmark ID (e.g., `2.1.1`)                              |
 | `cis_benchmark`  | string   | CIS benchmark name + version                                  |
@@ -117,7 +118,7 @@ Use the existing catalog vocabulary below where it fits. Legacy/imported categor
 | `process` | General evidence hygiene, record keeping, or reusable process controls |
 | `compliance` | Policy/control-framework checks such as CIS or NIST |
 
-Keep `category` broad and stable; use `tags` for precise technique, surface, protocol, framework, evidence type, and common search aliases. Add `tech_stack` for technologies, `cwe_ids`/ `owasp_id` for justified mappings, and `chains_with` for evidence-conditional follow-up playbooks.
+Keep `category` broad and stable; use `tags` for precise technique, surface, protocol, framework, evidence type, and common search aliases. Use `signals` for explicit names of observable behaviors or evidence patterns that should route an agent to this skill. Runtime search indexes both explicit `signals` and legacy `tags`, so existing skills remain discoverable without mass frontmatter rewrites. Add `tech_stack` for technologies, `cwe_ids`/ `owasp_id` for justified mappings, and `chains_with` for evidence-conditional follow-up playbooks. A signal is a routing hint, not proof of a vulnerability.
 
 ## Content Structure
 
