@@ -435,252 +435,252 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
   const truncatedRawRequest = req.raw_request ?? `${req.method} ${req.normalized_path} HTTP/1.1`
   let childSessionID: string | undefined
   let failureReason: string | undefined
-              // A request becomes processed only after agent processing and summary
-              // persistence both complete. Failed work stays visible and is not auto-replayed.
-              let finalStatus: "processed" | "failed" = "failed"
-                            try {
-                // Mark the dequeued request active immediately so queue waiters never open panels.
-                Request.updateStatus({ id: req.id, status: "processing" })
-                // Preserve the normal model preference order while opening the panel before
-                // configuration/session startup, so those failures still have visible status.
-                const proxyAgent = await Agent.get(agentName)
-                if (!proxyAgent || proxyAgent.mode === "primary") {
-                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
-                }
-                const configuredAgentModel = proxyAgent.model
-                  ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
-                  : undefined
-                const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
+  // A request becomes processed only after agent processing and summary
+  // persistence both complete. Failed work stays visible and is not auto-replayed.
+  let finalStatus: "processed" | "failed" = "failed"
+  try {
+    // Mark the dequeued request active immediately so queue waiters never open panels.
+    Request.updateStatus({ id: req.id, status: "processing" })
+    // Preserve the normal model preference order while opening the panel before
+    // configuration/session startup, so those failures still have visible status.
+    const proxyAgent = await Agent.get(agentName)
+    if (!proxyAgent || proxyAgent.mode === "primary") {
+      throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
+    }
+    const configuredAgentModel = proxyAgent.model
+      ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
+      : undefined
+    const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
 
-                // Create or reuse the persistent child before checking delegation permission.
-                // Even a permission-blocked capture must have an addressable child session so
-                // the Extension panel can open it and show the exact failure state.
-                const childSession = await getOrCreateProxyBrokerSession({
-                  parentSessionID: sessionID,
-                })
-                const analysisSessionID = childSession.id
-                childSessionID = analysisSessionID
-                log.info("captured request routed to persistent Proxy Agent broker", {
-                  sessionID,
-                  brokerSessionID: analysisSessionID,
-                  requestID: req.id,
-                  agent: proxyAgent.name,
-                })
-                // Deterministic runtime preflight: keep every captured request row and
-                // its observations, but do not spend a model turn on a proven empty
-                // document or a byte-for-byte repeat already completed for this same
-                // credential and UI/access context. Cross-credential captures are never
-                // considered duplicates.
-                const emptyStatic = Request.isConfirmedEmptyStatic(req.id)
-                const equivalent = emptyStatic ? undefined : Request.findEquivalentProcessed(req)
-                const skipReason = emptyStatic
-                  ? "Confirmed empty/static HTML response: no forms, controls, scripts, external resources, query/body inputs, or visible content."
-                  : equivalent
-                    ? `Exact repeat of previously processed request ${equivalent.id} for the same credential and access context; this capture remains stored as a separate observation.`
-                    : undefined
+    // Create or reuse the persistent child before checking delegation permission.
+    // Even a permission-blocked capture must have an addressable child session so
+    // the Extension panel can open it and show the exact failure state.
+    const childSession = await getOrCreateProxyBrokerSession({
+      parentSessionID: sessionID,
+    })
+    const analysisSessionID = childSession.id
+    childSessionID = analysisSessionID
+    log.info("captured request routed to persistent Proxy Agent broker", {
+      sessionID,
+      brokerSessionID: analysisSessionID,
+      requestID: req.id,
+      agent: proxyAgent.name,
+    })
+    // Deterministic runtime preflight: keep every captured request row and
+    // its observations, but do not spend a model turn on a proven empty
+    // document or a byte-for-byte repeat already completed for this same
+    // credential and UI/access context. Cross-credential captures are never
+    // considered duplicates.
+    const emptyStatic = Request.isConfirmedEmptyStatic(req.id)
+    const equivalent = emptyStatic ? undefined : Request.findEquivalentProcessed(req)
+    const skipReason = emptyStatic
+      ? "Confirmed empty/static HTML response: no forms, controls, scripts, external resources, query/body inputs, or visible content."
+      : equivalent
+        ? `Exact repeat of previously processed request ${equivalent.id} for the same credential and access context; this capture remains stored as a separate observation.`
+        : undefined
 
-                if (skipReason) {
-                  finalStatus = "processed"
-                  log.info("captured request skipped deep analysis after deterministic preflight", {
-                    sessionID,
-                    requestID: req.id,
-                    priorRequestID: equivalent?.id,
-                    reason: emptyStatic ? "confirmed-empty-static-html" : "exact-processed-repeat",
-                  })
-                } else {
-                // Respect ordered user permission overrides, but never fail silently.
-                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
-                if (taskPermission !== "allow") {
-                  throw new Error(
-                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
-                  )
-                }
-                const config = await Config.get()
-                const before = IngestSummary.snapshot(sessionID)
-                // Render at dequeue so Observed Values includes observations accrued while waiting.
-                const promptText = buildPrompt()
-                log.info("captured request prompt prepared", {
-                  sessionID,
-                  analysisSessionID,
-                  requestID: req.id,
-                  promptBytes: Buffer.byteLength(promptText, "utf8"),
-                  rawRequestBytes: Buffer.byteLength(req.raw_request ?? "", "utf8"),
-                  responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
-                  rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
-                  responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
-                })
-                const agentResult = await SessionPrompt.prompt({
-                  sessionID: analysisSessionID,
-                  agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
-                  model,
-                  // Match TaskTool's subagent runtime: specialist delegation remains
-                  // available only when the proxy-agent's permission profile allows it.
-                  tools: {
-                    todowrite: false,
-                    todoread: false,
-                    ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
-                  },
-                  // Keep the broker's prior request turns so discoveries can be
-                  // correlated across captures. The exact current request_id is
-                  // carried in this new user turn and delegated explicitly by Task.
-                  parts: [{ type: "text", text: promptText }],
-                })
-                // SessionPrompt.prompt can resolve with an assistant message carrying
-                // an error, stuck-abort, or step-cap marker instead of throwing.
-                // Do not turn those incomplete runs into a successful ingest status.
-                const agentInfo = agentResult.info
-                const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
-                const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
-                const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
-                const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
-                if (agentIncomplete) {
-                  failureReason = agentError
-                    ? (typeof agentError === "string" ? agentError : JSON.stringify(agentError))
-                    : agentStuck
-                      ? "Agent required a forced wrap-up after repeated no-progress actions; result is incomplete."
-                      : "Agent reached its step cap before completing."
-                  failureReason = failureReason.slice(0, 500)
-                }
-                await IngestSummary.write({
-                  // The persistent broker must not receive a synthetic user turn
-                  // after each request; keep the evidence delta out of chat transcripts.
-                  sessionID: analysisSessionID,
-                  agent: agentName,
-                  model,
-                  source,
-                  before,
-                  after: IngestSummary.snapshot(sessionID),
-                  transcript: false,
-                })
+    if (skipReason) {
+      finalStatus = "processed"
+      log.info("captured request skipped deep analysis after deterministic preflight", {
+        sessionID,
+        requestID: req.id,
+        priorRequestID: equivalent?.id,
+        reason: emptyStatic ? "confirmed-empty-static-html" : "exact-processed-repeat",
+      })
+    } else {
+    // Respect ordered user permission overrides, but never fail silently.
+    const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
+    if (taskPermission !== "allow") {
+      throw new Error(
+        `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
+      )
+    }
+    const config = await Config.get()
+    const before = IngestSummary.snapshot(sessionID)
+    // Render at dequeue so Observed Values includes observations accrued while waiting.
+    const promptText = buildPrompt()
+    log.info("captured request prompt prepared", {
+      sessionID,
+      analysisSessionID,
+      requestID: req.id,
+      promptBytes: Buffer.byteLength(promptText, "utf8"),
+      rawRequestBytes: Buffer.byteLength(req.raw_request ?? "", "utf8"),
+      responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
+      rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
+      responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
+    })
+    const agentResult = await SessionPrompt.prompt({
+      sessionID: analysisSessionID,
+      agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
+      model,
+      // Match TaskTool's subagent runtime: specialist delegation remains
+      // available only when the proxy-agent's permission profile allows it.
+      tools: {
+        todowrite: false,
+        todoread: false,
+        ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
+      },
+      // Keep the broker's prior request turns so discoveries can be
+      // correlated across captures. The exact current request_id is
+      // carried in this new user turn and delegated explicitly by Task.
+      parts: [{ type: "text", text: promptText }],
+    })
+    // SessionPrompt.prompt can resolve with an assistant message carrying
+    // an error, stuck-abort, or step-cap marker instead of throwing.
+    // Do not turn those incomplete runs into a successful ingest status.
+    const agentInfo = agentResult.info
+    const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
+    const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
+    const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
+    const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
+    if (agentIncomplete) {
+    }
+    await IngestSummary.write({
+      // The persistent broker must not receive a synthetic user turn
+      // after each request; keep the evidence delta out of chat transcripts.
+      sessionID: analysisSessionID,
+      agent: agentName,
+      model,
+      source,
+      before,
+      after: IngestSummary.snapshot(sessionID),
+      transcript: false,
+    })
 
-                // Keep one durable note per endpoint, not one JSON file and one growing note
-                // for every captured request. The canonical request store already owns the
-                // captured request row; duplicating it under requests/<id>.json made workspaces
-                // balloon without adding evidence. The note contains no raw headers/cookies/body.
-                if (normalized.origin) {
-                  try {
-                    const observedURL = new URL(normalized.normalizedPath, normalized.origin)
-                    const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
-                    if (scopeDecision.allowed && scopeDecision.workspace) {
-                      const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
-                      const endpointIdentityHash = createHash("sha256")
-                        .update([observedURL.origin, normalized.method.toUpperCase(), endpointPath].join("\\0"))
-                        .digest("hex")
-                        .slice(0, 32)
-                      const endpointIdentity = "extension-endpoint:" + endpointIdentityHash
-                      const requestNoteContent = [
-                        "# Captured Endpoint Observation",
-                        "",
-                        "- Method: " + normalized.method,
-                        "- Origin: " + observedURL.origin,
-                        "- Normalized path: " + endpointPath,
-                        "- Evidence source: the session's canonical captured-request store; use the Request ID from the request inventory/detail tools to inspect the individual observation.",
-                        "",
-                        "Interpretation: this is observed traffic, not a vulnerability finding. A route, parameter, status code, or client-side string alone does not establish unexpected behavior or security impact.",
-                        "Next analysis: correlate this method/path with the target's canonical endpoint inventory and JavaScript source candidates; inspect authentication/role context and concrete request/response evidence from the request store; compare an authorized baseline/control when appropriate. Preserve meaningful negative results and do not duplicate raw headers, cookies, tokens, or bodies into notes.",
-                      ].join("\n")
-                      await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
-                        kind: "evidence",
-                        title: ("Captured endpoint " + normalized.method + " " + endpointPath).slice(0, 180),
-                        content: requestNoteContent,
-                        source: endpointIdentity,
-                        sourceURL: observedURL.origin + endpointPath,
-                        identityKey: endpointIdentity,
-                        status: "observed",
-                        tags: ["extension-request", "endpoint-observation", normalized.method.toLowerCase()],
-                        upsertByIdentity: true,
-                      })
-                    } else {
-                      log.info("request evidence note skipped by persisted scope", {
-                        sessionID,
-                        analysisSessionID,
-                        requestID: req.id,
-                        reason: scopeDecision.reason,
-                      })
-                    }
-                  } catch (error) {
-                    // A note failure must not erase the successfully completed request analysis.
-                    log.warn("request evidence note persistence failed", {
-                      sessionID,
-                      analysisSessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
-                }
+    // Keep one durable note per endpoint, not one JSON file and one growing note
+    // for every captured request. The canonical request store already owns the
+    // captured request row; duplicating it under requests/<id>.json made workspaces
+    // balloon without adding evidence. The note contains no raw headers/cookies/body.
+    if (normalized.origin) {
+  try {
+        const observedURL = new URL(normalized.normalizedPath, normalized.origin)
+        const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
+        if (scopeDecision.allowed && scopeDecision.workspace) {
+          const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
+          const endpointIdentityHash = createHash("sha256")
+            .update([observedURL.origin, normalized.method.toUpperCase(), endpointPath].join("\\0"))
+            .digest("hex")
+            .slice(0, 32)
+          const endpointIdentity = "extension-endpoint:" + endpointIdentityHash
+          const requestNoteContent = [
+            "# Captured Endpoint Observation",
+            "",
+            "- Method: " + normalized.method,
+            "- Origin: " + observedURL.origin,
+            "- Normalized path: " + endpointPath,
+            "- Evidence source: the session's canonical captured-request store; use the Request ID from the request inventory/detail tools to inspect the individual observation.",
+            "",
+            "Interpretation: this is observed traffic, not a vulnerability finding. A route, parameter, status code, or client-side string alone does not establish unexpected behavior or security impact.",
+            "Next analysis: correlate this method/path with the target's canonical endpoint inventory and JavaScript source candidates; inspect authentication/role context and concrete request/response evidence from the request store; compare an authorized baseline/control when appropriate. Preserve meaningful negative results and do not duplicate raw headers, cookies, tokens, or bodies into notes.",
+          ].join("\n")
+          await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
+            kind: "evidence",
+            title: ("Captured endpoint " + normalized.method + " " + endpointPath).slice(0, 180),
+            content: requestNoteContent,
+            source: endpointIdentity,
+            sourceURL: observedURL.origin + endpointPath,
+            identityKey: endpointIdentity,
+            status: "observed",
+            tags: ["extension-request", "endpoint-observation", normalized.method.toLowerCase()],
+            upsertByIdentity: true,
+          })
+        } else {
+          log.info("request evidence note skipped by persisted scope", {
+            sessionID,
+            analysisSessionID,
+            requestID: req.id,
+            reason: scopeDecision.reason,
+          })
+        }
+      } catch (error) {
+        // A note failure must not erase the successfully completed request analysis.
+        log.warn("request evidence note persistence failed", {
+          sessionID,
+          analysisSessionID,
+          requestID: req.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
 
-                // JavaScript response captures automatically refresh the target's static
-                // analysis/correlation graph after the request agent finishes. The builder
-                // reads only already-captured, in-scope traffic and persists redacted metadata.
-                const isJavaScriptOrSourceMap =
-                  Boolean(req.processed_response?.trim()) &&
-                  isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
-                if (isJavaScriptOrSourceMap && normalized.origin) {
-                  try {
-                    const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
-                    const scopeDecision = await TargetMemory.checkURLScope(observedURL)
-                    if (scopeDecision.allowed && scopeDecision.workspace) {
-                      const correlation = await JavaScriptCorrelation.build({
-                        sessionID: analysisSessionID,
-                        targetURL: scopeDecision.workspace.targetURL,
-                      })
-                      log.info("automatic JavaScript correlation completed", {
-                        sessionID,
-                        analysisSessionID,
-                        requestID: req.id,
-                        targetID: scopeDecision.workspace.id,
-                        sourceFiles: correlation.graph.sourceFiles.length,
-                        endpointCandidates: correlation.graph.endpointCandidates.length,
-                        graphPath: correlation.graphPath,
-                      })
-                    } else {
-                      log.info("automatic JavaScript correlation skipped by persisted scope", {
-                        sessionID,
-                        requestID: req.id,
-                        reason: scopeDecision.reason,
-                      })
-                    }
-                  } catch (error) {
-                    // Correlation is a follow-up analysis, not the request-agent result.
-                    // Preserve the request's successful status and leave a diagnostic log.
-                    log.warn("automatic JavaScript correlation failed", {
-                      sessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
-                }
-                if (agentIncomplete) {
-                  log.warn("captured request analysis did not complete cleanly", {
-                    sessionID,
-                    analysisSessionID,
-                    requestID: req.id,
-                    agent: agentName,
-                    errorName:
-                      agentError && typeof agentError === "object" && "name" in agentError
-                        ? String(agentError.name)
-                        : agentError
-                          ? "error"
-                          : undefined,
-                    stuckAborted: agentStuck,
-                    stepCapped: agentCapped,
-                  })
-                } else {
-                  finalStatus = "processed"
-                }
-                }
-              } catch (error) {
-                failureReason = (error instanceof Error ? error.message : String(error)).slice(0, 500)
-                throw error
-              } finally {
-                Request.updateStatus({ id: req.id, status: finalStatus })
-                log.info("captured request broker turn finished", {
-                  sessionID,
-                  brokerSessionID: childSessionID,
-                  requestID: req.id,
-                  status: finalStatus,
-                })
-              }
+    // JavaScript response captures automatically refresh the target's static
+    // analysis/correlation graph after the request agent finishes. The builder
+    // reads only already-captured, in-scope traffic and persists redacted metadata.
+    const isJavaScriptOrSourceMap =
+      Boolean(req.processed_response?.trim()) &&
+      isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
+    if (isJavaScriptOrSourceMap && normalized.origin) {
+  try {
+        const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
+        const scopeDecision = await TargetMemory.checkURLScope(observedURL)
+        if (scopeDecision.allowed && scopeDecision.workspace) {
+          const correlation = await JavaScriptCorrelation.build({
+            sessionID: analysisSessionID,
+            targetURL: scopeDecision.workspace.targetURL,
+          })
+          log.info("automatic JavaScript correlation completed", {
+            sessionID,
+            analysisSessionID,
+            requestID: req.id,
+            targetID: scopeDecision.workspace.id,
+            sourceFiles: correlation.graph.sourceFiles.length,
+            endpointCandidates: correlation.graph.endpointCandidates.length,
+            graphPath: correlation.graphPath,
+          })
+        } else {
+          log.info("automatic JavaScript correlation skipped by persisted scope", {
+            sessionID,
+            requestID: req.id,
+            reason: scopeDecision.reason,
+          })
+        }
+      } catch (error) {
+        // Correlation is a follow-up analysis, not the request-agent result.
+        // Preserve the request's successful status and leave a diagnostic log.
+        log.warn("automatic JavaScript correlation failed", {
+          sessionID,
+          requestID: req.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    if (agentIncomplete) {
+      log.warn("captured request analysis did not complete cleanly", {
+        sessionID,
+        analysisSessionID,
+        requestID: req.id,
+        agent: agentName,
+        errorName:
+          agentError && typeof agentError === "object" && "name" in agentError
+            ? String(agentError.name)
+            : agentError
+              ? "error"
+              : undefined,
+        stuckAborted: agentStuck,
+        stepCapped: agentCapped,
+      })
+    } else {
+      finalStatus = "processed"
+    }
+    }
+  } catch (error) {
+    const failureReason = (error instanceof Error ? error.message : String(error)).slice(0, 500)
+    log.error("captured request analysis failed", {
+      sessionID,
+      brokerSessionID: childSessionID,
+      requestID: req.id,
+      error: failureReason,
+    })
+    throw error
+  } finally {
+    Request.updateStatus({ id: req.id, status: finalStatus })
+    log.info("captured request broker turn finished", {
+      sessionID,
+      brokerSessionID: childSessionID,
+      requestID: req.id,
+      status: finalStatus,
+    })
+  }
 }
 
 function buildPersistedRequestPrompt(sessionID: string, req: Request.Info): string {
