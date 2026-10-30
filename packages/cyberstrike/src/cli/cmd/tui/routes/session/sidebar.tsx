@@ -70,6 +70,15 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     const child = proxyBroker()
     if (child) navigate({ type: "session", sessionID: child.id })
   }
+  const requestStatusCounts = createMemo(() => {
+    const all = requests()
+    return {
+      queued: all.filter((r) => r.status === "queued").length,
+      processing: all.filter((r) => r.status === "processing").length,
+      processed: all.filter((r) => r.status === "processed").length,
+      failed: all.filter((r) => r.status === "failed").length,
+    }
+  })
   // Group endpoints by host for sidebar — narrow column can't fit
   // method+host+path on one line, so we render the host once per group
   // and let each row use the full width for its path.
