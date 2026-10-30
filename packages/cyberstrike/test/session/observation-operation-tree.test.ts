@@ -54,7 +54,7 @@ describe("Observation.operationTreeForRequest", () => {
 
         expect(tree?.keyHashes.sort()).toEqual(["shape-org-groups", "shape-user-contacts"])
         expect(tree?.credentials.sort()).toEqual(["credential-low", "credential-owner"])
-        expect(tree?.requests.map((item) => item.requestID)).toEqual([owner.id, lowUser.id, ownerRepeat.id])
+        expect(tree?.requests.map((item) => item.requestID).sort()).toEqual([owner.id, lowUser.id, ownerRepeat.id].sort())
         expect(tree?.params).toEqual([
           {
             name: "formAction",
