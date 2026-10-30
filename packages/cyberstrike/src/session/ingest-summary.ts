@@ -102,9 +102,15 @@ export namespace IngestSummary {
     requestAnalysis: Omit<RequestAnalysis, "status">
   }
 
+  // Keep each captured request's parent-side entry independently addressable.
+  // The Proxy Agent session is shared across requests, but request status and
+  // streaming output must never overwrite another request's panel entry.
   const activeLiveNotices = new Map<string, LiveNotice>()
-  // Serialize only changes to the single parent-side live panel, not request analyses.
   const liveNoticeLocks = new Map<string, Promise<void>>()
+
+  function liveNoticeKey(sessionID: string, requestID: string) {
+    return sessionID + "\\0" + requestID
+  }
 
   async function withLiveNoticeLock<T>(sessionID: string, run: () => Promise<T>): Promise<T> {
     const previous = liveNoticeLocks.get(sessionID) ?? Promise.resolve()
@@ -122,9 +128,7 @@ export namespace IngestSummary {
     }
   }
 
-  /** Create one parent-transcript entry that can be updated as the subagent streams.
-   * Keeping one stable part per captured request makes the live analysis visible
-   * without flooding the transcript with a new message for every token. */
+  /** Create one durable parent-transcript entry per captured request. */
   export async function createLiveNotice(input: {
     sessionID: string
     agent: string
@@ -134,32 +138,6 @@ export namespace IngestSummary {
   }): Promise<LiveNotice> {
     return withLiveNoticeLock(input.sessionID, async () => {
       const startedAt = Date.now()
-      // Keep one stable parent-chat analysis entry per session. A small lock prevents
-      // concurrent captures from creating competing parent messages.
-      const previous = activeLiveNotices.get(input.sessionID)
-      if (previous) {
-        const live: LiveNotice = {
-          ...previous,
-          startedAt,
-          requestAnalysis: input.requestAnalysis,
-        }
-        await Session.updatePart({
-          id: live.partID,
-          messageID: live.messageID,
-          sessionID: input.sessionID,
-          type: "text",
-          text: input.text,
-          time: { start: startedAt },
-          metadata: {
-            kind: KIND,
-            notice: true,
-            live: true,
-            requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
-          },
-        })
-        activeLiveNotices.set(input.sessionID, live)
-        return live
-      }
       const messageID = Identifier.ascending("message")
       const partID = Identifier.ascending("part")
       await Session.updateMessage({
@@ -185,12 +163,12 @@ export namespace IngestSummary {
         },
       })
       const live = { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
-      activeLiveNotices.set(input.sessionID, live)
+      activeLiveNotices.set(liveNoticeKey(input.sessionID, input.requestAnalysis.requestID), live)
       return live
     })
   }
 
-  /** Update the same visible transcript entry while the captured request is analyzed. */
+  /** Update only the matching request entry; stale writes cannot affect another capture. */
   export async function updateLiveNotice(input: {
     sessionID: string
     live: LiveNotice
@@ -199,30 +177,30 @@ export namespace IngestSummary {
     status?: RequestAnalysisStatus
   }): Promise<void> {
     await withLiveNoticeLock(input.sessionID, async () => {
-      const active = activeLiveNotices.get(input.sessionID)
-      // A previous request may finish after a newer request becomes the visible focus.
-      // Re-check inside the lock so stale streaming/final writes cannot win a race.
-      if (active && active.requestAnalysis.requestID !== input.live.requestAnalysis.requestID) return
+      const key = liveNoticeKey(input.sessionID, input.live.requestAnalysis.requestID)
+      const active = activeLiveNotices.get(key)
+      if (!active || active.partID !== input.live.partID) return
       await Session.updatePart({
-      id: input.live.partID,
-      messageID: input.live.messageID,
-      sessionID: input.sessionID,
-      type: "text",
-      text: input.text,
-      time: {
-        start: input.live.startedAt,
-        ...(input.completed ? { end: Date.now() } : {}),
-      },
-      metadata: {
-        kind: KIND,
-        notice: true,
-        live: !input.completed,
-        requestAnalysis: {
-          ...input.live.requestAnalysis,
-          status: input.status ?? "analyzing",
+        id: input.live.partID,
+        messageID: input.live.messageID,
+        sessionID: input.sessionID,
+        type: "text",
+        text: input.text,
+        time: {
+          start: input.live.startedAt,
+          ...(input.completed ? { end: Date.now() } : {}),
         },
-      },
+        metadata: {
+          kind: KIND,
+          notice: true,
+          live: !input.completed,
+          requestAnalysis: {
+            ...input.live.requestAnalysis,
+            status: input.status ?? "analyzing",
+          },
+        },
       })
+      if (input.completed) activeLiveNotices.delete(key)
     })
   }
 
