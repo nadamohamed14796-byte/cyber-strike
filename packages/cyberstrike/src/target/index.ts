@@ -2749,14 +2749,6 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       }
       return rows
     })
-    const workspaces = Database.use((db) =>
-      db
-        .select()
-        .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
-        .all(),
-    )
-
     const observedURLs = new Set<string>()
     const observedHosts = new Set<string>()
     function addHost(raw?: string | null) {
@@ -2785,6 +2777,43 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     for (const asset of intelAssets) addHost(asset)
 
     if (observedHosts.size === 0) return null
+
+    // A prompt needs only workspaces that can match an observed URL. Loading every
+    // workspace owned by the project made memory use proportional to the user's
+    // entire historical workspace library, even when this session touched one host.
+    // Generate exact normalized path ancestors (the same candidates accepted by
+    // targetObservationMatches) and fetch only those rows in SQLite-sized batches.
+    const workspaceCandidates = new Set<string>()
+    for (const observed of observedURLs) {
+      try {
+        const url = new URL(observed)
+        let pathname = url.pathname.replace(/\\/+$/, "")
+        while (pathname && pathname !== "/") {
+          workspaceCandidates.add(url.origin + pathname)
+          const slash = pathname.lastIndexOf("/")
+          pathname = slash > 0 ? pathname.slice(0, slash) : ""
+        }
+        workspaceCandidates.add(url.origin)
+      } catch {}
+    }
+    const workspaces = Database.use((db) => {
+      const rows: typeof TargetWorkspaceTable.$inferSelect[] = []
+      const candidates = [...workspaceCandidates]
+      for (let offset = 0; offset < candidates.length; offset += 500) {
+        rows.push(
+          ...db
+            .select()
+            .from(TargetWorkspaceTable)
+            .where(and(
+              eq(TargetWorkspaceTable.project_id, projectID),
+              eq(TargetWorkspaceTable.owner_key, ownerKey),
+              inArray(TargetWorkspaceTable.target_url, candidates.slice(offset, offset + 500)),
+            ))
+            .all(),
+        )
+      }
+      return rows
+    })
 
     // Match by exact origin and target path, never by hostname suffix. A
     // request for api.example.com must not inherit example.com's target memory.
@@ -2816,8 +2845,18 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     let parentTargetID = selected.parentTargetID
     while (parentTargetID) {
       if (lineageIDs.has(parentTargetID)) break
-      const parentRow = workspaces.find((row) => row.id === parentTargetID)
-      if (!parentRow || parentRow.project_id !== projectID || parentRow.owner_key !== ownerKey) break
+      const parentRow = Database.use((db) =>
+        db
+          .select()
+          .from(TargetWorkspaceTable)
+          .where(and(
+            eq(TargetWorkspaceTable.id, parentTargetID!),
+            eq(TargetWorkspaceTable.project_id, projectID),
+            eq(TargetWorkspaceTable.owner_key, ownerKey),
+          ))
+          .get(),
+      )
+      if (!parentRow) break
       const parentWorkspace = mapWorkspace(parentRow)
       lineage.unshift(parentWorkspace)
       lineageIDs.add(parentWorkspace.id)
