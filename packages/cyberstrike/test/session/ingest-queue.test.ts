@@ -647,6 +647,15 @@ describe("Extension ingest transcript isolation", () => {
       await IngestSummary.notice(session.id, "Extension request already known (deduplicated): GET /profile")
       await IngestSummary.notice(session.id, "Extension request received again: GET /profile")
       await IngestSummary.notice(session.id, "Extension request rejected before analysis: invalid HTTP request format")
+      await IngestSummary.write({
+        sessionID: session.id,
+        agent: "proxy-agent",
+        model: { providerID: "test", modelID: "test" },
+        source: "GET /profile",
+        before: { functions: 0, objects: 0, roles: 0, credentials: 0, vulnerabilities: 0 },
+        after: { functions: 1, objects: 0, roles: 0, credentials: 0, vulnerabilities: 0 },
+        transcript: false,
+      })
 
       const after = await Session.messages({ sessionID: session.id })
       expect(after.map((message) => message.info.id)).toEqual(before.map((message) => message.info.id))
