@@ -248,7 +248,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       const analyzer = await Agent.get("proxy-analyzer")
       expect(orchestrator).toBeDefined()
       expect(analyzer).toBeDefined()
-      expect(orchestrator?.mode).toBe("subagent")
+      expect(orchestrator?.mode).toBe("all")
 
       for (let i = 0; i < testerNames.length; i++) {
         const tester = testers[i]
