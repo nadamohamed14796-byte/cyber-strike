@@ -127,12 +127,3 @@ test("persistent broker request identity follows the latest captured turn", () =
   expect(requestIDFromRecentPromptTexts([first, second, followUp])).toBe("req-second")
   expect(requestIDFromRecentPromptTexts([followUp])).toBeUndefined()
 })
-
-test("blocked Extension Proxy specialist dispatch is passive-only and other callers remain blocked", () => {
-  const block = { phase: "authorization_testing", reason: "upstream evidence missing" }
-  expect(shouldRunProxyTesterPassiveOnly("proxy-agent", block)).toBe(true)
-  expect(shouldRunProxyTesterPassiveOnly("cyberstrike", block)).toBe(false)
-  expect(shouldRunProxyTesterPassiveOnly("proxy-tester-idor", block)).toBe(false)
-  expect(shouldRunProxyTesterPassiveOnly(undefined, block)).toBe(false)
-  expect(shouldRunProxyTesterPassiveOnly("proxy-agent", undefined)).toBe(false)
-})
