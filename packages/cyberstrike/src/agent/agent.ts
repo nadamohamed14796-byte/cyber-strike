@@ -621,6 +621,9 @@ export namespace Agent {
             web_write_object_value: "allow",
             web_write_function: "allow",
             web_update_credential_claims: "allow",
+            // A concrete analyzer finding must be persisted through the canonical
+            // report tool; that tool is the sole automatic Impact Hunter trigger.
+            report_vulnerability: "allow",
           }),
           user,
         ),
