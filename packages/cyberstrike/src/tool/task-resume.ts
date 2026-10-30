@@ -89,6 +89,19 @@ export function requestIDFromRecentPromptTexts(texts: readonly string[]): string
 
 
 /**
+ * Extract request identities explicitly attached to a task prompt. The primary
+ * orchestrator often places the ID in a structured Request ID field in the
+ * delegated prompt, while only Proxy Agent sessions previously inferred it from
+ * their transcript. Keep this parser narrow: prose mentions do not bind a task.
+ */
+export function requestIDsFromTaskPrompt(text: string): string[] {
+  const matches = text.matchAll(
+    /^\\s*(?:[-*]\\s*)?(?:\\*\\*)?(?:Request ID|request_id)(?:\\*\\*)?\\s*:\\s*(req[-_][A-Za-z0-9_-]+)\\s*$/gim,
+  )
+  return [...new Set(Array.from(matches, (match) => match[1]!).filter(Boolean))]
+}
+
+/**
  * Resolve request identity from the caller transcript when it is a request-aware
  * orchestrator. The Proxy Agent needs this in both standalone (mode=all) and
  * delegated (subagent) operation; ordinary primary agents must not scan their
