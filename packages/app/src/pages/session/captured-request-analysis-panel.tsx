@@ -45,8 +45,11 @@ export function CapturedRequestAnalysisPanel() {
   )
 
   const requests = createMemo(() =>
+    // Request IDs are assigned at intake, before normalization can finish.
+    // Sorting by created time would let a slower earlier capture appear after
+    // a later one, so keep the durable intake-ID order used by the FIFO queue.
     (((sync.data.request[parentID()] ?? []) as unknown as CapturedRequestRow[]).slice()).sort(
-      (a, b) => (a.time?.created ?? 0) - (b.time?.created ?? 0) || a.id.localeCompare(b.id),
+      (a, b) => a.id.localeCompare(b.id),
     ),
   )
 
@@ -88,7 +91,7 @@ export function CapturedRequestAnalysisPanel() {
               <span
                 class="inline-block size-2 shrink-0 rounded-full"
                 classList={{
-                  "bg-icon-warning-base": processingCount() > 0,
+                  "bg-icon-warning-base": processingCount() > 0 || queuedCount() > 0,
                   "bg-icon-success-base": processingCount() === 0 && queuedCount() === 0 && failedCount() === 0,
                   "bg-icon-danger-base": processingCount() === 0 && queuedCount() === 0 && failedCount() > 0,
                 }}
