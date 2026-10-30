@@ -5,7 +5,6 @@ import { SessionQueueStatus } from "../../src/session/queue-status"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
-import { MessageV2 } from "../../src/session/message-v2"
 import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
 import { Server } from "../../src/server/server"
@@ -1072,6 +1071,13 @@ describe("captured request payload preservation", () => {
         const capturedRows = Request.get(session.id).filter((item) => item.raw_request === rawRequest)
         expect(capturedRows).toHaveLength(2)
         expect(new Set(capturedRows.map((item) => item.id)).size).toBe(2)
+
+        // Extension captures are represented by request.updated inventory and the
+        // Agent Proxy child session, never by synthetic messages in the Main chat.
+        const parentMessages = await Session.messages({ sessionID: session.id })
+        expect(parentMessages).toHaveLength(0)
+        const children = await Session.children(session.id)
+        expect(children.filter((child) => child.title === "Agent Proxy")).toHaveLength(1)
       } finally {
         if (sessionID) await Session.remove(sessionID).catch(() => {})
         if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
