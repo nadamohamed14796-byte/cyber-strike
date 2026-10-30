@@ -1790,6 +1790,8 @@ export namespace TargetMemory {
       workspace: Workspace
       scope?: TargetScope
       exactHost: boolean
+      wildcardRoot: boolean
+      childExactHost: boolean
       scopeScore: number
       domainScore: number
       pathScore: number
@@ -1813,6 +1815,8 @@ export namespace TargetMemory {
       // container URL's host/scheme/port/path boundary. Assets in the root
       // workspace's own DNS family retain the original origin/path restrictions.
       const isRootScopeContainer = workspace.parentTargetID === null
+      const wildcardRoot = isRootScopeContainer && baseHostname.startsWith("*.")
+      const childExactHost = exactHost && workspace.parentTargetID !== null
       const sameWorkspaceDNSFamily = exactHost || isDNSDescendant
       if ((!isRootScopeContainer || sameWorkspaceDNSFamily) &&
           (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port)) continue
@@ -1868,17 +1872,21 @@ export namespace TargetMemory {
         workspace,
         scope: scope ?? undefined,
         exactHost,
+        wildcardRoot,
+        childExactHost,
         scopeScore,
         domainScore,
         pathScore: basePath === "/" ? 0 : basePath.length,
       })
     }
     candidates.sort((a, b) =>
+      // Explicit child workspaces remain the most specific boundary. Otherwise,
+      // one configured wildcard root is the canonical program ledger for its
+      // whole DNS family and must win over legacy concrete root duplicates.
+      Number(b.childExactHost) - Number(a.childExactHost) ||
+      Number(b.wildcardRoot) - Number(a.wildcardRoot) ||
       Number(b.exactHost) - Number(a.exactHost) ||
-      // When multiple root program containers overlap, prefer the most specific
-      // matching grant (exact host > wildcard family > broader pattern). This
-      // keeps one explicit app entry from becoming ambiguous with the same
-      // program's wildcard root while preserving fail-closed exclusions.
+      // For remaining overlapping roots, prefer the most specific matching grant.
       b.scopeScore - a.scopeScore ||
       b.domainScore - a.domainScore ||
       b.pathScore - a.pathScore,
@@ -1889,6 +1897,8 @@ export namespace TargetMemory {
       return { allowed: false, reason: "no target workspace and persisted scope match this URL's protocol, port, host, and path boundary", includeMatches: [], excludeMatches: [] }
     }
     if (candidates.length > 1 &&
+      Number(candidates[0].childExactHost) === Number(candidates[1].childExactHost) &&
+      Number(candidates[0].wildcardRoot) === Number(candidates[1].wildcardRoot) &&
       Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
       candidates[0].scopeScore === candidates[1].scopeScore &&
       candidates[0].domainScore === candidates[1].domainScore &&
@@ -1896,6 +1906,11 @@ export namespace TargetMemory {
       return { allowed: false, reason: "multiple equally specific target workspaces match; refusing ambiguous scope", includeMatches: [], excludeMatches: [] }
     }
 
+    // Keep exclusions from every overlapping root manifest authoritative even
+    // when a wildcard root is selected as the canonical shared evidence ledger.
+    const overlappingRootExclusions = candidates
+      .filter((entry) => entry.workspace.parentTargetID === null && entry.scope?.status === "configured")
+      .flatMap((entry) => matchingScopeItems(candidate, entry.scope!.excludedItems))
     const ownScope = selected.scope ?? null
     const inheritedScopes: TargetScope[] = []
     const inheritedExclusions: string[] = []
@@ -1941,7 +1956,7 @@ export namespace TargetMemory {
     }
     const includeMatches = matchingScopeItems(candidate, scope.scopeItems)
     const ownExclusions = matchingScopeItems(candidate, scope.excludedItems)
-    const excludeMatches = [...new Set([...ownExclusions, ...parentExclusions])]
+    const excludeMatches = [...new Set([...ownExclusions, ...parentExclusions, ...overlappingRootExclusions])]
     if (excludeMatches.length) {
       return { allowed: false, reason: "URL matches explicit scope exclusion: " + excludeMatches.join(", "), workspace: selected.workspace, scope, includeMatches, excludeMatches }
     }
