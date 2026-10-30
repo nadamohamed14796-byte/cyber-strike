@@ -641,6 +641,34 @@ test("agent mode can be overridden", async () => {
   })
 })
 
+test("renamed agents retain stable invocation and permission identities", async () => {
+  await using tmp = await tmpdir({
+    config: {
+      agent: {
+        custom_worker: {
+          name: "Friendly Worker",
+          description: "A renamed callable specialist.",
+          mode: "subagent",
+        },
+      },
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const byKey = await Agent.get("custom_worker")
+      const byDisplayName = await Agent.get("Friendly Worker")
+      const entry = (await Agent.entries()).find((item) => item.id === "custom_worker")
+
+      expect(byKey).toBeDefined()
+      expect(byDisplayName).toBe(byKey)
+      expect(entry?.id).toBe("custom_worker")
+      expect(entry?.info.name).toBe("Friendly Worker")
+      expect(entry?.info.mode).toBe("subagent")
+    },
+  })
+})
+
 test("agent name can be overridden", async () => {
   await using tmp = await tmpdir({
     config: {
