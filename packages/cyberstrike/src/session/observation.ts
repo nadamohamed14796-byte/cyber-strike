@@ -2,6 +2,8 @@ import { Database } from "../storage/db"
 import { RequestObservationTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { eq, and } from "../storage/db"
+import { createHash } from "crypto"
+import { RequestTable } from "./session.sql"
 
 // Per-credential observed-value accumulation (Faz 3).
 //
@@ -132,6 +134,79 @@ export namespace Observation {
       })),
     }))
     return { keyHash, credentials, params }
+  }
+
+  export interface OperationTree {
+    opGroupHash: string
+    keyHashes: string[]
+    credentials: (string | null)[]
+    params: {
+      name: string
+      loc: string
+      byCredential: { credentialID: string | null; values: string[]; redacted: boolean }[]
+    }[]
+  }
+
+  /** Aggregate observed values across every structural body shape for one operation. */
+  export function operationTree(sessionID: string, opGroupHash: string): OperationTree {
+    const obs = Database.use((db) =>
+      db.select().from(RequestObservationTable).where(and(
+        eq(RequestObservationTable.session_id, sessionID),
+        eq(RequestObservationTable.op_group_hash, opGroupHash),
+      )).all(),
+    )
+    const keyHashes = [...new Set(obs.map((o) => o.key_hash))]
+    const credentials = [...new Set(obs.map((o) => o.credential_id))]
+    const byParam = new Map<
+      string,
+      { loc: string; byCred: Map<string | null, { values: Set<string>; redacted: boolean }> }
+    >()
+    for (const observation of obs) {
+      const slots = (observation.slots ?? []) as Slot[]
+      for (const slot of slots) {
+        const param = byParam.get(slot.name) ?? { loc: slot.loc, byCred: new Map() }
+        const credential = param.byCred.get(observation.credential_id) ?? { values: new Set<string>(), redacted: false }
+        if (slot.retained === false) credential.redacted = true
+        else if (slot.value) credential.values.add(slot.value)
+        param.byCred.set(observation.credential_id, credential)
+        byParam.set(slot.name, param)
+      }
+    }
+    const params = [...byParam.entries()].map(([name, param]) => ({
+      name,
+      loc: param.loc,
+      byCredential: [...param.byCred.entries()].map(([credentialID, value]) => ({
+        credentialID,
+        values: [...value.values],
+        redacted: value.redacted,
+      })),
+    }))
+    return { opGroupHash, keyHashes, credentials, params }
+  }
+
+  /**
+   * Resolve the operation-level observation group from the request row itself.
+   * This also works when an identical observation was upserted earlier and its
+   * request_id still points at the first capture.
+   */
+  export function operationTreeForRequest(sessionID: string, requestID: string): OperationTree | undefined {
+    const request = Database.use((db) =>
+      db.select({
+        method: RequestTable.method,
+        origin: RequestTable.origin,
+        normalized_path: RequestTable.normalized_path,
+        operation: RequestTable.operation,
+      }).from(RequestTable).where(and(
+        eq(RequestTable.session_id, sessionID),
+        eq(RequestTable.id, requestID),
+      )).get(),
+    )
+    if (!request) return undefined
+    const opGroupHash = createHash("sha256")
+      .update([request.method, request.origin ?? "", request.normalized_path, request.operation ?? ""].join(" "))
+      .digest("hex")
+      .slice(0, 16)
+    return operationTree(sessionID, opGroupHash)
   }
 
   export interface EndpointObsSummary {
