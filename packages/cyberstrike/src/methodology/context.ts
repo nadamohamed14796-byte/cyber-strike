@@ -147,6 +147,7 @@ export function rankSkillsForPhase(
   category?: string
   owasp_id?: string
   tags: string[]
+  signals: string[]
   tech_stack: string[]
   cwe_ids: string[]
   chains_with: string[]
@@ -163,23 +164,24 @@ export function rankSkillsForPhase(
     if (entry.verified === "tampered") continue
     const name = normalizeSkillText(entry.name)
     const tags = entry.tags.map(normalizeSkillText).filter(Boolean)
+    const signals = Array.from(new Set([...(entry.signals ?? []), ...entry.tags])).map(normalizeSkillText).filter(Boolean)
     const category = normalizeSkillText(entry.category ?? "")
     const description = normalizeSkillText(entry.description)
     // Empty metadata values must not match every observed technology via includes("").
     const tech = entry.tech_stack.map(normalizeSkillText).filter(Boolean)
-    const searchable = [name, category, description, ...tags, ...tech, normalizeSkillText(entry.owasp_id ?? "")].join(" ")
+    const searchable = [name, category, description, ...tags, ...signals, ...tech, normalizeSkillText(entry.owasp_id ?? "")].join(" ")
     let score = 0
     let matchedQuery = queries[0] ?? phaseId
 
-    // Prefer exact skill aliases and exact phase tags over broad prose matches.
+    // Prefer exact skill aliases and named signals (including legacy tag aliases) over broad prose matches.
     for (const query of queries) {
       const normalizedQuery = normalizeSkillText(query)
       let queryScore = 0
       if (name === normalizedQuery) queryScore += 120
       else if (name.startsWith(normalizedQuery)) queryScore += 70
       else if (name.includes(normalizedQuery)) queryScore += 35
-      if (tags.includes(normalizedQuery)) queryScore += 90
-      else if (tags.some((tag) => tag.includes(normalizedQuery) || normalizedQuery.includes(tag))) queryScore += 30
+      if (signals.includes(normalizedQuery)) queryScore += 90
+      else if (signals.some((signal) => signal.includes(normalizedQuery) || normalizedQuery.includes(signal))) queryScore += 30
       if (category === normalizedQuery) queryScore += 25
       if (description.includes(normalizedQuery)) queryScore += 8
       if (tech.includes(normalizedQuery)) queryScore += 35
@@ -203,11 +205,11 @@ export function rankSkillsForPhase(
     // Token overlap alone is weak evidence: generic skills often share words like
     // "web", "testing", or "recon" without containing the actual procedure.
     // Keep broad token-only matches out of the shortlist unless several distinct
-    // tokens align; strong name/tag/category/technology matches still rank normally.
+    // tokens align; strong name/signal/category/technology matches still rank normally.
     const hasSubstantiveMatch = queries.some((query) => {
       const normalizedQuery = normalizeSkillText(query)
       return name === normalizedQuery || name.startsWith(normalizedQuery) || name.includes(normalizedQuery) ||
-        tags.includes(normalizedQuery) || tags.some((tag) => tag === normalizedQuery) ||
+        signals.includes(normalizedQuery) ||
         category === normalizedQuery || tech.includes(normalizedQuery) || description.includes(normalizedQuery)
     })
     if (hasSubstantiveMatch || matchedTokens.length >= 3) ranked.push({ entry, score, query: matchedQuery })
@@ -245,6 +247,7 @@ export function rankSkillsForPhase(
     category: entry.category,
     owasp_id: entry.owasp_id,
     tags: entry.tags,
+    signals: Array.from(new Set([...(entry.signals ?? []), ...entry.tags])),
     tech_stack: entry.tech_stack,
     cwe_ids: entry.cwe_ids,
     chains_with: entry.chains_with,
@@ -282,6 +285,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       category: item.category,
       owasp_id: item.owasp_id,
       tags: item.tags ?? [],
+      signals: Array.from(new Set([...(item.signals ?? []), ...(item.tags ?? [])])),
       tech_stack: item.tech_stack ?? [],
       cwe_ids: item.cwe_ids ?? [],
       chains_with: item.chains_with ?? [],
@@ -303,14 +307,14 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       lines.push("", "Phase-specific candidates (ranked by phase tags and skill metadata):")
       for (const match of selected) {
         lines.push(`- **${match.name}** — ${match.description.slice(0, 180)}${match.description.length > 180 ? "…" : ""}`)
-        lines.push(`  Routing: category=${match.category ?? "unspecified"}; tags=${match.tags.join(", ") || "none"}; tech_stack=${match.tech_stack.join(", ") || "none"}; CWE=${match.cwe_ids.join(", ") || "none"}; OWASP=${match.owasp_id ?? "none"}`)
+        lines.push(`  Routing: category=${match.category ?? "unspecified"}; tags=${match.tags.join(", ") || "none"}; signals=${match.signals.join(", ") || "none"}; tech_stack=${match.tech_stack.join(", ") || "none"}; CWE=${match.cwe_ids.join(", ") || "none"}; OWASP=${match.owasp_id ?? "none"}`)
         const resolvedChains = SkillIndex.chainsFrom(match.name).map((item) => item.target)
         lines.push(`  Prerequisites: ${match.prerequisites.join("; ") || "none declared"}`)
         lines.push(`  chains_with: ${match.chains_with.join(", ") || "none declared"}${resolvedChains.length ? `; resolved local skills: ${resolvedChains.join(", ")}` : ""}`)
         lines.push(`  Selection: matched ${match.query}; relevance ${match.score}. Load with skill(action="load", name="${match.name}") only when its procedure fits the current evidence gap.`)
       }
       lines.push(
-        "Use tags/category/CWE/technology to select the precise skill. Treat chains_with as conditional follow-up guidance: load a linked skill only when the observed evidence supports that next step; it is not an automatic severity increase or proof of a vulnerability.",
+        "Use signals/tags/category/CWE/technology to select the precise skill. Treat chains_with as conditional follow-up guidance: load a linked skill only when the observed evidence supports that next step; it is not an automatic severity increase or proof of a vulnerability.",
       )
 
     }
