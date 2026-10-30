@@ -19,27 +19,26 @@ const compiledScopeItemsCache = new WeakMap<readonly string[], CompiledScopeItem
  */
 export function scopeItemSpecificity(input: string): number {
   const value = input.trim()
-  const typed = value.match(/^(domain|wildcard|url|cidr|ip address|api)[ \\t]*:[ \\t]*(.+)$/i)
+  const typed = value.match(/^(domain|wildcard|url|cidr|ip address|api)[ \t]*:[ \t]*(.+)$/i)
   const kind = typed?.[1].toLowerCase()
   const identifier = (typed?.[2] ?? value).trim()
   if (kind === "wildcard" || identifier.startsWith("*.")) {
-    return 1_000_000 + identifier.replace(/^\\*\\./, "").length
+    return 1_000_000 + identifier.replace(/^\*\./, "").length
   }
-  if (/^https?:\\/\\//i.test(identifier) || kind === "url" || (kind === "api" && identifier.includes("/"))) {
+  if (/^https?:\/\//i.test(identifier) || kind === "url" || (kind === "api" && identifier.includes("/"))) {
     try {
-      const url = new URL(/^https?:\\/\\//i.test(identifier) ? identifier : "https://" + identifier)
+      const url = new URL(/^https?:\/\//i.test(identifier) ? identifier : "https://" + identifier)
       return 3_000_000 + url.hostname.length * 100 + url.pathname.length
     } catch {
       return 0
     }
   }
-  if (identifier.includes("*") || /\\{[^{}]+\\}/.test(identifier)) {
+  if (identifier.includes("*") || /\{[^{}]+\}/.test(identifier)) {
     return 500_000 + identifier.length
   }
   if (kind === "cidr" || identifier.includes("/")) return 100_000 + identifier.length
   return 2_000_000 + identifier.length
 }
-
 
 /** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
 function compileScopeItems(items: readonly string[]): CompiledScopeItems {
