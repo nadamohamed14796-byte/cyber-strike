@@ -232,7 +232,7 @@ export namespace SessionPrompt {
           if (agent) {
             parts.push({
               type: "agent",
-              name: agent.name,
+              name: (await Agent.resolveID(agent)) ?? name,
             })
           }
           return
@@ -658,6 +658,9 @@ export namespace SessionPrompt {
 
       // normal processing
       const agent = await Agent.get(lastUser.agent)
+      if (!agent) throw new Error(`Session references unknown agent "${lastUser.agent}". Select a registered agent and retry.`)
+      const agentID = await Agent.resolveID(agent)
+      if (!agentID) throw new Error(`Unable to resolve stable agent ID for "${lastUser.agent}".`)
       const maxSteps = agent.steps ?? Infinity
       const isLastStep = step >= maxSteps
       // Hard backstop (loop-termination Layer 1): the forced wrap-up turn strips
@@ -684,7 +687,7 @@ export namespace SessionPrompt {
           parentID: lastUser.id,
           role: "assistant",
           mode: agent.name,
-          agent: agent.name,
+          agent: agentID,
           variant: lastUser.variant,
           // Mark the forced wrap-up turn so callers (task tool) can tell a
           // step-capped / stuck run apart from a genuinely clean finish.
@@ -914,7 +917,7 @@ export namespace SessionPrompt {
           lines.push("", "Recommended skills for this agent (load these first):")
           for (const name of agent.skills) lines.push(`- ${name}`)
         }
-        const skillScope: SkillContext.ContextScope = { sessionID, agent: agent.name }
+        const skillScope: SkillContext.ContextScope = { sessionID, agent: agentID }
         const loaded = SkillContext.active(skillScope)
         if (loaded.length > 0) {
           lines.push("", `Currently loaded: ${loaded.join(", ")} (${SkillContext.tokenCount(skillScope)} tokens)`)
@@ -1177,6 +1180,8 @@ export namespace SessionPrompt {
     // per step. Past a small threshold, execute() short-circuits with a feedback result
     // instead of running the duplicate. Gated to native subagent executions (including
     // mode="all" agents only in child sessions) so standalone primary agents are untouched.
+    const agentID = await Agent.resolveID(input.agent)
+    if (!agentID) throw new Error(`Unable to resolve stable ID for tool caller "${input.agent.name}".`)
     const suppressDuplicates = isNativeSubagentRun({ agent: input.agent, session: input.session })
     const DUP_SUPPRESS_THRESHOLD = 3
     const sigCounts = new Map<string, number>()
@@ -1187,7 +1192,7 @@ export namespace SessionPrompt {
       messageID: input.processor.message.id,
       callID: options.toolCallId,
       extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck },
-      agent: input.agent.name,
+      agent: agentID,
       messages: input.messages,
       metadata: async (val: { title?: string; metadata?: any }) => {
         const match = input.processor.partFromToolCall(options.toolCallId)
@@ -1406,7 +1411,11 @@ export namespace SessionPrompt {
   }
 
   async function createUserMessage(input: PromptInput) {
-    const agent = await Agent.get(input.agent ?? (await Agent.defaultAgent()))
+    const requestedAgent = input.agent ?? (await Agent.defaultAgent())
+    const agent = await Agent.get(requestedAgent)
+    if (!agent) throw new Error(`Unknown agent "${requestedAgent}" for this message.`)
+    const agentID = await Agent.resolveID(agent)
+    if (!agentID) throw new Error(`Unable to resolve stable agent ID for "${requestedAgent}".`)
 
     // Store the ORIGINAL (requested) model on the user message — do NOT apply the
     // useSmallModel tier downgrade here. Persisting the downgrade poisons model
@@ -1429,7 +1438,7 @@ export namespace SessionPrompt {
         created: Date.now(),
       },
       tools: input.tools,
-      agent: agent.name,
+      agent: agentID,
       model,
       system: input.system,
       format: input.format,
@@ -1950,6 +1959,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       await SessionRevert.cleanup(session)
     }
     const agent = await Agent.get(input.agent)
+    if (!agent) throw new Error(`Unknown agent "${input.agent}" for shell command.`)
+    const agentID = await Agent.resolveID(agent)
+    if (!agentID) throw new Error(`Unable to resolve stable agent ID for "${input.agent}".`)
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
     const userMsg: MessageV2.User = {
       id: Identifier.ascending("message"),
@@ -1958,7 +1970,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         created: Date.now(),
       },
       role: "user",
-      agent: input.agent,
+      agent: agentID,
       model: {
         providerID: model.providerID,
         modelID: model.modelID,
@@ -1979,8 +1991,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       id: Identifier.ascending("message"),
       sessionID: input.sessionID,
       parentID: userMsg.id,
-      mode: input.agent,
-      agent: input.agent,
+      mode: agent.name,
+      agent: agentID,
       cost: 0,
       path: {
         cwd: Instance.directory,

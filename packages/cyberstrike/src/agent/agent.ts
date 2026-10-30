@@ -53,7 +53,7 @@ import PROMPT_METHODOLOGY_COMMON from "./prompt/methodology/common-methodology.t
 import PROMPT_METHODOLOGY_CONTINUATION from "./prompt/methodology/forced-continuation.txt"
 
 import { PermissionNext } from "@/permission/next"
-import { mergeDeep, pipe, sortBy, values } from "remeda"
+import { mergeDeep, pipe } from "remeda"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
@@ -208,9 +208,13 @@ export namespace Agent {
       prependRequestContext: z.boolean().optional(),
     })
     .meta({
-      ref: "Agent",
+      ref: "AgentInfo",
     })
   export type Info = z.infer<typeof Info>
+
+  // Public records expose the stable registry key separately from the display label.
+  export const PublicInfo = Info.extend({ id: z.string() }).meta({ ref: "Agent" })
+  export type PublicInfo = z.infer<typeof PublicInfo>
 
   const state = Instance.state(async () => {
     const cfg = await Config.get()
@@ -1076,9 +1080,7 @@ export namespace Agent {
         `Agent display name "${agent}" is ambiguous. Use a stable registry ID: ${matches.map(([id]) => id).join(", ")}.`,
       )
     }
-    throw new Error(
-      `Unknown agent "${agent}". Use one of the stable registry IDs: ${Object.keys(registry).join(", ")}.`,
-    )
+    return undefined
   }
 
   /**
@@ -1110,11 +1112,14 @@ export namespace Agent {
 
   export async function list() {
     const cfg = await Config.get()
-    return pipe(
-      await state(),
-      values(),
-      sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "cyberstrike"), "desc"]),
-    )
+    const registry = Object.entries(await state())
+    registry.sort(([leftID, left], [rightID, right]) => {
+      const preferred = (id: string) => (cfg.default_agent ? id === cfg.default_agent : id === "cyberstrike")
+      return Number(preferred(rightID)) - Number(preferred(leftID)) ||
+        left.name.localeCompare(right.name) ||
+        leftID.localeCompare(rightID)
+    })
+    return registry.map(([, info]) => info)
   }
 
   export async function defaultAgent() {
@@ -1126,13 +1131,13 @@ export namespace Agent {
       if (!agent) throw new Error(`default agent "${cfg.default_agent}" not found`)
       if (agent.mode === "subagent") throw new Error(`default agent "${cfg.default_agent}" is a subagent`)
       if (agent.hidden === true) throw new Error(`default agent "${cfg.default_agent}" is hidden`)
-      return agent.name
+      return cfg.default_agent
     }
 
     // "all" agents such as Agent Proxy can be selected explicitly, never implicitly.
-    const primaryVisible = Object.values(agents).find((a) => a.mode === "primary" && a.hidden !== true)
+    const primaryVisible = Object.entries(agents).find(([, a]) => a.mode === "primary" && a.hidden !== true)
     if (!primaryVisible) throw new Error("no primary visible agent found")
-    return primaryVisible.name
+    return primaryVisible[0]
   }
 
   export async function generate(input: { description: string; model?: { providerID: string; modelID: string } }) {
@@ -1143,7 +1148,7 @@ export namespace Agent {
 
     const system = [PROMPT_GENERATE]
     await Plugin.trigger("experimental.chat.system.transform", { model }, { system })
-    const existing = await list()
+    const existing = await entries()
 
     const params = {
       experimental_telemetry: {
@@ -1162,7 +1167,7 @@ export namespace Agent {
         ),
         {
           role: "user",
-          content: `Create an agent configuration based on this request: \"${input.description}\".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
+          content: `Create an agent configuration based on this request: \"${input.description}\".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.id).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
         },
       ],
       model: language,

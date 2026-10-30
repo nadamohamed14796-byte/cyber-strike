@@ -234,7 +234,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       let prompt = params.prompt
       // Cross-cutting handoff contract: every subagent receives the same routing
       // rule, regardless of which specialized prompt it was loaded from.
-      if (agent.name !== "impact-hunter") {
+      if (params.subagent_type !== "impact-hunter") {
         prompt =
           "## Automatic Impact Hunter dispatch\n" +
           "Every successful report_vulnerability call automatically starts or resumes one dedicated background Impact Hunter task for that persisted finding. The report tool returns its task_id and status. Do NOT manually start a second Hunter task for the same finding. Continue your assigned work independently; a started Hunter task is not a confirmation verdict.\n\n" +
@@ -374,7 +374,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           modelID: model.modelID,
           providerID: model.providerID,
         },
-        agent: agent.name,
+        agent: params.subagent_type,
         tools: {
           todowrite: false,
           todoread: false,

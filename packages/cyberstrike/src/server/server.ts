@@ -459,14 +459,14 @@ export namespace Server {
                 description: "List of agents",
                 content: {
                   "application/json": {
-                    schema: resolver(Agent.Info.array()),
+                    schema: resolver(Agent.PublicInfo.array()),
                   },
                 },
               },
             },
           }),
           async (c) => {
-            const modes = await Agent.list()
+            const modes = (await Agent.entries()).map(({ id, info }) => ({ ...info, id }))
             return c.json(modes)
           },
         )

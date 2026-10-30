@@ -2609,6 +2609,7 @@ export type Command = {
 }
 
 export type Agent = {
+  id: string
   name: string
   description?: string
   mode: "subagent" | "primary" | "all"
