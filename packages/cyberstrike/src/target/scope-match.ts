@@ -13,11 +13,11 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // HackerOne scope exports may include an asset type alongside its identifier.
   // Only web-addressable types can authorize an HTTP target. Non-web assets are
   // retained as scope evidence, but never authorize an unrelated HTTP request.
-  const typed = rawScope.match(/^(domain|wildcard|url|cidr|ip address|api|google play app id|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
+  const typed = rawScope.match(/^(domain|wildcard|url|javascript|js|cidr|ip address|api|google play app id|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
   if (typed) {
     const assetType = typed[1].replace(/\s+/g, " ").trim().toLowerCase()
     const identifier = typed[2].trim()
-    const webTypes = new Set(["domain", "wildcard", "url", "cidr", "ip address", "api"])
+    const webTypes = new Set(["domain", "wildcard", "url", "javascript", "js", "cidr", "ip address", "api"])
     if (!webTypes.has(assetType)) {
       return { matches: false, reason: `HackerOne asset type "${assetType}" is not an HTTP target scope; use its appropriate assessment workflow` }
     }
@@ -46,7 +46,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       }
     }
     if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
-    else if (assetType === "url" || (assetType === "api" && (identifier.includes("/") || /^https?:\/\//i.test(identifier)))) {
+    else if ((assetType === "url" || assetType === "javascript" || assetType === "js") || (assetType === "api" && (identifier.includes("/") || /^https?:\/\//i.test(identifier)))) {
       return matchURLScope(rawTarget, identifier, !/^https?:\/\//i.test(identifier))
     } else {
       rawAllowed = rawScope.replace(/^[^:]+:\s*/, "").trim()
