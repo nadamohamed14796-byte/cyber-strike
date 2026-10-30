@@ -1555,6 +1555,67 @@ export namespace TargetMemory {
     return { parent, asset }
   }
 
+  /** Record a passive asset observation in the canonical root registry without granting scope. */
+  export async function recordAssetObservation(
+    parent: Workspace,
+    assetURL: string,
+    assetType?: TargetAssetType,
+  ): Promise<string> {
+    if (parent.parentTargetID !== null) {
+      throw new Error("Observed assets must be recorded against the canonical root workspace.")
+    }
+    let candidate: URL
+    try { candidate = new URL(assetURL) } catch { throw new Error("Asset URL must be an absolute HTTP(S) URL.") }
+    if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) {
+      throw new Error("Asset URL must be a credential-free HTTP(S) URL.")
+    }
+    const observedURL = candidate.origin
+    const registryPath = path.join(parent.workspacePath, "assets", "registry.json")
+    await withAssetRegistryLock(registryPath, async () => {
+      let registry: {
+        schemaVersion?: number
+        parentTargetID?: string
+        targetURL?: string
+        updatedAt?: string
+        assets?: unknown[]
+        observations?: Array<{ url: string; type?: string; observedAt?: string; status?: string }>
+      } = {}
+      try {
+        const info = await fs.lstat(registryPath)
+        if (!info.isFile() || info.isSymbolicLink()) throw new Error("Asset registry is not a regular file.")
+        const parsed: unknown = JSON.parse(await fs.readFile(registryPath, "utf-8"))
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          registry = parsed as typeof registry
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+      }
+      const observations = Array.isArray(registry.observations) ? registry.observations : []
+      const existing = observations.find((item) => item.url === observedURL)
+      const nextObservations = existing
+        ? observations.map((item) => item.url === observedURL
+          ? { ...item, type: assetType ?? item.type, status: "observed" }
+          : item)
+        : [...observations, {
+            url: observedURL,
+            type: assetType ?? "host",
+            observedAt: new Date().toISOString(),
+            status: "observed",
+          }]
+      const nextRegistry = {
+        ...registry,
+        schemaVersion: registry.schemaVersion ?? 2,
+        parentTargetID: parent.id,
+        targetURL: parent.targetURL,
+        updatedAt: new Date().toISOString(),
+        assets: Array.isArray(registry.assets) ? registry.assets : [],
+        observations: nextObservations,
+      }
+      await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(nextRegistry, null, 2) + "\n")
+    })
+    return observedURL
+  }
+
   /** Passive observations may be linked to authorized programs, but never trigger probes. */
   export async function registerObservedAsset(input: string, assetType?: TargetAssetType): Promise<Workspace | null> {
     let candidate: URL
