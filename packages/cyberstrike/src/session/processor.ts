@@ -179,6 +179,11 @@ export namespace SessionProcessor {
                       )
                     ) {
                       const agent = await Agent.get(input.assistantMessage.agent)
+                      if (!agent) {
+                        throw new Error(
+                          `Cannot evaluate doom-loop permissions: agent "${input.assistantMessage.agent}" is not registered.`,
+                        )
+                      }
                       await PermissionNext.ask({
                         permission: "doom_loop",
                         patterns: [value.toolName],
