@@ -101,3 +101,23 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://[2001:db8::1]/", "CIDR: [2001:db8::]/32").matches).toBe(true)
   })
 })
+
+
+describe("JavaScript file scope assets", () => {
+  test("matches an exact script or source-map path and ignores cache query strings", () => {
+    expect(checkMatch("https://cdn.example.com/app.js?v=2", "JavaScript: https://cdn.example.com/app.js?v=1").matches).toBe(true)
+    expect(checkMatch("https://cdn.example.com/app.mjs", "JS: https://cdn.example.com/app.mjs").matches).toBe(true)
+    expect(checkMatch("https://cdn.example.com/app.js.map", "Source Map: https://cdn.example.com/app.js.map").matches).toBe(true)
+  })
+
+  test("does not broaden a JavaScript file grant to sibling paths, hosts, ports, or schemes", () => {
+    const scope = "JavaScript: https://cdn.example.com/assets/app.js"
+    expect(checkMatch("https://cdn.example.com/assets/app.js/chunk", scope).matches).toBe(false)
+    expect(checkMatch("https://cdn.example.com/assets/app.js.old", scope).matches).toBe(false)
+    expect(checkMatch("https://cdn.example.com/assets/other.js", scope).matches).toBe(false)
+    expect(checkMatch("https://sub.cdn.example.com/assets/app.js", scope).matches).toBe(false)
+    expect(checkMatch("https://cdn.example.com:8443/assets/app.js", scope).matches).toBe(false)
+    expect(checkMatch("http://cdn.example.com/assets/app.js", scope).matches).toBe(false)
+    expect(checkMatch("https://cdn.example.com/assets/app.css", scope).matches).toBe(false)
+  })
+})
