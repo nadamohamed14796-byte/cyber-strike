@@ -259,7 +259,7 @@ describe("Methodology phase skill routing", () => {
       expect(prompt).toContain("| " + agentId + " | " + codename + " |")
     }
     for (const phase of Phase.ALL) {
-      const row = prompt.split("\\n").find((line) => line.startsWith("| " + phase.id + " |"))
+      const row = prompt.split("\n").find((line) => line.startsWith("| " + phase.id + " |"))
       expect(row, "primary prompt must include methodology phase " + phase.id).toBeDefined()
       const [primary, secondary] = phase.agents
       expect(row).toContain(codenames[primary] + " (" + primary + ")")
