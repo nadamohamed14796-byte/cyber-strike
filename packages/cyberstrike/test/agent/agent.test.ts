@@ -687,6 +687,29 @@ test("renamed agents retain stable invocation and permission identities", async 
   })
 })
 
+test("resolveID accepts stable keys and unique display names only", async () => {
+  await using tmp = await tmpdir({
+    config: {
+      agent: {
+        worker_a: { name: "Friendly Worker", mode: "subagent" },
+        worker_b: { name: "Other Worker", mode: "subagent" },
+      },
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const byKey = await Agent.resolveID("worker_a")
+      const byDisplayName = await Agent.resolveID("Friendly Worker")
+      const byInfo = await Agent.get("worker_a").then((info) => Agent.resolveID(info))
+      expect(byKey).toBe("worker_a")
+      expect(byDisplayName).toBe("worker_a")
+      expect(byInfo).toBe("worker_a")
+      expect(await Agent.resolveID("missing")).toBeUndefined()
+    },
+  })
+})
+
 test("duplicate agent display names never shadow stable registry keys", async () => {
   await using tmp = await tmpdir({
     config: {
