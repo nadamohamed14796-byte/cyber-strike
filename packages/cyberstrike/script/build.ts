@@ -332,10 +332,15 @@ for (const key of Object.keys(binaries)) {
   const destination = path.join(dir, "dist", key, "bin", "skill")
   await fs.promises.rm(destination, { recursive: true, force: true })
   await fs.promises.cp(skillSource, destination, { recursive: true, errorOnExist: true, force: false })
+  // Skills referenced by mandatory agent workflows must be present in every
+  // portable archive. The source-level prompt reference test checks the full
+  // set; these runtime-critical entries also fail the release build immediately.
   for (const requiredSkill of [
     "target-workspace-workflow/SKILL.md",
     "recon-methodology/SKILL.md",
     "community-tool-selection/SKILL.md",
+    "attack-javascript-analysis/SKILL.md",
+    "WEB/OWASP_WSTG_4.2/wstg-authz-04/SKILL.md",
   ]) {
     if (!fs.existsSync(path.join(destination, requiredSkill))) {
       throw new Error("Required skill was not bundled for " + key + ": " + requiredSkill)
