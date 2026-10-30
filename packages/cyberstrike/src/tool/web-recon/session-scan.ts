@@ -120,32 +120,34 @@ export async function sessionScan(
   ]
   if (templateCount > 0) lines.push(`[*] ${templateCount} template path(s) skipped — discovered endpoints with {param} placeholders (use targeted programs)`)
 
-  const candidateOrigins = [...origins.entries()]
-  const originEntries: [string, OriginBucket][] = []
-  for (const entry of candidateOrigins) {
-    // The scan's origin-level checks probe "/", so path-scoped targets must
-    // not be scanned at origin root even if an in-scope subpath was captured.
-    if (scopeFilter && !(await scopeFilter(entry[0] + "/"))) {
-      lines.push(`[!] Skipping origin-root checks outside configured path scope: ${entry[0]}`)
-      continue
+  // Keep every origin with an authorized captured endpoint. Origin-root probes
+  // are a separate privilege: a path-scoped grant must still receive endpoint-
+  // specific checks, but must never be widened to "/".
+  const originEntries: [string, OriginBucket][] = [...origins.entries()]
+  const rootEntries: [string, OriginBucket][] = []
+  for (const entry of originEntries) {
+    if (!scopeFilter || await scopeFilter(entry[0] + "/")) {
+      rootEntries.push(entry)
+    } else {
+      lines.push(`[!] Origin-root checks skipped outside configured path scope; captured endpoint checks remain eligible: ${entry[0]}`)
     }
-    originEntries.push(entry)
   }
   if (originEntries.length === 0) {
     return {
-      output: lines.concat(["[-] No origin roots are authorized for session_scan. Path-scoped targets require endpoint-specific checks instead."]).join("\n"),
+      output: lines.concat(["[-] No captured endpoint has an authorized HTTP origin. No network probes were sent."]).join("\n"),
       findings: [],
     }
   }
-  // Require consent for the concrete origins that will receive active probes.
-  if (originEntries.length > 0) await authorize?.(originEntries.map(([origin]) => origin))
+  // The permission prompt covers origins represented by already scope-filtered
+  // captures; every individual probe repeats its exact URL authorization check.
+  await authorize?.(originEntries.map(([origin]) => origin))
   let apiCheckCount = 0
   let redirCheckCount = 0
 
-  // Phase 1: per-origin tech_detect + header_audit + sensitive_files
-  lines.push(`\n=== PHASE 1: ORIGIN CHECKS (${originEntries.length}) ===`)
+  // Phase 1: root-level checks run only when the root URL itself is authorized.
+  lines.push(`\n=== PHASE 1: ORIGIN CHECKS (${rootEntries.length}) ===`)
 
-  for (const [origin, bucket] of originEntries) {
+  for (const [origin, bucket] of rootEntries) {
     if (abort?.aborted) {
       lines.push(`[!] Scan interrupted — skipping remaining origins`)
       break
@@ -176,14 +178,11 @@ export async function sessionScan(
   if (!abort?.aborted) {
     const corsTargets: string[] = []
     for (const [origin, bucket] of originEntries) {
-      if (bucket.apis.size > 0) {
-        corsTargets.push(...[...bucket.apis])
-      } else {
-        corsTargets.push(origin + "/")
-      }
+      if (bucket.apis.size > 0) corsTargets.push(...bucket.apis)
+      else if (rootEntries.some(([root]) => root === origin)) corsTargets.push(origin + "/")
     }
 
-    const methodRoots = [...new Set(originEntries.map(([origin]) => origin + "/"))]
+    const methodRoots = [...new Set(rootEntries.map(([origin]) => origin + "/"))]
     apiCheckCount = corsTargets.length + methodRoots.length
 
     if (apiCheckCount > 0) {
@@ -241,7 +240,7 @@ export async function sessionScan(
   // Summary
   const sevOrder = ["critical", "high", "medium", "low", "info"]
   lines.push(`\n=== SUMMARY ===`)
-  lines.push(`[*] Scanned: ${originEntries.length} origins, ${apiCheckCount} API/method checks, ${redirCheckCount} redirect pages`)
+  lines.push(`[*] Captured origins: ${originEntries.length} (${rootEntries.length} root-authorized), ${apiCheckCount} API/method checks, ${redirCheckCount} redirect pages`)
   lines.push(`[*] Findings: ${allFindings.length}`)
 
   if (allFindings.length > 0) {
