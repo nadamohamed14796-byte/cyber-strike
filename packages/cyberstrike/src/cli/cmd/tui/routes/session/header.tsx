@@ -1,5 +1,5 @@
 import { type Accessor, createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
-import { useRouteData } from "@tui/context/route"
+import { useRoute, useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { pipe, sumBy } from "remeda"
 import { useTheme } from "@tui/context/theme"
@@ -49,6 +49,41 @@ export function Header() {
   const session = createMemo(() => sync.session.get(route.sessionID)!)
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const queueStatus = createMemo(() => sync.data.session_queue_status?.[route.sessionID])
+  const { navigate } = useRoute()
+  const proxyBroker = createMemo(() => {
+    const parentID = session()?.id
+    if (!parentID || session()?.parentID) return undefined
+    return sync.data.session.find(
+      (item) =>
+        item.parentID === parentID &&
+        (item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
+    )
+  })
+  const capturedRequests = createMemo(() =>
+    (sync.data.request[route.sessionID] ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
+  )
+  const currentRequest = createMemo(
+    () =>
+      capturedRequests().find((item) => item.status === "processing") ??
+      capturedRequests().find((item) => item.status === "queued"),
+  )
+  const currentRequestNumber = createMemo(() => {
+    const current = currentRequest()
+    return current ? capturedRequests().findIndex((item) => item.id === current.id) + 1 : 0
+  })
+  const requestCounts = createMemo(() => {
+    const rows = capturedRequests()
+    return {
+      queued: rows.filter((item) => item.status === "queued").length,
+      processing: rows.filter((item) => item.status === "processing").length,
+      processed: rows.filter((item) => item.status === "processed").length,
+      failed: rows.filter((item) => item.status === "failed").length,
+    }
+  })
+  const enterProxyBroker = () => {
+    const child = proxyBroker()
+    if (child) navigate({ type: "session", sessionID: child.id })
+  }
 
   const cost = createMemo(() => {
     const total = pipe(
@@ -152,16 +187,62 @@ export function Header() {
             </box>
           </Match>
           <Match when={true}>
-            <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
-              <Title session={session} />
-              <box flexDirection="row" gap={2} flexShrink={0}>
-                <Show when={queueStatus()?.paused}>
-                  <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
-                    ⏸ Queue paused — {queueStatus()!.pending} pending
-                  </text>
-                </Show>
-                <ContextInfo context={context} cost={cost} usage={treeUsage} />
+            <box flexDirection="column" gap={1}>
+              <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
+                <Title session={session} />
+                <box flexDirection="row" gap={2} flexShrink={0}>
+                  <Show when={queueStatus()?.paused}>
+                    <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
+                      ⏸ Queue paused — {queueStatus()!.pending} pending
+                    </text>
+                  </Show>
+                  <ContextInfo context={context} cost={cost} usage={treeUsage} />
+                </box>
               </box>
+              <Show when={proxyBroker() && capturedRequests().length > 0}>
+                <box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  gap={2}
+                  padding={1}
+                  backgroundColor={theme.backgroundElement}
+                >
+                  <box flexDirection="column" gap={0} flexGrow={1}>
+                    <text fg={theme.accent}>
+                      <b>Extension Agent</b>
+                    </text>
+                    <Show
+                      when={currentRequest()}
+                      fallback={
+                        <text fg={theme.textMuted}>
+                          Queue complete · {requestCounts().processed} done · {requestCounts().failed} failed
+                        </text>
+                      }
+                    >
+                      <text fg={theme.text}>
+                        {requestCounts().processing > 0
+                          ? `Analyzing request #${currentRequestNumber()} / ${capturedRequests().length}`
+                          : `Next request #${currentRequestNumber()} is queued`}
+                      </text>
+                    </Show>
+                    <text fg={theme.textMuted} wrapMode="none">
+                      {requestCounts().queued} queued · {requestCounts().processing} analyzing · {requestCounts().processed} done · {requestCounts().failed} failed
+                    </text>
+                  </box>
+                  <box
+                    onMouseOver={() => setHover("next")}
+                    onMouseOut={() => setHover(null)}
+                    onMouseUp={enterProxyBroker}
+                    backgroundColor={hover() === "next" ? theme.backgroundPanel : theme.backgroundElement}
+                    paddingLeft={1}
+                    paddingRight={1}
+                  >
+                    <text fg={theme.accent}>
+                      <b>Enter →</b>
+                    </text>
+                  </box>
+                </box>
+              </Show>
             </box>
           </Match>
         </Switch>
