@@ -119,7 +119,7 @@ export function CapturedRequestAnalysisPanel() {
             .map((part) => part.text)
             .join("\n"),
         })),
-      ).map((turn) => [turn.messageID, turn.requestID]),
+      ).map((turn) => [turn.messageID, turn.requestID] as const),
     )
     return messages.filter((message) => requestByMessageID.get(message.id) === requestID)
   })
