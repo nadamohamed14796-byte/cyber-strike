@@ -182,7 +182,40 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     }
 
     if (params.action === "configure_scope") {
-      const targetURL = required(params.target_url, "target_url")
+      let targetURL = required(params.target_url, "target_url")
+
+      // Keep scope expressions in the manifest, never create a workspace keyed
+      // by a wildcard. Preserve an already-existing legacy wildcard workspace so
+      // older projects remain readable/configurable, but do not create another one.
+      let wildcardTarget = false
+      try { wildcardTarget = new URL(targetURL).hostname.startsWith("*.") } catch {}
+      const exactWorkspace = await TargetMemory.get(targetURL)
+      if (wildcardTarget && !exactWorkspace) {
+        return {
+          title: "Wildcard scope cannot create a target workspace",
+          output: "No workspace or scope was created. A wildcard such as " + targetURL + " is a scope expression, not a workspace identity. Initialize one concrete canonical root from target_workspace(action=\\"list\\") and put the wildcard in its include list or scope file.",
+          metadata: { saved: false, reason: "wildcard_workspace_identity_rejected", target_url: targetURL } as TargetWorkspaceMetadata,
+        }
+      }
+
+      // A concrete subdomain that is already authorized by a saved program/root
+      // scope must update that canonical workspace. Calling configureScope(app)
+      // directly would otherwise let ensure() create a second root/child ledger
+      // even though the existing root already owns the asset.
+      if (!exactWorkspace) {
+        const resolution = await TargetMemory.checkURLScope(targetURL)
+        if (resolution.workspace) {
+          if (!resolution.allowed) {
+            return {
+              title: "Scope update stopped: existing workspace does not authorize this URL",
+              output: "No scope changes were made. The supplied target_url maps to an existing workspace, but its persisted scope decision is: " + resolution.reason + ". Reuse that canonical workspace and resolve the policy conflict there; do not create another workspace for this host.",
+              metadata: { saved: false, reason: "scope_denied", target_url: targetURL, canonical_target_url: resolution.workspace.targetURL } as TargetWorkspaceMetadata,
+            }
+          }
+          targetURL = resolution.workspace.targetURL
+        }
+      }
+
       let fileEntries: string[] = []
       let fileExcludedEntries: string[] = []
       let sourceContents: string | undefined
