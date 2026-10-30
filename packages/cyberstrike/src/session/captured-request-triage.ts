@@ -46,7 +46,7 @@ export function isConfirmedEmptyStaticHTML(input: EmptyStaticResponseInput): boo
   if (Buffer.byteLength(input.htmlSource, "utf8") !== input.responseSize) return false
   if (input.contentLength !== undefined) {
     const rawLength = input.contentLength.trim()
-    if (!/^\\d+$/.test(rawLength)) return false
+    if (!/^\d+$/.test(rawLength)) return false
     const declaredLength = Number(rawLength)
     if (!Number.isSafeInteger(declaredLength) || declaredLength !== input.responseSize) return false
   }
