@@ -487,6 +487,41 @@ test("serializes concurrent target-note writes and rebuilds notes.md from SQLite
   })
 })
 
+test("serializes concurrent asset-registry updates without dropping attached assets", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://asset-registry.example.test", {
+        include: ["asset-registry.example.test", "*.asset-registry.example.test"],
+        authorizationSource: "Asset registry concurrency regression fixture",
+        authorizationReference: "https://asset-registry.example.test/policy",
+      })
+      const assetURLs = [
+        "https://api.asset-registry.example.test",
+        "https://cdn.asset-registry.example.test",
+        "https://static.asset-registry.example.test",
+        "https://auth.asset-registry.example.test",
+      ]
+
+      await Promise.all(assetURLs.map((assetURL) =>
+        TargetMemory.attachAsset(configured.workspace.targetURL, assetURL),
+      ))
+
+      const registryPath = path.join(configured.workspace.workspacePath, "assets", "registry.json")
+      const registry = JSON.parse(await fs.readFile(registryPath, "utf-8")) as {
+        assets: Array<{ targetURL: string; workspaceID: string }>
+      }
+      expect(registry.assets.map((asset) => asset.targetURL).sort()).toEqual([...assetURLs].sort())
+      expect(new Set(registry.assets.map((asset) => asset.workspaceID)).size).toBe(assetURLs.length)
+
+      const notes = await fs.readFile(path.join(configured.workspace.workspacePath, "notes.md"), "utf-8")
+      for (const assetURL of assetURLs) expect(notes).toContain(assetURL)
+      await Instance.dispose()
+    },
+  })
+})
+
 describe("target workspace owner keys", () => {
   test("isolates non-Git project directories that share the global Project ID", () => {
     const first = targetWorkspaceOwnerKey("global", "/tmp/cyberstrike-project-a")
