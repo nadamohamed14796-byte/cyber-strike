@@ -112,6 +112,8 @@ function parseToolParams(input?: string) {
 }
 
 async function createToolContext(agent: Agent.Info) {
+  const agentID = await Agent.resolveID(agent)
+  if (!agentID) throw new Error(`Unable to resolve stable agent ID for "${agent.name}".`)
   const session = await Session.create({ title: `Debug tool run (${agent.name})` })
   const messageID = Identifier.ascending("message")
   const model = agent.model ?? (await Provider.defaultModel())
@@ -127,7 +129,7 @@ async function createToolContext(agent: Agent.Info) {
     modelID: model.modelID,
     providerID: model.providerID,
     mode: "debug",
-    agent: agent.name,
+    agent: agentID,
     path: {
       cwd: Instance.directory,
       root: Instance.worktree,
@@ -151,7 +153,7 @@ async function createToolContext(agent: Agent.Info) {
     sessionID: session.id,
     messageID,
     callID: Identifier.ascending("part"),
-    agent: agent.name,
+    agent: agentID,
     abort: new AbortController().signal,
     messages: [],
     metadata: () => {},
