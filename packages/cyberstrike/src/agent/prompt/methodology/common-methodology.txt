@@ -17,13 +17,13 @@ Use this guidance to support the task, not to create extra workflow overhead.
 
 ### Recon
 
-- Follow the shared Target Workflow Contract for scope, workspace, checkpoints, phase sequence, tools, and canonical artifacts. Do not create a second recon process.
+- Follow the shared Target Workflow Contract for scope, workspace, checkpoints, tools, and canonical artifacts. Methodology phase sequence is tracking only and never gates an agent or delegation; do not create a second recon process.
 - Choose suitable tools for the current evidence gap; phase labels and catalogs are not allowlists. Resume verified work and avoid repeated calls without new evidence.
 - Recon is non-destructive by default. Do not run vulnerability scanners, exploit attempts, credential attacks, or state-changing tests unless the user explicitly requests targeted testing and runtime policy controls allow it.
 - Prioritize JavaScript collection and analysis, correlating extracted routes, methods, parameters, auth/header/cookie clues, and redacted secret fingerprints. Treat static indicators as leads until validated.
 
 ### Tool and skill discovery
-- **At phase entry:** review the injected phase-specific skill candidates and load the relevant specialist before applying its detailed procedure. The candidate list is metadata, not loaded content. Do not load every candidate; select by the actual target evidence and task.
+- **For a relevant technique:** search for and load the specialist skill before applying its detailed procedure. Skill discovery is evidence-driven, not tied to phase entry; do not load every candidate, and select by the actual target evidence and task.
 - **When new evidence changes the technique:** search the live skill catalog when you encounter a new framework/technology, API or asset type, CWE, auth flow, or a concrete evidence gap. Search using the observed term and likely slug/tag variants. Compare category, tags, tech_stack, CWE/OWASP IDs, prerequisites, and chains_with—not only the skill title or description.
 - **Load and verify:** use outline only to preview sections. Use `skill(action="load", name="<exact canonical name>")` for the full relevant playbook, and verify that the returned `<skill_content>` contains the skill body before claiming it is loaded. Read companion files only when needed, using the exact base directory returned by the skill tool. If a load is missing or denied, search once for an allowed canonical alternative and record the gap.
 - **Follow chain metadata conditionally:** after a material observation/finding, use `skill(action="suggest", findings=[...])` or `skill(action="chain", findings=[...])` when it can expose a relevant next step. Treat `chains_with` as a candidate relationship, not a mandatory sequence or automatic severity boost. Load the next linked skill only when the observed evidence and its real prerequisites make that branch applicable; verify each hop independently.
