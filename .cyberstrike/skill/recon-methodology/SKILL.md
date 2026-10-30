@@ -117,24 +117,15 @@ Before handing a lead to a testing skill:
 
 Return normalized asset and endpoint inventories, scope decisions, provenance, delta summary, authentication coverage, deduplicated prioritized hypotheses, blockers, and next-step recommendations. Keep discovery facts separate from security conclusions.
 
-## Agent-executable CLI tooling, resources, and helper scripts
-
-Use registered tools for app/network activity and locally verified CLIs for local processing. A browser or intercepting proxy is not a dependency when captured requests or local files already provide the needed evidence. Use the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>`; read it using that skill's returned `Base directory` as the only tool/API/CLI/helper inventory instead of repeating candidate lists here.
+## Recon-specific tool guardrails
 
 - Nuclei is not part of default reconnaissance. Use it only in a separate, explicitly requested testing phase with reviewed templates and required authorization.
 - Use local `git diff` only when reviewing saved artifact changes; it does not replace evidence validation.
-
-References:
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://owasp.org/API-Security/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Community lists are discovery aids, not proof of maintenance or CLI behavior. Verify the official source/version before invocation.
 
 Reuse `recon_checkpoint` as the only phase-state ledger. Do not create a second phase manifest or per-phase runner manifest that duplicates its states. Add a small run/item record only when the existing checkpoint/source ledger lacks a necessary cursor, tool version, artifact hash, exit code, or failure detail. Keep raw evidence only when needed for provenance/debugging, normalize once into canonical inventories, and report actual commands/tools used, paths, verified counts, failures, confidence, and the next relevant specialist skill.
 
 ## Adaptive tool selection
 
-The canonical `/recon` prompt and `recon_checkpoint` own initialization, persisted scope, phase order, checkpoint actions, resumability, canonical outputs, and completion/reporting. The checkpoint defines **what work is current and what artifacts prove completion**, not a fixed phase-to-tool assignment. Every connected/registered tool can be considered at every active checkpoint; choose based on its actual capability, current evidence gap, verified availability, saved artifacts, and policy. Use the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>`; read it using that skill's returned `Base directory` as the single reference for candidate tools/APIs/CLIs/helpers, and the `RECON_PHASE_TOOL_MATRIX.md` companion listed in this skill's returned `<skill_files>`; read it using this skill's returned `Base directory` only for phase artifacts, dependencies, and completion criteria.
+The canonical `/recon` prompt and `recon_checkpoint` own initialization, persisted scope, phase order, checkpoint actions, resumability, canonical outputs, and completion/reporting. The checkpoint defines **what work is current and what artifacts prove completion**, not a fixed phase-to-tool assignment. Every connected/registered tool can be considered at every active checkpoint; choose based on its actual capability, current evidence gap, verified availability, saved artifacts, and policy. Consult the single `TOOLING_CATALOG.md` reference through `community-tool-selection` and the `RECON_PHASE_TOOL_MATRIX.md` companion through this skill's returned `<skill_files>` and `Base directory`. The catalog describes candidate tools; the matrix defines phase artifacts and completion criteria. Neither is an execution allowlist.
 
 Load specialist skills only when observed assets, technology, or evidence make their detailed procedure relevant. Select a useful combination of tools dynamically; add alternatives for distinct coverage, corroboration, or recovery, not merely because they are listed. Check schemas/versions only for candidates being considered, avoid repeated preflight/installing the entire catalog, and never reject a suitable tool only because its nominal category differs from the active checkpoint. Distinguish zero results from failure, unavailable, blocked, skipped-by-selection, not applicable, and pending work. The explicit vulnerability-testing checkpoint and all persisted scope, authorization, impact, and rate controls remain mandatory. A phase is complete only after applicable work and saved artifacts are verified, with remaining gaps stated honestly.

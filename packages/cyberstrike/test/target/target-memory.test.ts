@@ -881,6 +881,35 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
   })
 })
 
+test("MercadoPago program root authorizes explicitly listed MercadoLibre wildcard assets in one workspace", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://mercadopago.com", {
+        include: ["mercadopago.com", "*.mercadopago.com", "*.mercadolibre.com", "mercadolibreexperience.com.*"],
+        authorizationSource: "MercadoPago/MercadoLibre program scope regression fixture",
+        authorizationReference: "https://example.test/program-policy",
+      })
+
+      const api = await TargetMemory.checkURLScope("https://api.mercadolibre.com/")
+      const nested = await TargetMemory.checkURLScope("https://edge.api.mercadolibre.com/v1/items")
+      const suffix = await TargetMemory.checkURLScope("https://mercadolibreexperience.com.ar/")
+      const lookalike = await TargetMemory.checkURLScope("https://notmercadolibre.com/")
+
+      expect(api.allowed).toBe(true)
+      expect(api.workspace?.id).toBe(configured.workspace.id)
+      expect(nested.allowed).toBe(true)
+      expect(nested.workspace?.id).toBe(configured.workspace.id)
+      expect(suffix.allowed).toBe(true)
+      expect(suffix.workspace?.id).toBe(configured.workspace.id)
+      expect(lookalike.allowed).toBe(false)
+      expect(TargetMemory.list().filter((workspace) => workspace.parentTargetID === null)).toHaveLength(1)
+    },
+  })
+})
+
+
 test("user-confirmed scope without a policy URL must be exactly one asset, not a wildcard or CIDR", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
