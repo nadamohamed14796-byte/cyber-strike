@@ -185,7 +185,7 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
 
           expect(result.metadata.saved).toBe(false)
           expect(result.metadata.reason).toBe("wildcard_workspace_identity_rejected")
-          expect(result.output).toContain('include: ["*.example.com"]')
+          expect(result.output).toContain('include: ["*.example.test"]')
           expect(result.output).toContain("user_confirmed_scope_list=true")
           expect(TargetMemory.list()).toHaveLength(0)
         } finally {
@@ -239,14 +239,14 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
       directory: tmp.path,
       async fn() {
         try {
-          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
-            include: ["*.example.test"],
-            authorizationSource: "Program wildcard scope fixture",
-            authorizationReference: "https://program.example.test/policy",
-          })
           const legacy = await TargetMemory.configureScope("https://www.example.test", {
             include: ["www.example.test"],
             authorizationSource: "Legacy exact-host root fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+            include: ["*.example.test"],
+            authorizationSource: "Program wildcard scope fixture",
             authorizationReference: "https://program.example.test/policy",
           })
 
@@ -310,14 +310,14 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
       directory: tmp.path,
       async fn() {
         try {
-          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
-            include: ["*.example.test"],
-            authorizationSource: "Program wildcard scope fixture",
-            authorizationReference: "https://program.example.test/policy",
-          })
           await TargetMemory.configureScope("https://www.example.test", {
             include: ["www.example.test"],
             authorizationSource: "Legacy exact-host root fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+            include: ["*.example.test"],
+            authorizationSource: "Program wildcard scope fixture",
             authorizationReference: "https://program.example.test/policy",
           })
 
