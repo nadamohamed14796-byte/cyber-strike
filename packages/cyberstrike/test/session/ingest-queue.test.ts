@@ -1072,12 +1072,9 @@ describe("captured request payload preservation", () => {
         expect(capturedRows).toHaveLength(2)
         expect(new Set(capturedRows.map((item) => item.id)).size).toBe(2)
 
-        // Extension captures are represented by request.updated inventory and the
-        // Agent Proxy child session, never by synthetic messages in the Main chat.
+        // Dry-run still persists complete request rows but does not start an Agent Proxy.
         const parentMessages = await Session.messages({ sessionID: session.id })
         expect(parentMessages).toHaveLength(0)
-        const children = await Session.children(session.id)
-        expect(children.filter((child) => child.title === "Agent Proxy")).toHaveLength(1)
       } finally {
         if (sessionID) await Session.remove(sessionID).catch(() => {})
         if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
@@ -1136,6 +1133,8 @@ describe("captured request HTTP route scope gate", () => {
         expect(brokers[0]?.id).toBe(broker.id)
         expect(brokers[0]?.parentID).toBe(parent.id)
         expect(Request.get(parent.id)).toHaveLength(3)
+        // Live Extension captures must never add synthetic turns to the Main chat.
+        expect(await Session.messages({ sessionID: parent.id })).toHaveLength(0)
       } finally {
         const children = await Session.children(parent.id).catch(() => [])
         for (const child of children) await Session.remove(child.id).catch(() => {})
