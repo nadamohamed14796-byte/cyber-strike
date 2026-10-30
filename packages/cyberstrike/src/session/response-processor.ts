@@ -35,6 +35,8 @@ export interface ProcessedResponse {
   content: string
   /** Full JavaScript or source-map body for static analysis/correlation; separate from the bounded response preview. */
   javascriptSource?: string
+  /** Full HTML body for deterministic preflight; never copied into the LLM preview. */
+  htmlSource?: string
 }
 
 export function processResponse(input: ResponseInput): ProcessedResponse {
@@ -79,6 +81,7 @@ export function processResponse(input: ResponseInput): ProcessedResponse {
     originalSize,
     content,
     ...(isJavaScriptOrSourceMap(contentType, input.url) ? { javascriptSource: input.body } : {}),
+    ...(isHtml(contentType) ? { htmlSource: input.body } : {}),
   }
 }
 
