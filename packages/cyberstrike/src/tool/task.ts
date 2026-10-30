@@ -384,12 +384,8 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         if (lines.length > 0) prompt = lines.join("\n") + "\n\n" + prompt
       }
 
-      // NOTE: methodology context is NOT injected here. The subagent's own run loop
-      // (session/prompt.ts) pushes MethodologyContext.generate(root, testerClass(agent))
-      // into the system prompt on EVERY turn (lane-scoped identically), and that prefix
-      // is prompt-cached. Prepending it here too only duplicated it into turn-1's user
-      // message. The system-prompt path covers all subagent sessions, so this is the
-      // single source.
+      // Methodology prompt context is disabled centrally for all agents.
+      // Task creation and resumption do not consult methodology phase state.
       const promptParts = await SessionPrompt.resolvePromptParts(prompt)
 
       const promptInput = {
