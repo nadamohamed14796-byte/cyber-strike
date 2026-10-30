@@ -12,7 +12,7 @@
  * broker/delegated sessions from no-progress and duplicate-call loops.
  */
 export function isNativeSubagentRun(input: {
-  agent: { mode: "subagent" | "primary" | "all"; native?: boolean }
+  agent: { name?: string; mode: "subagent" | "primary" | "all"; native?: boolean }
   session: { parentID?: string | null }
 }): boolean {
   if (input.agent.native !== true) return false
