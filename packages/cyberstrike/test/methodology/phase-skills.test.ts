@@ -277,6 +277,7 @@ describe("Methodology phase skill routing", () => {
       name,
       description: "Reconnaissance enumeration and discovery",
       tags: ["recon", "active-recon", "enumeration"],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
@@ -300,6 +301,7 @@ describe("Methodology phase skill routing", () => {
       name,
       description: "Security reconnaissance workflow",
       tags: [],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
@@ -325,6 +327,7 @@ describe("Methodology phase skill routing", () => {
       name,
       description: "General business logic security testing",
       tags: [],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
@@ -340,11 +343,37 @@ describe("Methodology phase skill routing", () => {
     const ranked = rankSkillsForPhase("business_logic", entries, 2)
     expect(ranked.map((skill) => skill.name)).toContain("attack-business-logic")
   })
+  test("phase ranking routes through explicit signals and legacy tag aliases", () => {
+    const query = skillQueriesForPhase("authorization_testing")[0]!
+    const makeSkill = (name: string, tags: string[], signals: string[]): SkillIndex.Entry => ({
+      name,
+      description: "No free-text or name match should be needed",
+      tags,
+      signals,
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+
+    const ranked = rankSkillsForPhase("authorization_testing", [
+      makeSkill("explicit-signal-route", [], [query]),
+      makeSkill("legacy-tag-route", [query], []),
+    ])
+    const names = ranked.map((skill) => skill.name)
+    expect(names).toContain("explicit-signal-route")
+    expect(names).toContain("legacy-tag-route")
+    expect(ranked.find((skill) => skill.name === "explicit-signal-route")?.signals).toContain(query)
+    expect(ranked.find((skill) => skill.name === "legacy-tag-route")?.signals).toContain(query)
+  })
+
   test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
     const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
       name: "generic-web-testing",
       description: "General web application testing",
       tags: [],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
@@ -359,11 +388,13 @@ describe("Methodology phase skill routing", () => {
         name: "access-control-review",
         description: "Authorization and object-level access checks",
         tags: ["authz-testing", "authorization", "idor"],
+        signals: ["role-boundary-change"],
       }),
       makeSkill({
         name: "tampered-idor-skill",
         description: "Authorization IDOR testing",
         tags: ["authz-testing", "idor"],
+        signals: [],
         verified: "tampered",
       }),
     ])
@@ -379,6 +410,7 @@ describe("Methodology phase skill routing", () => {
       category: "recon",
       owasp_id: "WSTG-CLNT-01",
       tags: ["javascript", "source-maps", "endpoints"],
+      signals: ["request-shape-change"],
       tech_stack: ["browser", "javascript"],
       cwe_ids: ["CWE-79"],
       chains_with: ["attack-dom-xss"],
@@ -387,6 +419,7 @@ describe("Methodology phase skill routing", () => {
     }
     const ranked = rankSkillsForPhase("active_recon", [skill], 1)
     expect(ranked).toContainEqual(expect.objectContaining({
+      signals: ["request-shape-change", "javascript", "source-maps", "endpoints"],
       name: "attack-javascript-analysis",
       category: "recon",
       owasp_id: "WSTG-CLNT-01",
@@ -403,6 +436,7 @@ describe("Methodology phase skill routing", () => {
       name: "unrelated-skill",
       description: "General testing notes",
       tags: [],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
@@ -430,6 +464,7 @@ describe("Methodology phase skill routing", () => {
       name,
       description: "Technology profiling and framework detection",
       tags: ["technology", "framework", "tech-profile"],
+      signals: [],
       tech_stack,
       cwe_ids: [],
       chains_with: [],
@@ -450,6 +485,7 @@ describe("Methodology phase skill routing", () => {
       name,
       description,
       tags,
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
