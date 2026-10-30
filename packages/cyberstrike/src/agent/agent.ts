@@ -1082,7 +1082,7 @@ export namespace Agent {
     for (const [id, agent] of Object.entries(result)) {
       if (["compaction", "title", "summary", "normalize-request"].includes(id)) continue
       if (PermissionNext.evaluate("skill", "*", agent.permission).action !== "allow") continue
-      agent.prompt = [PROMPT_RUNTIME_DISCOVERY, agent.prompt].filter(Boolean).join("\\n\\n---\\n\\n")
+      agent.prompt = [PROMPT_RUNTIME_DISCOVERY, agent.prompt].filter(Boolean).join("\n\n---\n\n")
     }
 
     return result
