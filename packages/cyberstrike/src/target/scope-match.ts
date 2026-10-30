@@ -13,15 +13,18 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // HackerOne scope exports may include an asset type alongside its identifier.
   // Only web-addressable types can authorize an HTTP target. Non-web assets are
   // retained as scope evidence, but never authorize an unrelated HTTP request.
-  const typed = rawScope.match(/^(domain|wildcard|url|javascript|js|cidr|ip address|api|google play app id|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
+  const typed = rawScope.match(/^(domain|wildcard|url|javascript|js|source[ \\t]+map|cidr|ip address|api|google play app id|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
   if (typed) {
     const assetType = typed[1].replace(/\s+/g, " ").trim().toLowerCase()
     const identifier = typed[2].trim()
-    const webTypes = new Set(["domain", "wildcard", "url", "javascript", "js", "cidr", "ip address", "api"])
+    const webTypes = new Set(["domain", "wildcard", "url", "javascript", "js", "source map", "cidr", "ip address", "api"])
     if (!webTypes.has(assetType)) {
       return { matches: false, reason: `HackerOne asset type "${assetType}" is not an HTTP target scope; use its appropriate assessment workflow` }
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
+    if (assetType === "javascript" || assetType === "js" || assetType === "source map") {
+      return matchJavaScriptFileScope(rawTarget, identifier, !/^https?:\\/\\//i.test(identifier), assetType === "source map")
+    }
     if (assetType === "domain") {
       const normalizedHost = parseHostname(identifier)
       if (
@@ -188,6 +191,39 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // include subdomains must express that permission with an explicit wildcard.
   if (hostname === scopeHost) return { matches: true, reason: "exact domain/IP match (ignoring protocol, port, and path)" }
   return { matches: false, reason: "no exact domain/IP match; add an explicit wildcard if subdomains are in scope" }
+}
+
+/** Match JavaScript grants to one exact file path; unlike URL grants, never allow sibling paths. */
+function matchJavaScriptFileScope(rawTarget: string, identifier: string, allowEitherScheme: boolean, allowSourceMap = false): ScopeMatch {
+  let targetURL: URL
+  let scopeURL: URL
+  const explicitScheme = /^https?:\/\//i.test(identifier)
+  try {
+    targetURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
+    scopeURL = explicitScheme ? new URL(identifier) : new URL("https://" + identifier)
+  } catch {
+    return { matches: false, reason: "invalid JavaScript file scope URL or target" }
+  }
+  if (
+    (targetURL.protocol !== "http:" && targetURL.protocol !== "https:") ||
+    (scopeURL.protocol !== "http:" && scopeURL.protocol !== "https:") ||
+    targetURL.username || targetURL.password || scopeURL.username || scopeURL.password
+  ) return { matches: false, reason: "JavaScript file scope and target must be credential-free HTTP(S) URLs" }
+  const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(scopeURL.pathname)
+  const sourceMapFile = allowSourceMap && /\.map$/i.test(scopeURL.pathname)
+  if (!scriptFile && !sourceMapFile) {
+    return { matches: false, reason: "JavaScript scope must identify one exact script or source-map file" }
+  }
+  if (explicitScheme && !allowEitherScheme && targetURL.protocol !== scopeURL.protocol) {
+    return { matches: false, reason: "protocol does not match explicit JavaScript file scope" }
+  }
+  const sameOrigin =
+    targetURL.hostname.toLowerCase().replace(/\.$/, "") === scopeURL.hostname.toLowerCase().replace(/\.$/, "") &&
+    targetURL.port === scopeURL.port
+  if (!sameOrigin) return { matches: false, reason: "target does not match JavaScript file scope origin" }
+  return targetURL.pathname === scopeURL.pathname
+    ? { matches: true, reason: "exact JavaScript file path match" }
+    : { matches: false, reason: "target does not match the exact JavaScript file path" }
 }
 
 /** Match URL assets without discarding the path, port, or an explicit scheme. */
