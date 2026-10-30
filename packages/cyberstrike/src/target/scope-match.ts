@@ -23,7 +23,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
     if (assetType === "javascript" || assetType === "js" || assetType === "source map") {
-      return matchJavaScriptFileScope(rawTarget, identifier, !/^https?:\\/\\//i.test(identifier), assetType === "source map")
+      return matchJavaScriptFileScope(rawTarget, identifier, !/^https?:\/\//i.test(identifier), assetType === "source map")
     }
     if (assetType === "domain") {
       const normalizedHost = parseHostname(identifier)
