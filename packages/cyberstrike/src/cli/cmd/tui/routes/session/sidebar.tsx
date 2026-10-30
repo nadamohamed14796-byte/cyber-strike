@@ -2,6 +2,7 @@ import { useSync } from "@tui/context/sync"
 import { createEffect, createMemo, For, onCleanup, Show, Switch, Match } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useTheme } from "../../context/theme"
+import { useRoute } from "@tui/context/route"
 import { Locale } from "@/util/locale"
 import path from "path"
 import type { AssistantMessage } from "@cyberstrike-io/sdk/v2"
@@ -21,6 +22,27 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
   const { theme } = useTheme()
   const session = createMemo(() => sync.session.get(props.sessionID)!)
+  const { navigate } = useRoute()
+  const proxyBroker = createMemo(() => {
+    const current = session()
+    if (!current?.id || current.parentID) return undefined
+    return sync.data.session.find(
+      (item) =>
+        item.parentID === current.id &&
+        (item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
+    )
+  })
+  const isExtensionTreeSession = createMemo(() => {
+    const all = sync.data.session ?? []
+    let cursor = session()
+    const visited = new Set<string>()
+    while (cursor?.parentID && !visited.has(cursor.id)) {
+      visited.add(cursor.id)
+      if (cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") return true
+      cursor = all.find((item) => item.id === cursor?.parentID)
+    }
+    return false
+  })
   const diff = createMemo(() => sync.data.session_diff[props.sessionID] ?? [])
   const todo = createMemo(() => sync.data.todo[props.sessionID] ?? [])
   const vulnerability = createMemo(() => sync.data.vulnerability[props.sessionID] ?? [])
@@ -41,6 +63,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return out
   })
   const requests = createMemo(() => sync.data.request[props.sessionID] ?? [])
+  const extensionQueueRequests = createMemo(() =>
+    requests().slice().sort((a, b) => a.id.localeCompare(b.id)).filter((item) => item.status === "processing" || item.status === "queued"),
+  )
+  const enterProxyBroker = () => {
+    const child = proxyBroker()
+    if (child) navigate({ type: "session", sessionID: child.id })
+  }
   const requestStatusCounts = createMemo(() => {
     const all = requests()
     return {
@@ -204,7 +233,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </text>
               </Show>
             </box>
-            <Show when={(queueStatus()?.pending ?? 0) > 0 || queueStatus()?.paused}>
+            <Show when={!isExtensionTreeSession() && !!session()?.parentID && ((queueStatus()?.pending ?? 0) > 0 || queueStatus()?.paused)}>
               <box>
                 <text fg={theme.text}>
                   <b>Request Queue</b>
@@ -216,6 +245,34 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   <text fg={theme.textMuted}>{queueStatus()!.pending} request(s) queued or preparing</text>
                 </Show>
                 <text fg={theme.info}>{queueStatus()?.paused ? "/qresume" : "/qpause"}</text>
+              </box>
+            </Show>
+            <Show when={!session()?.parentID && proxyBroker()}>
+              <box flexDirection="column" gap={1}>
+                <text fg={theme.text}>
+                  <b>Extension Agent</b>
+                </text>
+                <box flexDirection="row" alignItems="center" gap={1}>
+                  <For each={extensionQueueRequests()}>
+                    {(_, index) => (
+                      <box paddingLeft={1} paddingRight={1} backgroundColor={theme.backgroundElement}>
+                        <text fg={theme.text}>{index() + 1}</text>
+                      </box>
+                    )}
+                  </For>
+                  <box
+                    onMouseOver={() => setHover("next")}
+                    onMouseOut={() => setHover(null)}
+                    onMouseUp={enterProxyBroker}
+                    backgroundColor={hover() === "next" ? theme.backgroundPanel : theme.backgroundElement}
+                    paddingLeft={1}
+                    paddingRight={1}
+                  >
+                    <text fg={theme.accent}>
+                      <b>Enter →</b>
+                    </text>
+                  </box>
+                </box>
               </box>
             </Show>
             <Show when={hackbrowserStatus()}>
@@ -505,7 +562,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </Show>
               </box>
             </Show>
-            <Show when={requests().length > 0}>
+            <Show when={!isExtensionTreeSession() && !!session()?.parentID && requests().length > 0}>
               <box>
                 <box
                   flexDirection="row"
