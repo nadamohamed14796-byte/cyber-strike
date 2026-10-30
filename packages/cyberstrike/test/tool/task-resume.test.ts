@@ -25,7 +25,7 @@ test("Proxy Agent keeps request-ID inference in standalone and delegated modes",
   expect(shouldInferSessionRequestID(undefined)).toBe(false)
 })
 
-test("only non-Impact-Hunter subagents can use the background handoff bypass", () => {
+test("only non-Impact-Hunter callers can use the background Impact Hunter handoff bypass", () => {
   const base = {
     subagentType: "impact-hunter",
     background: true,
@@ -33,11 +33,13 @@ test("only non-Impact-Hunter subagents can use the background handoff bypass", (
     callerMode: "subagent" as const,
   }
   expect(isInternalImpactHandoff(base)).toBe(true)
+  expect(isInternalImpactHandoff({ ...base, caller: "proxy-agent", callerMode: "all" })).toBe(true)
+  expect(isInternalImpactHandoff({ ...base, caller: "cyberstrike", callerMode: "primary" })).toBe(true)
   expect(isInternalImpactHandoff({ ...base, background: false })).toBe(false)
   expect(isInternalImpactHandoff({ ...base, subagentType: "proxy-tester-idor" })).toBe(false)
   expect(isInternalImpactHandoff({ ...base, caller: "impact-hunter" })).toBe(false)
-  expect(isInternalImpactHandoff({ ...base, caller: "cyberstrike", callerMode: "primary" })).toBe(false)
   expect(isInternalImpactHandoff({ ...base, caller: undefined })).toBe(false)
+  expect(isInternalImpactHandoff({ ...base, callerMode: undefined })).toBe(false)
 })
 
 
