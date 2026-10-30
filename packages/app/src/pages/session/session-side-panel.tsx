@@ -779,10 +779,30 @@ function WebContextPanelList() {
   const [retryErrors, setRetryErrors] = createSignal<Record<string, string>>({})
 
   const sessionID = () => params.id ?? ""
+  const currentSession = createMemo(() => sync.session.get(sessionID()))
+  const extensionRequestOwnerID = createMemo(() => {
+    const all = sync.data.session ?? []
+    let cursor = currentSession()
+    const visited = new Set<string>()
+    while (cursor?.parentID && !visited.has(cursor.id)) {
+      visited.add(cursor.id)
+      if (cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") {
+        return cursor.parentID
+      }
+      cursor = all.find((item) => item.id === cursor?.parentID)
+    }
+    return undefined
+  })
+  const visibleSections = createMemo(() =>
+    extensionRequestOwnerID() ? webSections : webSections.filter((item) => item.id !== "endpoints"),
+  )
+  const activeSection = createMemo(() =>
+    visibleSections().some((item) => item.id === section()) ? section() : (visibleSections()[0]?.id ?? "roles"),
+  )
   const credLabel = (id: string | null) =>
     id == null
       ? "anon"
-      : (((sync.data.web_credential[sessionID()] ?? []) as { id: string; label: string }[]).find((c) => c.id === id)
+      : (((sync.data.web_credential[extensionRequestOwnerID() ?? sessionID()] ?? []) as { id: string; label: string }[]).find((c) => c.id === id)
           ?.label ?? id.slice(0, 6))
   const toggleEndpoint = async (v: Record<string, unknown>) => {
     const id = v.id as string
@@ -791,7 +811,7 @@ function WebContextPanelList() {
     // Fetch by request id (always present; the SDK can strip key_hash from the list).
     if (open && !obsTree()[id]) {
       try {
-        const r = await sdk.fetch(`/session/${sessionID()}/observations?id=${encodeURIComponent(id)}`)
+        const r = await sdk.fetch(`/session/${extensionRequestOwnerID()}/observations?id=${encodeURIComponent(id)}`)
         const tree = (await r.json()) as ObsTree
         if (tree && Array.isArray(tree.params)) setObsTree({ ...obsTree(), [id]: tree })
       } catch {
@@ -801,7 +821,7 @@ function WebContextPanelList() {
   }
 
   const retryCapturedRequest = async (requestID: string) => {
-    const id = sessionID()
+    const id = extensionRequestOwnerID()
     if (!id || retryingRequestID() === requestID) return
     setRetryingRequestID(requestID)
     setRetryErrors((previous) => ({ ...previous, [requestID]: "" }))
@@ -827,7 +847,8 @@ function WebContextPanelList() {
 
   // A retry can be offered again if the new run reaches a terminal state.
   createEffect(() => {
-    const rows = sync.data.request[sessionID()] ?? []
+    const ownerID = extensionRequestOwnerID()
+    const rows = ownerID ? (sync.data.request[ownerID] ?? []) : []
     const cleared = new Set<string>()
     for (const row of rows) {
       const requestID = row.id
@@ -845,22 +866,31 @@ function WebContextPanelList() {
     }
   })
 
-  // Fetch web context for active session
+  // Keep ordinary architecture context on the current session. Captured
+  // request details are parent-owned records and are loaded only while viewing
+  // the Agent Proxy session tree, never in the Main session sidebar.
   createEffect(() => {
     const id = sessionID()
     if (!id) return
-    void sync.session.request(id)
     void sync.session.webCredentials(id)
     void sync.session.webRoles(id)
     void sync.session.webObjects(id)
     void sync.session.webFunctions(id)
+    const requestOwnerID = extensionRequestOwnerID()
+    if (requestOwnerID) {
+      void sync.session.request(requestOwnerID)
+      void sync.session.webCredentials(requestOwnerID)
+    }
   })
 
   const items = createMemo(() => {
     const id = sessionID()
     if (!id) return []
-    const s = section()
-    if (s === "endpoints") return sync.data.request[id] ?? []
+    const s = activeSection()
+    if (s === "endpoints") {
+      const ownerID = extensionRequestOwnerID()
+      return ownerID ? (sync.data.request[ownerID] ?? []) : []
+    }
     if (s === "roles") return sync.data.web_role[id] ?? []
     if (s === "credentials") return sync.data.web_credential[id] ?? []
     if (s === "objects") return sync.data.web_object[id] ?? []
@@ -872,7 +902,7 @@ function WebContextPanelList() {
     const id = sessionID()
     if (!id) return 0
     return (
-      (sync.data.request[id]?.length ?? 0) +
+      (extensionRequestOwnerID() ? (sync.data.request[extensionRequestOwnerID()!]?.length ?? 0) : 0) +
       (sync.data.web_role[id]?.length ?? 0) +
       (sync.data.web_credential[id]?.length ?? 0) +
       (sync.data.web_object[id]?.length ?? 0) +
@@ -890,7 +920,7 @@ function WebContextPanelList() {
 
       {/* Section pills */}
       <div class="flex items-center gap-1 px-2 py-1 flex-wrap">
-        <For each={webSections}>
+        <For each={visibleSections()}>
           {(s) => (
             <button
               class="px-2 py-0.5 rounded text-11-medium cursor-pointer border-none"
@@ -917,7 +947,7 @@ function WebContextPanelList() {
           const v = item as Record<string, unknown>
           return (
             <div class="flex items-start gap-2 px-2 py-1 rounded">
-              <Show when={section() === "endpoints"}>
+              <Show when={activeSection() === "endpoints"}>
                 <div class="flex flex-col w-full gap-0.5">
                   <div class="flex items-center gap-1.5 cursor-pointer" onClick={() => toggleEndpoint(v)}>
                     <span class="text-11-regular text-text-muted shrink-0">
@@ -977,7 +1007,7 @@ function WebContextPanelList() {
                   </Show>
                 </div>
               </Show>
-              <Show when={section() === "roles"}>
+              <Show when={activeSection() === "roles"}>
                 <span class="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 bg-icon-accent-base" />
                 <div class="flex flex-col min-w-0 flex-1">
                   <span class="text-12-regular truncate">
@@ -986,18 +1016,18 @@ function WebContextPanelList() {
                   </span>
                 </div>
               </Show>
-              <Show when={section() === "credentials"}>
+              <Show when={activeSection() === "credentials"}>
                 <span class="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 bg-icon-success-base" />
                 <div class="flex items-center gap-1.5 min-w-0 flex-1">
                   <span class="text-12-medium text-text-accent shrink-0">{(v.type as string) ?? "auth"}</span>
                   <span class="text-12-regular truncate">{v.label as string}</span>
                 </div>
               </Show>
-              <Show when={section() === "objects"}>
+              <Show when={activeSection() === "objects"}>
                 <span class="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 bg-surface-inset-base" />
                 <span class="text-12-regular truncate">{v.name as string}</span>
               </Show>
-              <Show when={section() === "functions"}>
+              <Show when={activeSection() === "functions"}>
                 <Icon
                   name="dash"
                   size="small"
