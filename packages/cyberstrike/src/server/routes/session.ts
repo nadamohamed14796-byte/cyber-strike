@@ -836,9 +836,6 @@ export async function recoverPendingRequests(): Promise<void> {
             req: resumable,
             buildPrompt: () => buildPersistedRequestPrompt(request.session_id, resumable),
           }),
-        request.session_id,
-        false,
-        { independentFromParent: true },
       )
       state.scheduled.add(request.id)
       scheduled++
@@ -1323,9 +1320,6 @@ export const SessionRoutes = lazy(() =>
               req,
               buildPrompt: () => buildPersistedRequestPrompt(sessionID, req),
             }),
-          sessionID,
-          false,
-          { independentFromParent: true },
         )
 
         c.status(202)
@@ -1817,11 +1811,8 @@ export const SessionRoutes = lazy(() =>
             config: await Config.get(),
           })
           // Reserve before normalization so concurrent captures preserve arrival order.
-          // The broker session owns this queue; the Main Agent session is tracked for
-          // UI visibility only and cannot serialize or pause Proxy execution.
-          captureReservation = IngestQueue.reserve(brokerSession.id, activeSessionID, {
-            independentFromParent: true,
-          })
+          // This queue belongs only to Agent Proxy; do not register it on the Main queue.
+          captureReservation = IngestQueue.reserve(brokerSession.id)
         }
         const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
 
@@ -2144,9 +2135,6 @@ export const SessionRoutes = lazy(() =>
               IngestQueue.enqueue(
                 brokerSession.id,
                 requestTask,
-                activeSessionID,
-                false,
-                { independentFromParent: true },
               )
             }
           }
@@ -2795,9 +2783,6 @@ export const SessionRoutes = lazy(() =>
                       reject(error)
                     }
                   },
-                  targetSession.parentID!,
-                  false,
-                  { independentFromParent: true },
                 )
               })
             : await SessionPrompt.prompt(promptInput).catch((error) => {
@@ -2865,9 +2850,6 @@ export const SessionRoutes = lazy(() =>
             IngestQueue.enqueue(
               targetSession.id,
               runPrompt,
-              targetSession.parentID!,
-              false,
-              { independentFromParent: true },
             )
             return
           }
