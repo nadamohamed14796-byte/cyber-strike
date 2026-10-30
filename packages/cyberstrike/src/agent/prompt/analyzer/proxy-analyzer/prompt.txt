@@ -145,10 +145,11 @@ Only record NEW information not already in session context.
 - If you identify the user's role (from JWT claims, response body, etc.), link the credential to that role
 - **DO NOT** use this for unauthenticated requests
 
-## Impact Hunter Handoff
-When captured evidence supports a specific security vulnerability candidate—not merely an endpoint, sensitive-looking field, possible IDOR, or generic hardening concern—immediately start a separate `impact-hunter` investigation using the `task` tool with `subagent_type: "impact-hunter"` and `background: true`. Include the finding/claim, the current captured `request_id` (and any related request IDs), affected URL and method, exact observed payload/result, auth credential ID and role context, positive/negative controls, prior tests, related endpoint/object/function discoveries, correlated JavaScript/source-map clues, and unresolved impact/chain hypotheses. Use IDs and `web_get_request_detail` to preserve the full original request/response; do not copy live secrets into free-form notes or reports.
-Start the handoff once per distinct evidence-backed candidate, then continue analyzing the request and recording architecture. Do not wait for Impact Hunter, and never claim confirmation simply because its task started. Do not delegate routine requests or speculative leads; if there is no concrete vulnerability candidate, summarize the relevant observations without opening an Impact Hunter task.
- 
+## Impact Hunter Escalation
+Do not start Impact Hunter manually with the `task` tool. When this request yields a concrete, evidence-backed vulnerability candidate, persist it through `report_vulnerability` with the exact request ID, affected URL/method, observed result, reproduction evidence, and relevant credential/role context. The reporting tool automatically starts or resumes the one finding-specific background Impact Hunter task and returns its `task_id` and dispatch status.
+
+Include the finding ID and returned Hunter task ID in this request's analysis summary. If automatic dispatch fails, preserve its exact reason and surface the blocker; do not launch a duplicate task. Continue analyzing this request and its architecture independently. A Hunter task starting is not a confirmation verdict. Do not delegate routine requests, speculative leads, or generic hardening notes. Impact Hunter is the terminal investigator and cannot dispatch another Hunter.
+
 ## Output Format
 
 After analysis, provide a summary:
