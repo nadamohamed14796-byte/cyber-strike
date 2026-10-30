@@ -337,14 +337,15 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
       const pathname = new URL(request.url).pathname
       requested.push(pathname)
       if (/^\/assets\/bundle-\d+\.js$/.test(pathname)) {
-        if (pathname === "/assets/bundle-9999.js") {
-          // Valid minimal JavaScript served with a misleading MIME type.
-          return new Response("void 0;", { status: 200, headers: { "content-type": "text/plain" } })
-        }
-        return new Response('fetch("/api/profile"); const featureFlag = "account_export";', {
-          status: 200,
-          headers: { "content-type": "application/javascript" },
-        })
+        const assetIndex = Number(pathname.match(/bundle-(\d+)\.js$/)?.[1] ?? 0)
+        const contentIndex = assetIndex % 1_000
+        // Every 10 URLs share one source body, producing 1,000 distinct
+        // JavaScript contents across 10,000 distinct asset URLs.
+        const body =
+          'function loadBundle' + contentIndex + '() { return fetch("/api/v' + contentIndex + '/profile"); }\n' +
+          'const featureFlag = "feature_' + contentIndex + '";'
+        const contentType = assetIndex === 9_999 ? "text/plain" : "application/javascript"
+        return new Response(body, { status: 200, headers: { "content-type": contentType } })
       }
       return new Response("not found", { status: 404 })
     },
@@ -404,10 +405,27 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
 
         const manifestPath = path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json")
         const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
-          assets: Array<{ url: string; status: string }>
+          assets: Array<{ url: string; status: string; contentHash?: string; assetKind?: string }>
         }
         expect(manifest.assets).toHaveLength(urls.length)
         expect(manifest.assets.every((asset) => asset.status === "downloaded" || asset.status === "reused")).toBe(true)
+
+        // URL coverage and source-content coverage are deliberately measured
+        // separately: 10,000 URLs must resolve to exactly 1,000 unique bodies.
+        const uniqueContentHashes = new Set(manifest.assets.map((asset) => asset.contentHash).filter(Boolean))
+        expect(uniqueContentHashes.size).toBe(1_000)
+        expect(metadata.downloaded).toBe(1_000)
+        expect(metadata.reused).toBe(9_000)
+        expect(metadata.analyzed_source_records).toBe(1_000)
+        expect(metadata.analysis_complete).toBe(true)
+
+        // The final asset is valid JavaScript despite its misleading MIME type;
+        // it shares the expected content hash with bundle-999.js.
+        const mislabeledAsset = manifest.assets.find((asset) => asset.url === urls[9_999])
+        expect(mislabeledAsset?.assetKind).toBe("javascript")
+        expect(mislabeledAsset?.contentHash).toBe(
+          manifest.assets.find((asset) => asset.url === urls[999])?.contentHash,
+        )
         await Session.remove(session.id)
       },
     })
