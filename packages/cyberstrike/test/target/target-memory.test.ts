@@ -7,7 +7,7 @@ import { TargetMemory } from "../../src/target"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
 import { Database, eq } from "../../src/storage/db"
-import { TargetWorkspaceTable } from "../../src/target/target.sql"
+import { TargetNoteTable, TargetWorkspaceTable } from "../../src/target/target.sql"
 import { targetWorkspaceOwnerKey } from "../../src/target/project-key"
 
 describe("target memory normalization", () => {
@@ -702,6 +702,55 @@ test("resumable target context reports note and journal entries omitted by promp
       expect(context).toContain("1 selected-asset journal entries")
       expect(context).toContain("Use target_notes_read")
       expect([context.includes("First archived experiment."), context.includes("Second archived experiment.")].filter(Boolean)).toHaveLength(1)
+      await Session.remove(session.id)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("bounds prompt note reads while preserving older confirmed notes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://bounded-context-notes.example.test"
+      const workspace = await TargetMemory.ensure(targetURL)
+      const now = Date.now()
+      const rows = Array.from({ length: 505 }, (_, index) => ({
+        id: "context-preview-note-" + index,
+        target_id: workspace.id,
+        kind: index === 0 ? "finding" : "manual",
+        title: index === 0 ? "Older confirmed authorization finding" : "Context note " + index,
+        content: "Context preview fixture note " + index,
+        source: "agent:context-preview-test",
+        content_hash: "context-preview-hash-" + index,
+        status: index === 0 ? "confirmed" : "observed",
+        tags: [],
+        time_created: now - (505 - index) * 1000,
+        time_updated: now - (505 - index) * 1000,
+      }))
+      Database.use((db) => {
+        for (let offset = 0; offset < rows.length; offset += 100) {
+          db.insert(TargetNoteTable).values(rows.slice(offset, offset + 100)).run()
+        }
+      })
+      const session = await Session.create({ title: "bounded-target-context-notes-test" })
+      const request = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/api/profile",
+        origin: targetURL,
+        keyHash: "bounded-target-context-notes-test-key",
+      })
+      expect(request).toBeDefined()
+
+      const context = TargetMemory.contextForSession(session.id)
+      if (context === null) throw new Error("Expected target memory context for an observed target")
+      expect(context).toContain("Older confirmed authorization finding")
+      expect(context).toContain("additional notes outside the bounded prompt preview")
+      expect(context).toContain("target_notes_read")
+      expect(Database.use((db) => db.select().from(TargetNoteTable).where(eq(TargetNoteTable.target_id, workspace.id)).all())).toHaveLength(505)
       await Session.remove(session.id)
       await Instance.dispose()
     },
