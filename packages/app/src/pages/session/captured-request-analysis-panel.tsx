@@ -208,6 +208,13 @@ export function CapturedRequestAnalysisPanel() {
     if (!text || !sessionID || !requestID || !lastUserMessage || replySending() || childBusy()) return
 
     const submittedDraft = replyDraft()
+    const brokerFollowUp = [
+      "## Current request",
+      `- request_id: ${requestID}`,
+      "- source: Extension analysis panel",
+      "",
+      text,
+    ].join("\\n")
     setReplyDraft("")
     setReplyError("")
     setReplyNotice("")
@@ -223,14 +230,14 @@ export function CapturedRequestAnalysisPanel() {
           {
             id: Identifier.ascending("part"),
             type: "text",
-            text,
+            text: brokerFollowUp,
           },
         ],
       })
       if (result.error) throw new Error(JSON.stringify(result.error))
       await sync.session.sync(sessionID).catch(() => {})
       if (selected()?.requestID === requestID) {
-        setReplyNotice("Message sent to this request's Proxy Agent session.")
+        setReplyNotice("Message sent to the shared Extension Proxy Broker.")
       }
     } catch (error) {
       if (selected()?.requestID === requestID) {
@@ -484,7 +491,7 @@ export function CapturedRequestAnalysisPanel() {
                   <Show when={displayStatus() === "failed"}>
                     <p class="mt-1 text-text-weak">
                       {analysisSessionID()
-                        ? "You can continue in this request's Proxy Agent session or open the full session to inspect the final error."
+                        ? "You can continue in the shared Proxy Agent broker session or open it to inspect the final error."
                         : "The agent session could not start; the request was marked failed before tool execution."}
                     </p>
                   </Show>
@@ -518,7 +525,7 @@ export function CapturedRequestAnalysisPanel() {
                   />
                   <div class="mt-2 flex items-center justify-between gap-2">
                     <p class="text-10-regular text-text-weaker">
-                      This stays in the captured request's Proxy Agent session; main Recon continues independently.
+                      This goes to the shared Proxy Agent broker under the active Main Agent; the Main Agent's conversation stays separate.
                     </p>
                     <button
                       type="submit"
