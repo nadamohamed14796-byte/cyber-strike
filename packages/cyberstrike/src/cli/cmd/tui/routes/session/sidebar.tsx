@@ -267,7 +267,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     paddingRight={1}
                   >
                     <text fg={theme.accent}>
-                      <b>Enter →</b>
+                      <b>Enter</b>
                     </text>
                   </box>
                 </box>
