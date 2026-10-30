@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { matchingScopeItems } from "../../src/target/scope-index"
+import { matchingScopeItems, scopeItemSpecificity } from "../../src/target/scope-index"
+
+describe("scopeItemSpecificity", () => {
+  test("prefers an exact host grant over a wildcard family and a path-scoped URL over a bare host", () => {
+    expect(scopeItemSpecificity("app.smartsheet.com")).toBeGreaterThan(scopeItemSpecificity("*.smartsheet.com"))
+    expect(scopeItemSpecificity("https://app.smartsheet.com/api")).toBeGreaterThan(scopeItemSpecificity("app.smartsheet.com"))
+    expect(scopeItemSpecificity("Wildcard: *.smartsheet.com")).toBe(scopeItemSpecificity("*.smartsheet.com"))
+  })
+})
 
 describe("matchingScopeItems", () => {
   test("trims entries before indexing exact hosts, wildcards, and typed URL scopes", () => {
