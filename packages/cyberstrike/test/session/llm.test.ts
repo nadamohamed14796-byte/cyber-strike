@@ -307,7 +307,7 @@ describe("session.llm.stream", () => {
           agent,
           system: ["You are a helpful assistant."],
           abort: new AbortController().signal,
-          messages: [{ role: "user", content: "Run a test" }],
+          messages: [{ role: "user", content: "اتاكد إن أداة الاختبار شغالة" }],
           tools: {
             probe: tool({
               description: "A test tool used to verify tool calling is enabled",
