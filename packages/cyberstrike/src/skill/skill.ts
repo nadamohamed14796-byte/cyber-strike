@@ -27,6 +27,8 @@ export namespace Skill {
     version: z.string().optional(),
     author: z.string().optional(),
     tags: z.array(z.string()).optional(),
+    // Explicit observed-behavior aliases used by runtime skill routing. Legacy tags remain signal aliases.
+    signals: z.array(z.string()).optional(),
     sha256: z.string().optional(),
     signature: z.string().optional(),
     signed_by: z.string().optional(),
@@ -191,6 +193,7 @@ export namespace Skill {
         version: typeof raw.version === "string" ? raw.version : undefined,
         author: typeof raw.author === "string" ? raw.author : undefined,
         tags: toStringArray(raw.tags),
+        signals: toStringArray(raw.signals),
         sha256: typeof raw.sha256 === "string" ? raw.sha256 : undefined,
         signature: typeof raw.signature === "string" ? raw.signature : undefined,
         signed_by: typeof raw.signed_by === "string" ? raw.signed_by : undefined,
