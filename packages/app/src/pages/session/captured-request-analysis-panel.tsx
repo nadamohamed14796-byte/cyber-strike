@@ -53,6 +53,7 @@ export function CapturedRequestAnalysisPanel() {
   const [retryError, setRetryError] = createSignal("")
   const [replyDraft, setReplyDraft] = createSignal("")
   const [replySending, setReplySending] = createSignal(false)
+  const [brokerQueuePending, setBrokerQueuePending] = createSignal(false)
   const [replyError, setReplyError] = createSignal("")
   const [replyNotice, setReplyNotice] = createSignal("")
   let seenKey: string | undefined
@@ -109,10 +110,39 @@ export function CapturedRequestAnalysisPanel() {
   // follow-ups while any capture is normalizing, queued, or running so they cannot
   // be inserted between two serialized request turns.
   const brokerQueueBusy = createMemo(() =>
+    brokerQueuePending() ||
     ((sync.data.request[parentID()] ?? []) as unknown as RequestRow[]).some(
       (item) => item.status === "queued" || item.status === "processing",
     ),
   )
+
+  // Request reservations start before normalization and before a Request row
+  // exists. Poll the server queue while the panel is open so manual replies
+  // cannot overtake a capture that has already reached the socket endpoint.
+  createEffect(() => {
+    const sessionID = parentID()
+    if (!sessionID || !open()) {
+      setBrokerQueuePending(false)
+      return
+    }
+    let active = true
+    const refreshQueue = async () => {
+      try {
+        const result = await sdk.client.session.queueStatus()
+        if (!active) return
+        const status = (result.data as Record<string, { pending?: number }> | undefined)?.[sessionID]
+        setBrokerQueuePending((status?.pending ?? 0) > 0)
+      } catch {
+        // Persisted request status remains a second source of truth if polling fails.
+      }
+    }
+    void refreshQueue()
+    const timer = setInterval(() => void refreshQueue(), 500)
+    onCleanup(() => {
+      active = false
+      clearInterval(timer)
+    })
+  })
   const replyDisabled = createMemo(
     () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || brokerQueueBusy() || replySending(),
   )
