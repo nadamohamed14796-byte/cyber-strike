@@ -2,7 +2,6 @@ import { Database } from "../storage/db"
 import { RequestObservationTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { eq, and } from "../storage/db"
-import { createHash } from "crypto"
 import { RequestTable } from "./session.sql"
 
 // Per-credential observed-value accumulation (Faz 3).
@@ -194,22 +193,30 @@ export namespace Observation {
    */
   export function operationTreeForRequest(sessionID: string, requestID: string): OperationTree | undefined {
     const request = Database.use((db) =>
-      db.select({
-        method: RequestTable.method,
-        origin: RequestTable.origin,
-        normalized_path: RequestTable.normalized_path,
-        operation: RequestTable.operation,
-      }).from(RequestTable).where(and(
-        eq(RequestTable.session_id, sessionID),
-        eq(RequestTable.id, requestID),
-      )).get(),
+      db.select({ key_hash: RequestTable.key_hash })
+        .from(RequestTable)
+        .where(and(
+          eq(RequestTable.session_id, sessionID),
+          eq(RequestTable.id, requestID),
+        ))
+        .get(),
     )
-    if (!request) return undefined
-    const opGroupHash = createHash("sha256")
-      .update([request.method, request.origin ?? "", request.normalized_path, request.operation ?? ""].join(" "))
-      .digest("hex")
-      .slice(0, 16)
-    return operationTree(sessionID, opGroupHash)
+    if (!request?.key_hash) return undefined
+
+    // Resolve the group from the persisted observation, not by duplicating
+    // Normalize's hash formula. Repeated observations may still point at the
+    // first request ID, so key_hash is the stable lookup anchor here.
+    const group = Database.use((db) =>
+      db.select({ op_group_hash: RequestObservationTable.op_group_hash })
+        .from(RequestObservationTable)
+        .where(and(
+          eq(RequestObservationTable.session_id, sessionID),
+          eq(RequestObservationTable.key_hash, request.key_hash!),
+        ))
+        .get(),
+    )
+    if (!group) return undefined
+    return operationTree(sessionID, group.op_group_hash)
   }
 
   export interface EndpointObsSummary {
