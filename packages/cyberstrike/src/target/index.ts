@@ -219,7 +219,7 @@ function normalizeJavaScriptFileScope(input: string, allowSourceMap = false): st
   if (!scriptFile && !sourceMapFile) return undefined
   url.search = ""
   url.hash = ""
-  return "JavaScript: " + url.origin + url.pathname
+  return (allowSourceMap ? "Source Map: " : "JavaScript: ") + url.origin + url.pathname
 }
 
 function isExactUserConfirmedScopeItem(input: string): boolean {
