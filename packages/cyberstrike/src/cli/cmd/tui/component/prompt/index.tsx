@@ -669,9 +669,8 @@ export function Prompt(props: PromptProps) {
       isProxyAgentSession() && lastBrokerUserMessage
         ? requestIDFromPromptText(
             (sync.data.part[lastBrokerUserMessage.id] ?? [])
-              .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
-              .map((part) => part.text)
-              .join("\\n"),
+              .flatMap((part) => (part.type === "text" && !part.synthetic && !part.ignored ? [part.text] : []))
+              .join("\n"),
           )
         : undefined
 
