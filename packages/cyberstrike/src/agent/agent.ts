@@ -166,7 +166,7 @@ async function loadVulnAgent(
       : ""
 
   // Prepend common vulnerability testing instructions to agent-specific prompt
-  const fullPrompt = `${PROMPT_VULN_COMMON}\n\n---\n\n${prompt}${skillSection}`
+  const fullPrompt = `${PROMPT_VULN_COMMON}\n\n${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${prompt}${skillSection}`
   return { prompt: fullPrompt, description: shortDesc }
 }
 
@@ -241,7 +241,7 @@ export namespace Agent {
       cyberstrike: {
         name: "cyberstrike",
         description: "The default CyberStrike agent. AI-powered offensive security with full tool access.",
-        prompt: `${PROMPT_METHODOLOGY_COMMON}\n\n---\n\n${PROMPT_CYBERSTRIKE}`,
+        prompt: `${PROMPT_METHODOLOGY_COMMON}\n\n${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_CYBERSTRIKE}`,
         options: {},
         permission: PermissionNext.merge(
           defaults,
@@ -256,7 +256,7 @@ export namespace Agent {
       general: {
         name: "general",
         description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
-        prompt: PROMPT_GENERAL,
+        prompt: `${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_GENERAL}`,
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
@@ -563,7 +563,7 @@ export namespace Agent {
         // the small tier caused measured mis-/over-/under-dispatch. Only the analyzer
         // (pure recon/extraction) runs cheap.
         color: "blue",
-        prompt: `${PROMPT_METHODOLOGY_COMMON}\n\n---\n\n${PROMPT_WEB_PROXY_AGENT}`,
+        prompt: `${PROMPT_METHODOLOGY_COMMON}\n\n${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_WEB_PROXY_AGENT}`,
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
