@@ -106,7 +106,11 @@ export function CapturedRequestAnalysisPanel() {
   // The broker is shared by every capture under the Main Agent. Disable manual
   // follow-ups while any capture is normalizing, queued, or running so they cannot
   // be inserted between two serialized request turns.
-  const brokerQueueBusy = createMemo(() => (sync.data.session_queue_status?.[parentID()]?.pending ?? 0) > 0)
+  const brokerQueueBusy = createMemo(() =>
+    ((sync.data.request[parentID()] ?? []) as unknown as RequestRow[]).some(
+      (item) => item.status === "queued" || item.status === "processing",
+    ),
+  )
   const replyDisabled = createMemo(
     () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || brokerQueueBusy() || replySending(),
   )
