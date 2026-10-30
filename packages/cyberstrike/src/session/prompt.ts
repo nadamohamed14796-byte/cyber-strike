@@ -1061,9 +1061,9 @@ export namespace SessionPrompt {
           log.warn("empty continuation persisted after recovery — scheduling a final wrap-up", { sessionID })
         }
 
-        // The coarse no-progress heuristic is limited to native subagents; it was
-        // disabled after measured false positives. Identical-call detection below is
-        // precise and applies to primary and subagent runs alike.
+        // The coarse no-progress heuristic is limited to native subagent executions; a
+        // mode="all" agent qualifies only when its session has a parent. Identical-call
+        // detection below is precise and applies to primary and subagent runs alike.
         if (isNativeSubagentRun({ agent, session })) {
           const verdict = stuckDetector.observe({ toolCalls })
           if (verdict.kind === "nudge") {
@@ -1174,8 +1174,8 @@ export namespace SessionPrompt {
     // SAME (tool+args) call dozens/hundreds of times in ONE generation. This resolveTools
     // call maps 1:1 to one assistant message (one step), so a Map here counts signatures
     // per step. Past a small threshold, execute() short-circuits with a feedback result
-    // instead of running the duplicate. Gated to native subagents (the proxy pipeline) so
-    // interactive/primary agents are untouched. Same keying as the doom_loop check.
+    // instead of running the duplicate. Gated to native subagent executions (including
+    // mode="all" agents only in child sessions) so standalone primary agents are untouched.
     const suppressDuplicates = isNativeSubagentRun({ agent: input.agent, session: input.session })
     const DUP_SUPPRESS_THRESHOLD = 3
     const sigCounts = new Map<string, number>()
