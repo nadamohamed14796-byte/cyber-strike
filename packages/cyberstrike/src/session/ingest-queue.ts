@@ -95,15 +95,29 @@ export namespace IngestQueue {
    * normalization may complete out of order, but a later reservation cannot
    * pass this slot until it is enqueued or explicitly skipped.
    */
+  export interface QueueOptions {
+    /**
+     * Keep a child-session queue independent from parent pause/queue execution.
+     * Parent pending counts are still tracked for UI visibility.
+     */
+    independentFromParent?: boolean
+  }
+
   export interface Reservation {
     sessionID: string
     trackedIDs: string[]
+    pauseIDs: string[]
     previous: Promise<void>
     release(): void
   }
 
-  export function reserve(sessionID: string, parentSessionID?: string): Reservation {
+  export function reserve(
+    sessionID: string,
+    parentSessionID?: string,
+    options: QueueOptions = {},
+  ): Reservation {
     const ticket = beginTracking(sessionID, parentSessionID)
+    const pauseIDs = options.independentFromParent ? [sessionID] : ticket.trackedIDs
     const s = getOrInit(sessionID)
     const previous = s.chain
     let releaseSlot!: () => void
@@ -117,6 +131,7 @@ export namespace IngestQueue {
     return {
       sessionID,
       trackedIDs: ticket.trackedIDs,
+      pauseIDs,
       previous,
       release() {
         if (released) return
@@ -128,12 +143,13 @@ export namespace IngestQueue {
   }
 
   async function waitForReservation(reservation: Reservation) {
-    while (reservation.trackedIDs.some((id) => state()[id]?.paused)) {
+    while (reservation.pauseIDs.some((id) => state()[id]?.paused)) {
       log.info("ingest task waiting for queue resume", {
         sessionID: reservation.sessionID,
         trackedSessionIDs: reservation.trackedIDs,
+        pauseGateSessionIDs: reservation.pauseIDs,
       })
-      await waitIfAnyPaused(reservation.trackedIDs)
+      await waitIfAnyPaused(reservation.pauseIDs)
     }
   }
 
@@ -197,15 +213,18 @@ export namespace IngestQueue {
     task: () => Promise<unknown>,
     parentSessionID?: string,
     concurrent = false,
+    options: QueueOptions = {},
   ) {
     const ticket = beginTracking(sessionID, parentSessionID)
+    const pauseIDs = options.independentFromParent ? [sessionID] : ticket.trackedIDs
     const run = async () => {
-      while (ticket.trackedIDs.some((id) => state()[id]?.paused)) {
+      while (pauseIDs.some((id) => state()[id]?.paused)) {
         log.info("ingest task waiting for queue resume", {
           sessionID,
           trackedSessionIDs: ticket.trackedIDs,
+          pauseGateSessionIDs: pauseIDs,
         })
-        await waitIfAnyPaused(ticket.trackedIDs)
+        await waitIfAnyPaused(pauseIDs)
       }
       log.info("ingest task started", {
         sessionID,
