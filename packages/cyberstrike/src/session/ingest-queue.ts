@@ -91,9 +91,86 @@ export namespace IngestQueue {
   }
 
   /**
+   * Reserve a FIFO position as soon as a capture reaches the server. Request
+   * normalization may complete out of order, but a later reservation cannot
+   * pass this slot until it is enqueued or explicitly skipped.
+   */
+  export interface Reservation {
+    sessionID: string
+    trackedIDs: string[]
+    previous: Promise<void>
+    release(): void
+  }
+
+  export function reserve(sessionID: string, parentSessionID?: string): Reservation {
+    const ticket = beginTracking(sessionID, parentSessionID)
+    const s = getOrInit(sessionID)
+    const previous = s.chain
+    let releaseSlot!: () => void
+    let released = false
+    const slot = new Promise<void>((resolve) => {
+      releaseSlot = resolve
+    })
+    // Insert the placeholder immediately. Subsequent reservations and ordinary
+    // serial tasks will wait behind it, even if this capture normalizes slowly.
+    s.chain = previous.then(() => slot)
+    return {
+      sessionID,
+      trackedIDs: ticket.trackedIDs,
+      previous,
+      release() {
+        if (released) return
+        released = true
+        releaseSlot()
+        ticket.settle()
+      },
+    }
+  }
+
+  async function waitForReservation(reservation: Reservation) {
+    while (reservation.trackedIDs.some((id) => state()[id]?.paused)) {
+      log.info("ingest task waiting for queue resume", {
+        sessionID: reservation.sessionID,
+        trackedSessionIDs: reservation.trackedIDs,
+      })
+      await waitIfAnyPaused(reservation.trackedIDs)
+    }
+  }
+
+  /** Fill a previously reserved FIFO slot with the captured request's analysis. */
+  export function enqueueReserved(reservation: Reservation, task: () => Promise<unknown>) {
+    void reservation.previous.then(async () => {
+      try {
+        await waitForReservation(reservation)
+        log.info("reserved ingest task started", {
+          sessionID: reservation.sessionID,
+          trackedSessionIDs: reservation.trackedIDs,
+          pending: state()[reservation.sessionID]?.pending ?? 0,
+        })
+        await task()
+      } catch (err) {
+        log.error("reserved ingest task failed", { sessionID: reservation.sessionID, error: err })
+      } finally {
+        reservation.release()
+        log.info("reserved ingest task settled", {
+          sessionID: reservation.sessionID,
+          trackedSessionIDs: reservation.trackedIDs,
+          pending: state()[reservation.sessionID]?.pending ?? 0,
+        })
+      }
+    })
+  }
+
+  /** Release a reservation when normalization, deduplication, or validation
+   * determines that no Proxy Agent turn should be created for this capture. */
+  export function skipReserved(reservation: Reservation) {
+    void reservation.previous.then(() => reservation.release())
+  }
+
+  /**
    * Track request intake/normalization before a persisted Request row exists.
-   * This makes the queue indicator react as soon as the extension sends traffic.
-   * The callback runs immediately; queue pause only gates actual queued work.
+   * Kept for non-queued intake callers; Extension captures should use reserve()
+   * so their arrival order is preserved through normalization.
    */
   export async function track<T>(
     sessionID: string,
@@ -109,10 +186,10 @@ export namespace IngestQueue {
   }
 
   /**
-   * Schedule work for a session.
-   * - Ordinary text-ingest tasks remain ordered on their session chain.
-   * - Independent captured HTTP requests opt into parallel execution because
-   *   each request is analyzed in its own child session.
+   * Schedule work for a session. Ordinary serial tasks append to the session
+   * chain; explicitly independent tasks may bypass it when they have isolated
+   * sessions and no shared conversational context. Captured requests use
+   * reserve()/enqueueReserved() because they share one persistent Proxy Agent.
    * There is no fixed concurrency ceiling for explicitly independent work.
    */
   export function enqueue(
