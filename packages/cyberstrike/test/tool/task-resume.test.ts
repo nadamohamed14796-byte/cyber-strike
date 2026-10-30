@@ -5,6 +5,7 @@ import {
   requestIDFromPromptText,
   requestIDFromRecentPromptTexts,
   selectTaskRequestContext,
+  shouldInferSessionRequestID,
 } from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
@@ -13,6 +14,15 @@ test("resumes only a subtask owned by the current parent session", () => {
     "Cannot resume task child-1: it does not belong to the current parent session.",
   )
   expect(() => assertTaskResumeScope({ id: "root-session", parentID: null }, "parent-1")).toThrow()
+})
+
+test("Proxy Agent keeps request-ID inference in standalone and delegated modes", () => {
+  expect(shouldInferSessionRequestID({ name: "proxy-agent", mode: "all" })).toBe(true)
+  expect(shouldInferSessionRequestID({ name: "proxy-agent", mode: "primary" })).toBe(true)
+  expect(shouldInferSessionRequestID({ name: "proxy-agent", mode: "subagent" })).toBe(true)
+  expect(shouldInferSessionRequestID({ name: "proxy-analyzer", mode: "subagent" })).toBe(true)
+  expect(shouldInferSessionRequestID({ name: "cyberstrike", mode: "primary" })).toBe(false)
+  expect(shouldInferSessionRequestID(undefined)).toBe(false)
 })
 
 test("only non-Impact-Hunter subagents can use the background handoff bypass", () => {
