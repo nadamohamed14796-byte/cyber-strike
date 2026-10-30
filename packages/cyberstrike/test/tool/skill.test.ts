@@ -15,7 +15,7 @@ const baseCtx: Omit<Tool.Context, "ask"> = {
   sessionID: "test",
   messageID: "",
   callID: "",
-  agent: "build",
+  agent: "cyberstrike",
   abort: AbortSignal.any([]),
   messages: [],
   metadata: () => {},
