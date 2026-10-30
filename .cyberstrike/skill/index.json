@@ -184,14 +184,11 @@
       "verified": "unverified",
       "tags": [
         "tool-selection",
-        "tooling-catalog",
-        "external-tools",
-        "cli",
-        "api",
-        "datasets",
-        "preflight",
-        "installation",
-        "verification"
+        "cli-tooling",
+        "recon",
+        "bug-bounty",
+        "tool-preflight",
+        "research"
       ],
       "tech_stack": [],
       "cwe_ids": [],
