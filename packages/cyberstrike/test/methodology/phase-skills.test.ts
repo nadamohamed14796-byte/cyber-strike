@@ -46,6 +46,18 @@ describe("Provider prompt agent-roster alignment", () => {
 })
 
 describe("Phase-critical skill pinning", () => {
+  test("every indexed skill has searchable routing tags", async () => {
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const catalog = await Skill.all()
+        for (const skill of catalog) {
+          expect(skill.tags?.length, skill.name + " must have searchable routing tags").toBeGreaterThan(0)
+        }
+      },
+    })
+  })
+
   test("every pinned phase-critical skill exists in the actual runtime catalog", async () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
