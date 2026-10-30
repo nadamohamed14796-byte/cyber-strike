@@ -25,6 +25,8 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
   iosipa: "iOS: .ipa",
   iostestflight: "iOS: Testflight",
   ipaddress: "IP Address",
+  javascript: "JavaScript",
+  js: "JavaScript",
   other: "Other Asset",
   otherasset: "Other Asset",
   smartcontract: "Smart Contract",
