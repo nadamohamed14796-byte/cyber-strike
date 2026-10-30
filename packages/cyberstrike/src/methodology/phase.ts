@@ -57,7 +57,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: ["Info Disclosure", "Auth Bypass", "Privilege Escalation", "Known CVE"],
       appliesTo: ["mobile"],
-      agents: ["cyberstrike", "web-application"],
+      agents: ["cyberstrike", "mobile-application"],
     },
     {
       id: "passive_recon",

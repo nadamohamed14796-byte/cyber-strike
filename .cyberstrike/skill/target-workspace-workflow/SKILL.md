@@ -17,6 +17,13 @@ chains_with:
 
 # Target Workspace and Persistence Contract
 
+## Workspace ownership and delegated-agent handoffs
+
+- The session designated as the target/workspace owner initializes the single canonical root, configures the saved scope when explicitly authorized, and owns any decision to attach a separately requested child workspace.
+- A delegated specialist reuses the exact canonical `target_url`, target ID, workspace path, and scope context supplied by its caller or shared session context. It must not initialize a second root, create a child workspace, change the scope manifest, or invent a path to work around a missing permission.
+- Delegated specialists may use `target_notes_read`, `target_note`, and `target_artifact` only when those tools are present in their live tool list and permitted. `target_artifact` writes only to an existing workspace; it does not initialize one.
+- If canonical target/workspace identity is absent, return that exact missing context to the caller/workspace owner. Do not substitute a discovered host, wildcard, child URL, or guessed folder. If a persistence tool is denied, return the normalized evidence and denied tool name to the parent instead of writing a parallel copy.
+
 ## Autonomous execution — complete the task, do not narrate it
 
 The shared Target Workflow Contract is the single source of truth for execution order, retries, and closeout. This skill preserves the workspace/evidence contract. Apply the following in every multi-step task:
@@ -30,9 +37,11 @@ The shared Target Workflow Contract is the single source of truth for execution 
 
 ## Initialize one canonical workspace
 
-For a target, scope file/list, reconnaissance request, or request to save target results:
+For a target, scope file/list, reconnaissance request, or request to save target results **when this agent is the designated workspace owner**:
 
 1. Call `target_workspace(action="init", target_url="<stable program/root URL>")` and use the exact returned canonical absolute path.
+
+A delegated specialist does not repeat this initialization step. It reuses the canonical workspace identity from the caller and proceeds only with the tools permitted to that specialist.
 2. Verify the returned workspace/manifest metadata and reuse the standard existing layout. Never create a parallel target root.
 3. Remember that workspace creation is storage setup, not authorization. Finish the scope procedure below before active requests.
 4. Keep all domains in one explicitly identified program scope in one workspace, even if the domains are unrelated. Keep genuinely distinct programs separate; do not create a child workspace for each discovered host, URL, API, or subdomain.

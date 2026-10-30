@@ -89,11 +89,11 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
   description: [
     "Persist and update target artifacts only inside the exact existing target workspace; return the absolute path.",
     "Persist target artifacts in one workspace. Canonical inventories stay in the root; scope/ stores authorization; assets/ stores the asset registry; runs/ stores checkpoints; recon/ stores recon outputs and endpoint sidecars; javascript/ stores JS assets and correlation data; findings/ stores tester surveys, validation evidence, and finding records; reports/ stores final reports. Do not create a separate endpoints/ folder.",
-    "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Call target_workspace first.",
+    "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Use the canonical target_url supplied by the current session/task context; call target_workspace(action=\"show\" or action=\"list\") only when the canonical target or workspace is missing or ambiguous and your agent has workspace-management permission. A delegated specialist must ask its caller for the canonical target/workspace when unavailable rather than initialize a second workspace.",
     "Provide exactly one input: content (up to 2 MB) or source_path (an absolute, existing regular text file up to 32 MB). source_path copies the file into the workspace without returning its contents to the model and reports its SHA-256 hash.",
     "Logical areas such as urls, parameters, directories, requests, scans, logs, sessions, research, testing, and evidence remain accepted for compatibility but are saved under the compact folders with a descriptive filename prefix. Read and merge existing canonical inventories, then update the same filename intentionally instead of creating duplicate copies.",
     "Only known artifact areas and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
-    "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, verify it, normalize it into the canonical inventory, and remove temporary output unless that raw file must be retained as evidence. Do not use the shell current directory or /root/targets implicitly.",
+    "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace or supplied in the current task/session context, verify it, normalize it into the canonical inventory, and remove temporary output unless that raw file must be retained as evidence. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
@@ -101,7 +101,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     if (!workspace) {
       return {
         title: "Target artifact not saved",
-        output: "No existing workspace matches " + params.target_url + ". Initialize the root target or attach the authorized asset with target_workspace first. No other directory was created.",
+        output: "No existing workspace matches " + params.target_url + ". Ask the assigned workspace owner/orchestrator to initialize the canonical root or attach the authorized asset with target_workspace. No alternate directory was created.",
         metadata: { saved: false, reason: "workspace_missing", target_url: params.target_url } as TargetArtifactMetadata,
       }
     }

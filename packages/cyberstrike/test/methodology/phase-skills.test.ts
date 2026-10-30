@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
+import { Agent } from "../../src/agent/agent"
 import { Phase } from "../../src/methodology/phase"
 import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
 import { Skill } from "../../src/skill"
@@ -227,6 +228,47 @@ describe("Methodology phase skill routing", () => {
       expect(agents).toContain("web-application")
       expect(agents).not.toContain("explore")
     }
+  })
+
+  test("every phase agent reference resolves to a registered callable agent", async () => {
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const available = new Set((await Agent.entries()).map((entry) => entry.id))
+        for (const phase of Phase.ALL) {
+          for (const agentName of phase.agents) {
+            expect(available.has(agentName), phase.id + " references unavailable agent " + agentName).toBe(true)
+          }
+        }
+      },
+    })
+  })
+
+  test("the primary routing table mirrors the methodology agent registry", async () => {
+    const promptPath = path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")
+    const prompt = await Bun.file(promptPath).text()
+    const codenames: Record<string, string> = {
+      cyberstrike: "COMMAND",
+      "web-application": "STRIKER",
+      "mobile-application": "CIPHER",
+      "proxy-agent": "INTERCEPTOR",
+      "cloud-security": "AURORA",
+      "internal-network": "PHANTOM",
+    }
+    for (const [agentId, codename] of Object.entries(codenames)) {
+      expect(prompt).toContain("| " + agentId + " | " + codename + " |")
+    }
+    for (const phase of Phase.ALL) {
+      const row = prompt.split("\\n").find((line) => line.startsWith("| " + phase.id + " |"))
+      expect(row, "primary prompt must include methodology phase " + phase.id).toBeDefined()
+      const [primary, secondary] = phase.agents
+      expect(row).toContain(codenames[primary] + " (" + primary + ")")
+      if (secondary) expect(row).toContain(codenames[secondary] + " (" + secondary + ")")
+      else expect(row).toContain("| — |")
+    }
+    expect(prompt).not.toContain("delegate recon to GHOST")
+    expect(prompt).not.toContain("| passive_recon | GHOST (explore) |")
+    expect(prompt).not.toContain("| active_recon | GHOST (explore) |")
   })
 
   test("recon phases rank their base and specialized skills without dropping skill retrieval", () => {

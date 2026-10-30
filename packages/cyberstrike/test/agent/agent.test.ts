@@ -257,7 +257,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       const analyzer = await Agent.get("proxy-analyzer")
       const impactHunter = await Agent.get("impact-hunter")
       const registeredTools = new Set(await ToolRegistry.ids())
-      const sharedContextTools = ["skill", "read", "target_note", "target_notes_read"] as const
+      const sharedContextTools = ["skill", "read", "target_note", "target_notes_read", "target_artifact"] as const
       for (const tool of [...sharedContextTools, "target_workspace"] as const) {
         expect(registeredTools.has(tool), "shared context tool " + tool + " must be registered").toBe(true)
       }
