@@ -131,6 +131,25 @@ export function Prompt(props: PromptProps) {
       })
     }).at(-1)
   })
+  // The persistent Extension broker is an existing subagent session. Keep
+  // subsequent TUI replies on that same agent without changing the globally
+  // selected Main Agent in the user's local session selector.
+  const isProxyAgentSession = createMemo(
+    () =>
+      !!props.sessionID &&
+      !!sync.session.get(props.sessionID)?.parentID &&
+      lastUserMessage()?.agent === "proxy-agent",
+  )
+  const activeAgentName = () => (isProxyAgentSession() ? "proxy-agent" : local.agent.current().name)
+  const activeModel = () => {
+    if (isProxyAgentSession()) {
+      const model = lastUserMessage()?.model
+      if (model) return model
+    }
+    return local.model.current()
+  }
+  const activeVariant = () =>
+    isProxyAgentSession() ? (lastUserMessage()?.variant ?? local.model.variant.current()) : local.model.variant.current()
 
   const [store, setStore] = createStore<{
     prompt: PromptInfo
@@ -579,7 +598,7 @@ export function Prompt(props: PromptProps) {
       exit()
       return
     }
-    const selectedModel = local.model.current()
+    const selectedModel = activeModel()
     if (!selectedModel) {
       promptModelWarning()
       return
@@ -630,12 +649,13 @@ export function Prompt(props: PromptProps) {
       mode: currentMode,
       parts: [...store.prompt.parts],
     }
-    const variant = local.model.variant.current()
+    const variant = activeVariant()
+    const agentName = activeAgentName()
 
     if (store.mode === "shell") {
       void sdk.client.session.shell({
         sessionID,
-        agent: local.agent.current().name,
+        agent: agentName,
         model: {
           providerID: selectedModel.providerID,
           modelID: selectedModel.modelID,
@@ -662,7 +682,7 @@ export function Prompt(props: PromptProps) {
         sessionID,
         command: command.slice(1),
         arguments: args,
-        agent: local.agent.current().name,
+        agent: agentName,
         model: `${selectedModel.providerID}/${selectedModel.modelID}`,
         messageID,
         variant,
@@ -679,7 +699,7 @@ export function Prompt(props: PromptProps) {
           sessionID,
           ...selectedModel,
           messageID,
-          agent: local.agent.current().name,
+          agent: agentName,
           model: selectedModel,
           variant,
           parts: [
