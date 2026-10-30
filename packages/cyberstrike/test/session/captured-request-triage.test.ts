@@ -46,10 +46,10 @@ describe("isConfirmedEmptyStaticHTML", () => {
 
   test("does not skip requests with query parameters, bodies, or protocol operations", () => {
     expect(isConfirmedEmptyStaticHTML(input({
-      rawRequest: "GET /b/blank.htm?next=1 HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\n",
+      rawRequest: "GET /b/blank.htm?next=1 HTTP/1.1\r\nHost: example.test\r\n\r\n",
     }))).toBe(false)
     expect(isConfirmedEmptyStaticHTML(input({
-      rawRequest: "POST /b/blank.htm HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\nx=1",
+      rawRequest: "POST /b/blank.htm HTTP/1.1\r\nHost: example.test\r\n\r\nx=1",
       method: "POST",
     }))).toBe(false)
     expect(isConfirmedEmptyStaticHTML(input({ protocol: "graphql", operation: "query:Viewer" }))).toBe(false)
