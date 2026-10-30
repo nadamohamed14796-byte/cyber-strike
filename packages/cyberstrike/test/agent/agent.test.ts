@@ -265,9 +265,9 @@ test("cyberstrike prompt allows direct invocation of every registered specialist
     directory: tmp.path,
     fn: async () => {
       const cs = await Agent.get("cyberstrike")
-      expect(cs?.prompt).toContain("Every registered agent in that roster is a valid `Task` target")
-      expect(cs?.prompt).toContain("not a prerequisite or dispatch lock")
-      expect(cs?.prompt).not.toContain("should be invoked through their documented parent workflow")
+      expect(cs?.prompt).toContain("Use the live Task roster and the evidence-backed task to select the exact registered agent")
+      expect(cs?.prompt).toContain("Methodology phase, parent-workflow position, or phase recommendations as a dispatch gate")
+      expect(cs?.prompt).not.toContain("Phase-to-Agent Decision Table")
     },
   })
 })
