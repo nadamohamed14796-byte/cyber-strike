@@ -318,7 +318,12 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(orchestrator?.prompt).not.toContain("path-confusion-prone routes → proxy-tester-ssrf")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
-      expect(evalPerm(analyzer, "report_vulnerability")).toBe("deny")
+      // Proxy Analyzer may persist a concrete finding; the report tool owns
+      // automatic Impact Hunter dispatch. It still cannot spawn tasks or triage.
+      expect(evalPerm(analyzer, "report_vulnerability")).toBe("allow")
+      expect(evalPerm(analyzer, "task")).toBe("deny")
+      expect(evalPerm(analyzer, "validate_finding")).toBe("deny")
+      expect(evalPerm(analyzer, "triage_vulnerability")).toBe("deny")
 
       for (const name of ["web-application", "mobile-application", "cloud-security", "internal-network", "general"]) {
         expect(evalPerm(await Agent.get(name), "research_knowledge"), name).toBe("allow")
