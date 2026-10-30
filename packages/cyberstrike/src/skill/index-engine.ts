@@ -13,6 +13,7 @@ export namespace SkillIndex {
     category?: string
     owasp_id?: string
     tags: string[]
+    signals: string[]
     tech_stack: string[]
     cwe_ids: string[]
     chains_with: string[]
@@ -25,6 +26,7 @@ export namespace SkillIndex {
     catalog?: ReturnType<typeof Skill.state>
     entries: Map<string, Entry>
     tagIndex: Map<string, Set<string>>
+    signalIndex: Map<string, Set<string>>
     techIndex: Map<string, Set<string>>
     cweIndex: Map<string, Set<string>>
     categoryIndex: Map<string, Set<string>>
@@ -39,6 +41,7 @@ export namespace SkillIndex {
   const emptyState = (): IndexState => ({
     entries: new Map(),
     tagIndex: new Map(),
+    signalIndex: new Map(),
     techIndex: new Map(),
     cweIndex: new Map(),
     categoryIndex: new Map(),
@@ -83,6 +86,7 @@ export namespace SkillIndex {
     // Exact tag aliases are used by methodology routing and agent tool calls.
     // Shared tags stay ambiguous because resolveInState only accepts unique aliases.
     for (const tag of entry.tags) addReference(state, tag, entry.name)
+    for (const signal of entry.signals) addReference(state, signal, entry.name)
     for (const tech of entry.tech_stack) addReference(state, tech, entry.name)
     for (const cwe of entry.cwe_ids) addReference(state, cwe, entry.name)
   }
@@ -130,6 +134,8 @@ export namespace SkillIndex {
       category: skill.category,
       owasp_id: skill.owasp_id,
       tags: skill.tags ?? [],
+      // Preserve existing catalog routing: skill tags are also searchable as signal aliases.
+      signals: Array.from(new Set([...(skill.signals ?? []), ...(skill.tags ?? [])])),
       tech_stack: skill.tech_stack ?? [],
       cwe_ids: skill.cwe_ids ?? [],
       chains_with: skill.chains_with ?? [],
@@ -145,6 +151,12 @@ export namespace SkillIndex {
       if (!key) continue
       if (!state.tagIndex.has(key)) state.tagIndex.set(key, new Set())
       state.tagIndex.get(key)!.add(entry.name)
+    }
+    for (const signal of entry.signals) {
+      const key = normalizeSearchText(signal)
+      if (!key) continue
+      if (!state.signalIndex.has(key)) state.signalIndex.set(key, new Set())
+      state.signalIndex.get(key)!.add(entry.name)
     }
     for (const tech of entry.tech_stack) {
       const key = normalizeSearchText(tech)
@@ -250,6 +262,7 @@ export namespace SkillIndex {
         entry.category ?? "",
         entry.owasp_id ?? "",
         ...entry.tags,
+        ...entry.signals,
         ...entry.tech_stack,
         ...entry.cwe_ids,
         ...entry.chains_with,
@@ -257,6 +270,7 @@ export namespace SkillIndex {
       ].map(normalizeSearchText).filter(Boolean)
       const name = normalizeSearchText(entry.name)
       const tags = entry.tags.map(normalizeSearchText).filter(Boolean)
+      const signals = entry.signals.map(normalizeSearchText).filter(Boolean)
       const category = normalizeSearchText(entry.category ?? "")
       const tech = entry.tech_stack.map(normalizeSearchText).filter(Boolean)
       const cwes = entry.cwe_ids.map(normalizeSearchText).filter(Boolean)
@@ -267,6 +281,8 @@ export namespace SkillIndex {
       if (name === q) score += 140
       else if (name.startsWith(q)) score += 80
       else if (name.includes(q)) score += 45
+      if (signals.includes(q)) score += 120
+      else if (signals.some((signal) => signal.includes(q))) score += 40
       if (tags.includes(q)) score += 110
       else if (tags.some((tag) => tag.includes(q))) score += 35
       if (category === q) score += 65
@@ -344,6 +360,18 @@ export namespace SkillIndex {
   export function byTag(tag: string, limit = 50): Entry[] {
     const state = current()
     const set = state.tagIndex.get(normalizeSearchText(tag))
+    if (!set) return []
+    return Array.from(set)
+      .map((n) => state.entries.get(n)!)
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit)
+  }
+
+  /** Search explicit signal aliases and legacy skill tags with one normalized vocabulary. */
+  export function bySignal(signal: string, limit = 50): Entry[] {
+    const state = current()
+    const set = state.signalIndex.get(normalizeSearchText(signal))
     if (!set) return []
     return Array.from(set)
       .map((n) => state.entries.get(n)!)
