@@ -393,6 +393,50 @@ describe("IngestQueue parent-child controls", () => {
     })
   })
 
+  test("later captures cannot overtake earlier intake while normalization finishes out of order", async () => {
+    await withInstance(async () => {
+      const parent = "parent-intake-order-barrier"
+      const proxy = "proxy-intake-order-barrier"
+      // Reserve all tickets synchronously in the order the browser requests arrive.
+      const first = IngestQueue.reserveOrder(parent)
+      const second = IngestQueue.reserveOrder(parent)
+      const third = IngestQueue.reserveOrder(parent)
+      const started: number[] = []
+      const finished: number[] = []
+      const allFinished = defer()
+
+      // Simulate request 3 and 2 finishing preprocessing before request 1.
+      // They must wait for the earlier intake tickets before reserving broker work.
+      const enqueueAfterPreprocessing = async (
+        reservation: IngestQueue.IntakeOrderReservation,
+        number: number,
+      ) => {
+        await reservation.previous
+        const brokerSlot = IngestQueue.reserve(proxy)
+        IngestQueue.enqueueReserved(brokerSlot, async () => {
+          started.push(number)
+          await Promise.resolve()
+          finished.push(number)
+          if (finished.length === 3) allFinished.resolve()
+        })
+        reservation.release()
+      }
+
+      const laterThree = enqueueAfterPreprocessing(third, 3)
+      const laterTwo = enqueueAfterPreprocessing(second, 2)
+      const earliestOne = enqueueAfterPreprocessing(first, 1)
+
+      await Promise.all([laterThree, laterTwo, earliestOne])
+      await allFinished.promise
+      for (let attempt = 0; attempt < 20 && IngestQueue.pendingCount(proxy) !== 0; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      expect(started).toEqual([1, 2, 3])
+      expect(finished).toEqual([1, 2, 3])
+      expect(IngestQueue.pendingCount(proxy)).toBe(0)
+    })
+  })
+
   test("runs ten captured requests automatically in intake FIFO order", async () => {
     await withInstance(async () => {
       const proxy = "proxy-ten-request-fifo"
