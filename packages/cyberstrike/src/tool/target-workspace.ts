@@ -201,22 +201,41 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         }
       }
 
-      // A concrete subdomain that is already authorized by a saved program/root
-      // scope must update that canonical workspace. Calling configureScope(app)
-      // directly would otherwise let ensure() create a second root/child ledger
-      // even though the existing root already owns the asset.
-      if (!exactWorkspace) {
-        const resolution = await TargetMemory.checkURLScope(targetURL)
-        if (resolution.workspace) {
-          if (!resolution.allowed) {
-            return {
-              title: "Scope update stopped: existing workspace does not authorize this URL",
-              output: "No scope changes were made. The supplied target_url maps to an existing workspace, but its persisted scope decision is: " + resolution.reason + ". Reuse that canonical workspace and resolve the policy conflict there; do not create another workspace for this host.",
-              metadata: { saved: false, reason: "scope_denied", target_url: targetURL, canonical_target_url: resolution.workspace.targetURL } as TargetWorkspaceMetadata,
-            }
-          }
-          targetURL = resolution.workspace.targetURL
+      // Resolve concrete URLs against the persisted program scope before writing.
+      // A legacy installation may already contain both a wildcard root and an
+      // exact-host root for the same program. checkURLScope deliberately selects
+      // the wildcard root as the canonical program ledger; configure_scope must
+      // honor that decision even when TargetMemory.get() finds the legacy row.
+      const resolution = await TargetMemory.checkURLScope(targetURL)
+      const resolvedWorkspace = resolution.workspace
+      let resolvedWildcardRoot = false
+      if (resolvedWorkspace?.parentTargetID === null) {
+        try {
+          resolvedWildcardRoot = new URL(resolvedWorkspace.targetURL).hostname.startsWith("*.")
+        } catch {
+          resolvedWildcardRoot = false
         }
+      }
+      if (
+        exactWorkspace &&
+        resolvedWorkspace &&
+        resolvedWorkspace.id !== exactWorkspace.id &&
+        resolvedWildcardRoot &&
+        resolution.scope?.status === "configured"
+      ) {
+        // Preserve the legacy workspace and its evidence; only route new scope
+        // writes to the existing canonical root. Explicit exclusions are still
+        // enforced by checkURLScope across every overlapping root.
+        targetURL = resolvedWorkspace.targetURL
+      } else if (!exactWorkspace && resolvedWorkspace) {
+        if (!resolution.allowed) {
+          return {
+            title: "Scope update stopped: existing workspace does not authorize this URL",
+            output: "No scope changes were made. The supplied target_url maps to an existing workspace, but its persisted scope decision is: " + resolution.reason + ". Reuse that canonical workspace and resolve the policy conflict there; do not create another workspace for this host.",
+            metadata: { saved: false, reason: "scope_denied", target_url: targetURL, canonical_target_url: resolvedWorkspace.targetURL } as TargetWorkspaceMetadata,
+          }
+        }
+        targetURL = resolvedWorkspace.targetURL
       }
 
       let fileEntries: string[] = []
@@ -652,7 +671,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       }
     }
 
-    if (params.action === "show") {
+    // Treat show without target_url as a request to list workspaces. This
+    // makes the common discovery call resilient and avoids a pointless tool error.
+    if (params.action === "show" && params.target_url?.trim()) {
       const targetURL = required(params.target_url, "target_url")
       const workspace = await TargetMemory.get(targetURL)
       if (!workspace) {
