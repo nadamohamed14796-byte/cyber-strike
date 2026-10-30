@@ -47,7 +47,10 @@ describe("Observation.operationTreeForRequest", () => {
 
         const owner = create("shape-user-contacts", "credential-owner", "fa_loadUserContacts")
         const lowUser = create("shape-org-groups", "credential-low", "fa_loadOrgGroupList")
-        const tree = Observation.operationTreeForRequest(session.id, lowUser.id)
+        // An identical observation is upserted, so the observation row still points
+        // at the first Request ID. The later request must resolve through key_hash.
+        const ownerRepeat = create("shape-user-contacts", "credential-owner", "fa_loadUserContacts")
+        const tree = Observation.operationTreeForRequest(session.id, ownerRepeat.id)
 
         expect(tree?.keyHashes.sort()).toEqual(["shape-org-groups", "shape-user-contacts"])
         expect(tree?.credentials.sort()).toEqual(["credential-low", "credential-owner"])
@@ -62,6 +65,7 @@ describe("Observation.operationTreeForRequest", () => {
           },
         ])
         expect(owner.id).not.toBe(lowUser.id)
+        expect(ownerRepeat.id).not.toBe(owner.id)
         await Session.remove(session.id)
         await Instance.dispose()
       },
