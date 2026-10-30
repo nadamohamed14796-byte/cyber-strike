@@ -71,8 +71,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         throw new Error("Skill catalog changed repeatedly while resolving accessible skills; retry the skill operation.")
       }
 
-      const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
-      const agentInfo = await Agent.get(ctx.agent)
+      const agentID = await Agent.resolveID(ctx.agent)
+      const agentKey = `${Instance.directory}\\0${agentID ?? ctx.agent ?? ""}`
+      const agentInfo = agentID ? await Agent.get(agentID) : undefined
       const permissionFingerprint = JSON.stringify(agentInfo?.permission ?? null)
       const cached = accessibleCache.get(agentKey)
       if (!cached || cached.catalog !== catalog || cached.permissionFingerprint !== permissionFingerprint) {
