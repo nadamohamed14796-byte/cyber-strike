@@ -128,10 +128,9 @@ export function Session() {
       .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   })
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
-  // Extension requests already run inside a child session with the existing
-  // proxy-agent. Make only those sessions interactive; specialist tester
-  // sessions remain read-only in the TUI. The initial captured-request message
-  // records its agent, so this identity survives navigation and process restarts.
+  // Extension captures use one persistent child session titled Agent Proxy.
+  // Only that broker is interactive; specialist tester sessions nested beneath
+  // it remain read-only in the TUI. The stable child title survives restarts.
   const proxyAgentSession = createMemo(
     () =>
       !!session()?.parentID &&
