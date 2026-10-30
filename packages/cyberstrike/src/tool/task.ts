@@ -18,7 +18,6 @@ import { Observation } from "../session/observation"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
-import { Methodology } from "../methodology/methodology"
 import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
@@ -26,9 +25,6 @@ import {
   requestIDsFromTaskPrompt,
   shouldInferSessionRequestID,
   selectTaskRequestContext,
-  proxyTesterMethodologyPhase,
-  proxyTesterMethodologyBlock,
-  shouldRunProxyTesterPassiveOnly,
 } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
@@ -94,32 +90,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const config = await Config.get()
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
-
-      // Enforce methodology prerequisites at the actual dispatch boundary. The
-      // phase is computed from the root session's persisted evidence, so a proxy
-      // tester cannot be started merely because its skill was discoverable or
-      // because the caller explicitly selected it.
-      const requiredPhase = proxyTesterMethodologyPhase(params.subagent_type)
-      let passiveTriageBlock: { phase: string; reason: string } | undefined
-      if (requiredPhase) {
-        const methodology = Methodology.computeState(Session.root(ctx.sessionID))
-        const block = proxyTesterMethodologyBlock(params.subagent_type, methodology.phases)
-        if (block) {
-          if (shouldRunProxyTesterPassiveOnly(callerID, block)) {
-            passiveTriageBlock = block
-          } else {
-            return {
-              title: "Dispatch blocked — " + params.subagent_type,
-              output: [
-                "The " + params.subagent_type + " specialist cannot start while methodology phase \"" + block.phase + "\" is blocked or unavailable.",
-                "Reason: " + block.reason,
-                "Complete the upstream prerequisites for this target scope, then dispatch the specialist again.",
-              ].join("\n"),
-              metadata: { sessionId: "", model: { providerID: "", modelID: "" }, outcome: "clean" as const },
-            }
-          }
-        }
-      }
 
       // Impact Hunter is a designated internal escalation path. Any subagent may
       // hand off an evidence-backed finding to it in background mode without
@@ -433,47 +403,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // single source.
       const promptParts = await SessionPrompt.resolvePromptParts(prompt)
 
-      // A methodology-blocked Proxy dispatch is still useful for passive
-      // hypothesis preparation, but the child must not receive tools capable of
-      // active requests, scans, shell/network execution, or state mutation. Include
-      // built-in, custom, and known lazy MCP tools in the deny map by default.
-      const passiveTools = passiveTriageBlock
-        ? new Set([
-            "read",
-            "glob",
-            "grep",
-            "codesearch",
-            "websearch",
-            "skill",
-            "web_get_session_context",
-            "web_get_request_detail",
-            "web_get_detail",
-            "web_get_vulnerabilities",
-            "web_get_vuln_detail",
-            "target_note",
-            "target_notes_read",
-            "research_knowledge",
-            "correlate_javascript",
-            "memory_search",
-            "memory_read",
-            "memory_context",
-          ])
-        : undefined
-      let passiveToolOverrides: Record<string, boolean> = {}
-      if (passiveTools) {
-        const [{ ToolRegistry }, { LazyToolRegistry }] = await Promise.all([
-          import("./registry"),
-          import("./lazy-registry"),
-        ])
-        const knownToolIDs = new Set([
-          ...(await ToolRegistry.ids()),
-          ...LazyToolRegistry.getAll().map((tool) => tool.id),
-          ...LazyToolRegistry.getLoaded().map((tool) => tool.id),
-        ])
-        passiveToolOverrides = Object.fromEntries(
-          [...knownToolIDs].filter((id) => !passiveTools.has(id)).map((id) => [id, false]),
-        )
-      }
       const promptInput = {
         messageID,
         sessionID: session.id,
@@ -485,7 +414,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         tools: {
           todowrite: false,
           todoread: false,
-          ...passiveToolOverrides,
           ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
         },
         parts: promptParts,
