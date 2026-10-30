@@ -104,6 +104,8 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
 
           expect(result.metadata.saved).toBe(false)
           expect(result.metadata.reason).toBe("wildcard_workspace_identity_rejected")
+          expect(result.output).toContain('include: ["*.example.com"]')
+          expect(result.output).toContain("user_confirmed_scope_list=true")
           expect(TargetMemory.list()).toHaveLength(0)
         } finally {
           await Instance.dispose()
