@@ -4,6 +4,7 @@ import { SessionTurn } from "@cyberstrike-io/ui/session-turn"
 import { Identifier } from "@/utils/id"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { requestIDsByBrokerTurn } from "./captured-request-analysis"
 
 type AnalysisStatus = "analyzing" | "processed" | "failed"
 
@@ -36,24 +37,6 @@ function parseRequest(raw?: string) {
   const head = split === -1 ? normalized : normalized.slice(0, split)
   const body = split === -1 ? "" : normalized.slice(split + 2)
   return { headers: head.split("\n").slice(1).filter(Boolean), body }
-}
-
-function requestIDFromBrokerTurn(text: string): string | undefined {
-  let inIdentitySection = false
-  for (const line of text.split(/\r?\n/)) {
-    if (/^## (?:Request Task Identity|Current request)\s*$/.test(line)) {
-      inIdentitySection = true
-      continue
-    }
-    if (/^## /.test(line)) {
-      if (inIdentitySection) break
-      continue
-    }
-    if (!inIdentitySection) continue
-    const match = line.match(/^\s*-\s*(?:Request ID|request_id):\s*([^\r\n]+)\s*$/i)
-    if (match?.[1]) return match[1].trim()
-  }
-  return undefined
 }
 
 export function CapturedRequestAnalysisPanel() {
@@ -126,18 +109,19 @@ export function CapturedRequestAnalysisPanel() {
   const requestTurnMessages = createMemo(() => {
     const requestID = selected()?.requestID
     if (!requestID) return []
-    let activeRequestID: string | undefined
-    const result: ReturnType<typeof childUserMessages> = []
-    for (const message of childUserMessages()) {
-      const text = (sync.data.part[message.id] ?? [])
-        .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
-        .map((part) => part.text)
-        .join("\n")
-      const explicitRequestID = requestIDFromBrokerTurn(text)
-      if (explicitRequestID) activeRequestID = explicitRequestID
-      if (activeRequestID === requestID) result.push(message)
-    }
-    return result
+    const messages = childUserMessages()
+    const requestByMessageID = new Map(
+      requestIDsByBrokerTurn(
+        messages.map((message) => ({
+          messageID: message.id,
+          text: (sync.data.part[message.id] ?? [])
+            .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
+            .map((part) => part.text)
+            .join("\n"),
+        })),
+      ).map((turn) => [turn.messageID, turn.requestID]),
+    )
+    return messages.filter((message) => requestByMessageID.get(message.id) === requestID)
   })
   const replyModelMessage = createMemo(
     () =>
