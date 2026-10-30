@@ -37,7 +37,7 @@ export namespace IngestSummary {
       vulnerabilities: db.select({ value: count() }).from(VulnerabilityTable)
         .where(and(
           eq(VulnerabilityTable.session_id, sessionID),
-          notInArray(VulnerabilityTable.status, ["duplicate", "false_positive"]),
+          notInArray(VulnerabilityTable.status, ["duplicate"]),
         )).get()?.value ?? 0,
     }))
   }
