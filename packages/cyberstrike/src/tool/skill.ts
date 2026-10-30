@@ -158,23 +158,20 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const limit = Math.max(1, params.limit ?? 25)
         const offset = Math.max(0, params.offset ?? 0)
         const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
-        let candidates: SkillIndex.Entry[] = []
-
+        // Apply every supplied signal together: exact metadata filters intersect,
+        // while a tech array is an OR group (any listed technology may match).
+        // Free-text relevance establishes the initial ordering when present.
+        const candidates = params.query
+          ? SkillIndex.search(params.query, Infinity)
+          : SkillIndex.all().sort((left, right) => left.name.localeCompare(right.name))
+        const filterSets: Set<string>[] = []
+        if (params.cwe) filterSets.push(new Set(SkillIndex.byCWE(params.cwe, Infinity).map((entry) => entry.name)))
+        if (params.tech?.length) filterSets.push(new Set(SkillIndex.byTechStack(params.tech, Infinity).map((entry) => entry.name)))
+        if (params.category) filterSets.push(new Set(SkillIndex.byCategory(params.category, Infinity).map((entry) => entry.name)))
+        if (params.tag) filterSets.push(new Set(SkillIndex.byTag(params.tag, Infinity).map((entry) => entry.name)))
+        const matched = candidates.filter((entry) => filterSets.every((set) => set.has(entry.name)))
         // Filter permissions before paginating so denied skills neither leak nor hide allowed results.
-        if (params.cwe) {
-          candidates = SkillIndex.byCWE(params.cwe, Infinity)
-        } else if (params.tech?.length) {
-          candidates = SkillIndex.byTechStack(params.tech, Infinity)
-        } else if (params.category) {
-          candidates = SkillIndex.byCategory(params.category, Infinity)
-        } else if (params.tag) {
-          candidates = SkillIndex.byTag(params.tag, Infinity)
-        } else if (params.query) {
-          candidates = SkillIndex.search(params.query, Infinity)
-        } else {
-          candidates = SkillIndex.all().sort((left, right) => left.name.localeCompare(right.name))
-        }
-        const permitted = candidates.filter((entry) => accessibleNames.has(entry.name))
+        const permitted = matched.filter((entry) => accessibleNames.has(entry.name))
         const totalCount = permitted.length
         const results = permitted.slice(offset, offset + limit)
 
