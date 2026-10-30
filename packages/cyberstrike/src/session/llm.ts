@@ -173,6 +173,20 @@ export namespace LLM {
       })
     }
 
+    // Make the normal tool-enabled path explicit. Some OpenAI-compatible gateways
+    // behave inconsistently when tools are supplied but tool_choice is omitted.
+    // Preserve caller overrides (required/none), and never force a choice when no
+    // callable tools remain after permission filtering.
+    const activeTools = Object.keys(tools).filter((name) => name !== "invalid" && name !== "_noop")
+    const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
+    l.info("tool availability", {
+      available: Object.keys(tools).length,
+      active: activeTools.length,
+      activeToolNames: activeTools.slice(0, 30),
+      omittedToolNames: Math.max(0, activeTools.length - 30),
+      toolChoice: toolChoice ?? "provider-default",
+    })
+
     return streamText({
       onError(error) {
         l.error("stream error", {
@@ -204,9 +218,9 @@ export namespace LLM {
       topP: params.topP,
       topK: params.topK,
       providerOptions: ProviderTransform.providerOptions(input.model, params.options),
-      activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+      activeTools,
       tools,
-      toolChoice: input.toolChoice,
+      toolChoice,
       maxOutputTokens,
       abortSignal: input.abort,
       headers: {
