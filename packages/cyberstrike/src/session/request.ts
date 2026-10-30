@@ -136,6 +136,9 @@ export namespace Request {
 
     const responseURL = requestResponseURL(input)
     const processed = input.response ? processResponse({ ...input.response, url: responseURL }) : undefined
+    const responseBodyHash = input.response
+      ? createHash("sha256").update(input.response.body, "utf8").digest("hex")
+      : undefined
     const emptyStaticHTML = processed?.htmlSource
       ? isConfirmedEmptyStaticHTML({
           method: input.method,
@@ -191,6 +194,7 @@ export namespace Request {
           response_headers: processed?.headers ?? null,
           response_content_type: processed?.contentType ?? null,
           response_size: processed?.originalSize ?? null,
+          response_body_hash: responseBodyHash ?? null,
           processed_response: processed?.content ?? null,
           javascript_source: processed?.javascriptSource ?? null,
           empty_static_html: emptyStaticHTML ? 1 : 0,
@@ -540,10 +544,7 @@ export namespace Request {
     if (!current || current.response_status == null || current.response_size == null) return undefined
 
     // A truncated text preview is not enough to establish exact response equality.
-    const hasCompleteSource =
-      current.javascript_source != null ||
-      (current.response_size <= 100 * 1024 && !current.response_content_type?.toLowerCase().includes("text/html"))
-    if (!hasCompleteSource) return undefined
+    if (current.response_body_hash == null) return undefined
 
     const candidates = Database.use((db) =>
       db.select().from(RequestTable).where(and(
@@ -566,6 +567,7 @@ export namespace Request {
       candidate.response_status === current.response_status &&
       candidate.response_content_type === current.response_content_type &&
       candidate.response_size === current.response_size &&
+      candidate.response_body_hash === current.response_body_hash &&
       candidate.processed_response === current.processed_response &&
       candidate.javascript_source === current.javascript_source &&
       sameJSON(candidate.response_headers, current.response_headers) &&
