@@ -11,6 +11,7 @@ import { TargetMemory } from "../../src/target"
 import { Server } from "../../src/server/server"
 import { Database, eq } from "../../src/storage/db"
 import { RequestJavaScriptCaptureTable, RequestTable } from "../../src/session/session.sql"
+import { Identifier } from "../../src/id/id"
 
 function defer<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -392,6 +393,34 @@ describe("IngestQueue parent-child controls", () => {
     })
   })
 
+  test("runs ten captured requests automatically in intake FIFO order", async () => {
+    await withInstance(async () => {
+      const proxy = "proxy-ten-request-fifo"
+      const reservations = Array.from({ length: 10 }, () => IngestQueue.reserve(proxy))
+      const started: number[] = []
+      const finished: number[] = []
+      const allFinished = defer()
+
+      reservations.forEach((reservation, index) => {
+        const number = index + 1
+        IngestQueue.enqueueReserved(reservation, async () => {
+          started.push(number)
+          await Promise.resolve()
+          finished.push(number)
+          if (finished.length === 10) allFinished.resolve()
+        })
+      })
+
+      await allFinished.promise
+      for (let attempt = 0; attempt < 20 && IngestQueue.pendingCount(proxy) !== 0; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      expect(started).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      expect(finished).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      expect(IngestQueue.pendingCount(proxy)).toBe(0)
+    })
+  })
+
   test("Agent Proxy manual follow-ups stay behind captures but not Main work", async () => {
     await withInstance(async () => {
       const parent = "main-manual-followup-running"
@@ -428,6 +457,9 @@ describe("IngestQueue parent-child controls", () => {
       releaseCapture.resolve()
       await manualStarted.promise
       expect(order).toEqual(["capture-start", "capture-finish", "manual-follow-up"])
+      for (let attempt = 0; attempt < 20 && IngestQueue.pendingCount(proxy) !== 0; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
       // Both Proxy turns finished while the Main Agent task was still running.
       expect(IngestQueue.pendingCount(parent)).toBe(1)
       expect(IngestQueue.pendingCount(proxy)).toBe(0)
@@ -646,13 +678,37 @@ describe("Request pending recovery query", () => {
       Request.updateStatus({ id: processed.id, status: "processed" })
       Request.updateStatus({ id: failed.id, status: "failed" })
 
-      const pending = Request.pending().map((item) => item.id)
+      const pending = Request.pending().filter((item) => item.session_id === session.id).map((item) => item.id)
       expect(pending).toContain(queued.id)
       expect(pending).toContain(processing.id)
       expect(pending).not.toContain(processed.id)
       expect(pending).not.toContain(failed.id)
       await Session.remove(session.id)
     })
+  })
+})
+
+test("request recovery uses intake IDs even when normalization writes rows in reverse order", async () => {
+  await withInstance(async () => {
+    const session = await Session.create({ title: "request-intake-order-recovery-test" })
+    const arrivalIDs = Array.from({ length: 10 }, () => Identifier.ascending("request"))
+    for (let index = arrivalIDs.length - 1; index >= 0; index--) {
+      const request = Request.add({
+        id: arrivalIDs[index],
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: `/dependency/${index + 1}`,
+        origin: "https://example.test",
+        keyHash: "same-structural-endpoint",
+      })
+      expect(request).toBeDefined()
+    }
+    const recovered = Request.pending().filter((item) => item.session_id === session.id)
+    expect(recovered.map((item) => item.id)).toEqual(arrivalIDs)
+    expect(recovered.map((item) => item.normalized_path)).toEqual(
+      Array.from({ length: 10 }, (_, index) => `/dependency/${index + 1}`),
+    )
+    await Session.remove(session.id)
   })
 })
 
@@ -763,7 +819,7 @@ describe("full JavaScript source persistence", () => {
 })
 
 
-test("retains changed JavaScript response versions when request analysis is deduplicated", async () => {
+test("preserves JavaScript versions while each captured transaction has its own request row", async () => {
   await withInstance(async () => {
     const session = await Session.create({ title: "javascript-capture-history-test" })
     const common = {
@@ -795,7 +851,8 @@ test("retains changed JavaScript response versions when request analysis is dedu
         body: secondBody,
       },
     })
-    expect(second).toBeUndefined()
+    expect(second).toBeDefined()
+    expect(second?.id).not.toBe(first?.id)
 
     const rows = Database.use((db) =>
       db.select()
@@ -819,14 +876,16 @@ test("retains changed JavaScript response versions when request analysis is dedu
         body: secondBody,
       },
     })
-    expect(repeatedBody).toBeUndefined()
+    expect(repeatedBody).toBeDefined()
+    expect(repeatedBody?.id).not.toBe(first?.id)
+    expect(repeatedBody?.id).not.toBe(second?.id)
     const afterRepeat = Database.use((db) =>
       db.select({ id: RequestJavaScriptCaptureTable.id })
         .from(RequestJavaScriptCaptureTable)
         .where(eq(RequestJavaScriptCaptureTable.session_id, session.id))
         .all(),
     )
-    expect(afterRepeat).toHaveLength(2)
+    expect(afterRepeat).toHaveLength(3)
     await Session.remove(session.id)
   })
 })
@@ -875,6 +934,21 @@ describe("captured request payload preservation", () => {
         expect(stored?.raw_request).toContain("X-Captured-Header-23: value-23")
         expect(stored?.raw_request).toContain('"marker":"end-of-body-marker"')
         expect(stored?.raw_request).toContain("x".repeat(12 * 1024))
+
+        // A repeated HTTP transaction with the same endpoint/body is still its own
+        // Request row and must be offered to the Agent Proxy for independent analysis.
+        const duplicateResponse = await Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: rawRequest, sessionID: session.id, scheme: "https" }),
+          },
+        )
+        expect(duplicateResponse.status, await duplicateResponse.clone().text()).toBe(202)
+        const capturedRows = Request.get(session.id).filter((item) => item.raw_request === rawRequest)
+        expect(capturedRows).toHaveLength(2)
+        expect(new Set(capturedRows.map((item) => item.id)).size).toBe(2)
       } finally {
         if (sessionID) await Session.remove(sessionID).catch(() => {})
         if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
