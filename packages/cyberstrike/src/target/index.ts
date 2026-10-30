@@ -193,13 +193,45 @@ function currentOwnerKey(): string {
   return targetWorkspaceOwnerKey(Instance.project.id, projectRoot())
 }
 
+const JAVASCRIPT_SCOPE_TYPE = /^(javascript|js|source[ \t]+map)[ \t]*:[ \t]*(.+)$/i
+
+/** Normalize one explicitly listed script or source map to an exact, query-insensitive file grant. */
+function normalizeJavaScriptFileScope(input: string, allowSourceMap = false): string | undefined {
+  const value = input.trim()
+  if (!value || /[\u0000-\u001f\u007f]/.test(value)) return undefined
+  let url: URL
+  try {
+    url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value)
+  } catch {
+    return undefined
+  }
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    !url.hostname ||
+    url.hostname.includes("*") ||
+    url.username ||
+    url.password ||
+    url.pathname.includes("*") ||
+    /[{}]/.test(url.pathname)
+  ) return undefined
+  const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(url.pathname)
+  const sourceMapFile = allowSourceMap && /\.map$/i.test(url.pathname)
+  if (!scriptFile && !sourceMapFile) return undefined
+  url.search = ""
+  url.hash = ""
+  return "JavaScript: " + url.origin + url.pathname
+}
+
 function isExactUserConfirmedScopeItem(input: string): boolean {
   const value = input.trim()
-  if (!value || /[*{}\\]/.test(value)) return false
+  if (!value) return false
+  const typedJavaScript = value.match(JAVASCRIPT_SCOPE_TYPE)
+  if (typedJavaScript) return normalizeJavaScriptFileScope(typedJavaScript[2], /^source[ \t]+map$/i.test(typedJavaScript[1])) !== undefined
+  if (/^https?:\/\//i.test(value) && normalizeJavaScriptFileScope(value)) return true
+  if (/[*{}\\]/.test(value)) return false
   if (/^(?:domain|wildcard|url|javascript|js|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
   if (/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return false
   if (!/^https?:\/\//i.test(value) && value.includes("/")) return false
-  // normalizeScopeItem() validates the concrete host, scheme, port, path, and URL syntax before this check.
   return true
 }
 
@@ -207,6 +239,17 @@ function normalizeScopeItem(input: string): string {
   const value = input?.trim()
   if (!value) throw new Error("Scope entries cannot be empty.")
   if (/[\u0000-\u001f\u007f]/.test(value)) throw new Error("Scope entries cannot contain control characters.")
+
+  const typedJavaScript = value.match(JAVASCRIPT_SCOPE_TYPE)
+  if (typedJavaScript) {
+    const normalized = normalizeJavaScriptFileScope(typedJavaScript[2], /^source[ \t]+map$/i.test(typedJavaScript[1]))
+    if (!normalized) throw new Error("JavaScript scope entries must identify an exact HTTP(S) script or source-map file URL: " + value)
+    return normalized
+  }
+  if (/^https?:\/\//i.test(value)) {
+    const javascriptFile = normalizeJavaScriptFileScope(value)
+    if (javascriptFile) return javascriptFile
+  }
 
   // Preserve explicit URL boundaries (scheme, port and path); stripping these
   // would broaden a narrow program scope to the whole host.
