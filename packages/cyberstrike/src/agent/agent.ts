@@ -171,13 +171,9 @@ async function loadVulnAgent(
 }
 
 export namespace Agent {
-  // Hard step-caps (Layer 1 backstop for the loop-termination fix — see
-  // AGENT_LOOP_TERMINATION_SPEC.md). Single tuning point. NOTE: proxy-tester-* are
-  // deliberately left at their existing default of 50 (see the `startsWith` guard
-  // below — lowering them regressed findings); only the two genuinely-uncapped
-  // orchestration agents get a cap here. Enforcement (tool-strip + break on the
-  // capped turn) lives in session/prompt.ts.
-  const STEP_CAPS = { orchestrator: 40, analyzer: 20 } as const
+  // Autonomous agents run until their evidence-driven work is complete.
+  // Explicit per-agent `steps` values from user configuration remain supported;
+  // the session loop's stuck/retry/abort guards handle genuine runaway behavior.
 
   export const Info = z
     .object({
@@ -562,7 +558,6 @@ export namespace Agent {
         // delegated by any other agent through Task. "all" preserves both paths.
         mode: "all",
         native: true,
-        steps: STEP_CAPS.orchestrator,
         // NOTE: proxy-agent runs on the FULL run model (no useSmallModel). Routing
         // is the brain of the pipeline — dispatch quality matters; downgrading it to
         // the small tier caused measured mis-/over-/under-dispatch. Only the analyzer
@@ -613,7 +608,6 @@ export namespace Agent {
         mode: "subagent",
         native: true,
         hidden: true,
-        steps: STEP_CAPS.analyzer,
         useSmallModel: true, // architecture extraction, not exploitation — run cheap
         prompt: PROMPT_PROXY_ANALYZER,
         prependRequestContext: true,
@@ -1059,20 +1053,6 @@ export namespace Agent {
         result[name].permission,
         PermissionNext.fromConfig({ external_directory: { [Truncate.GLOB]: "allow" } }),
       )
-    }
-
-    // Phase 1a (docs/proxy-pipeline-redesign): default turn budget for the proxy
-    // vuln testers. Measured baseline: a single tester ran up to ~12 turns on ONE
-    // request. An earlier cap of 8 turned out to be BELOW that natural length —
-    // testers spent all their turns verifying via bash and hit the soft wrap-up
-    // before ever calling report_vulnerability, so confirmed findings were summarized
-    // to the orchestrator but never recorded. Raised to 50 to leave ample headroom for
-    // multi-step verification AND reporting on complex endpoints. Affordable now that
-    // prompt caching is on (extra turns re-read the cached prefix at ~10% cost, not full
-    // price). The cap is soft (forces a text wrap-up at the limit, prompt.ts) and only
-    // applies when not explicitly configured, so user config still overrides.
-    for (const name in result) {
-      if (result[name].steps == null && name.startsWith("proxy-tester-")) result[name].steps = 60
     }
 
     // Attach the same live runtime/skill/signal routing contract to every
