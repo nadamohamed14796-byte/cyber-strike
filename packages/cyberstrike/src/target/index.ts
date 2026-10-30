@@ -227,6 +227,8 @@ function isExactUserConfirmedScopeItem(input: string): boolean {
   if (!value) return false
   const typedJavaScript = value.match(JAVASCRIPT_SCOPE_TYPE)
   if (typedJavaScript) return normalizeJavaScriptFileScope(typedJavaScript[2], /^source[ \t]+map$/i.test(typedJavaScript[1])) !== undefined
+  const typedURL = value.match(/^url[ \t]*:[ \t]*(.+)$/i)
+  if (typedURL && normalizeJavaScriptFileScope(typedURL[1])) return true
   if (/^https?:\/\//i.test(value) && normalizeJavaScriptFileScope(value)) return true
   if (/[*{}\\]/.test(value)) return false
   if (/^(?:domain|wildcard|url|javascript|js|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
@@ -245,6 +247,11 @@ function normalizeScopeItem(input: string): string {
     const normalized = normalizeJavaScriptFileScope(typedJavaScript[2], /^source[ \t]+map$/i.test(typedJavaScript[1]))
     if (!normalized) throw new Error("JavaScript scope entries must identify an exact HTTP(S) script or source-map file URL: " + value)
     return normalized
+  }
+  const typedURL = value.match(/^url[ \t]*:[ \t]*(.+)$/i)
+  if (typedURL) {
+    const javascriptFile = normalizeJavaScriptFileScope(typedURL[1])
+    if (javascriptFile) return javascriptFile
   }
   if (/^https?:\/\//i.test(value)) {
     const javascriptFile = normalizeJavaScriptFileScope(value)
