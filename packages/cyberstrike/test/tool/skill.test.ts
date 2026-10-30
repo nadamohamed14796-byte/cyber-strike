@@ -91,7 +91,7 @@ describe("tool.skill", () => {
           const parentCtx: Tool.Context = {
             ...baseCtx,
             sessionID: "parent-session",
-            agent: "build",
+            agent: "cyberstrike",
             ask: async () => {},
           }
           const childCtx: Tool.Context = {
