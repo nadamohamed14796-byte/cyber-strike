@@ -180,6 +180,31 @@ describe("scope_check uses persisted target scope when a workspace is supplied",
     )
   }
 
+  test("uses the canonical wildcard root manifest when a legacy exact-host root overlaps", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+          include: ["*.example.test"],
+          authorizationSource: "Canonical wildcard program scope",
+          authorizationReference: "https://example.test/policy",
+        })
+        await TargetMemory.configureScope("https://www.example.test", {
+          include: ["www.example.test"],
+          authorizationSource: "Legacy exact-host scope",
+          authorizationReference: "https://example.test/policy",
+        })
+
+        const result = await execute("app.example.test", "https://www.example.test")
+        expect(result.metadata.inScope).toBe(true)
+        expect(result.metadata.scopeSource).toBe("Canonical wildcard program scope")
+        expect(result.metadata.workspace_target_url).toBe(wildcard.workspace.targetURL)
+        expect(result.output).toContain("Canonical workspace target: " + wildcard.workspace.targetURL)
+      },
+    })
+  })
+
   test("uses the authoritative root policy for typed API host-port scope", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
