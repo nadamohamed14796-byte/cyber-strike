@@ -20,3 +20,13 @@ test("caps large fields and preserves both head and tail with a retrieval instru
   expect(result).toContain("IMPORTANT_TAIL_MARKER")
   expect(result.startsWith("A")).toBe(true)
 })
+
+test("keeps the byte ceiling for multilingual captures", () => {
+  const result = capCapturedRequestField({
+    value: "محتوى".repeat(10_000),
+    label: "response",
+    requestID: "req-unicode",
+    maxBytes: 4096,
+  })
+  expect(Buffer.byteLength(result, "utf8")).toBeLessThanOrEqual(4096)
+})
