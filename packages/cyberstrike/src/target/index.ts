@@ -1110,9 +1110,15 @@ export namespace TargetMemory {
         const isDNSAncestor = candidate.hostname !== base.hostname &&
           candidate.hostname.endsWith("." + base.hostname) &&
           base.pathname === "/"
+        // A workspace below the candidate's own hostname is never its parent.
+        // For example, a legacy www.example.com ledger must not absorb the
+        // canonical example.com program root merely because it listed that apex.
+        const isReverseDNSDescendant = base.hostname !== candidate.hostname &&
+          base.hostname.endsWith("." + candidate.hostname)
         // Child workspaces remain tied to their DNS subtree. Only root program
-        // workspaces may own explicitly listed domains outside their own hostname.
-        return candidate.hostname !== base.hostname && (isDNSAncestor || workspace.parentTargetID === null)
+        // workspaces may own explicitly listed unrelated domains.
+        return candidate.hostname !== base.hostname && !isReverseDNSDescendant &&
+          (isDNSAncestor || workspace.parentTargetID === null)
       })
       .sort((a, b) => {
         const aHost = new URL(a.targetURL).hostname
@@ -1931,6 +1937,7 @@ export namespace TargetMemory {
       wildcardRoot: boolean
       wildcardPolicyRoot: boolean
       childExactHost: boolean
+      childDNSAncestor: boolean
       scopeScore: number
       domainScore: number
       pathScore: number
@@ -2018,6 +2025,10 @@ export namespace TargetMemory {
         wildcardPolicyRoot: isRootScopeContainer && Boolean(scope?.status === "configured" &&
           scope.scopeItems.some((item) => /^(?:wildcard[ \t]*:[ \t]*)?\*\./i.test(item.trim()))),
         childExactHost,
+        // A configured child workspace that contains the candidate in its DNS
+        // subtree is more specific than a program wildcard root. This ensures
+        // its own exclusions and path limits are evaluated before root grants.
+        childDNSAncestor: workspace.parentTargetID !== null && isDNSDescendant,
         scopeScore,
         domainScore,
         pathScore: basePath === "/" ? 0 : basePath.length,
@@ -2028,6 +2039,7 @@ export namespace TargetMemory {
       // one configured wildcard root is the canonical program ledger for its
       // whole DNS family and must win over legacy concrete root duplicates.
       Number(b.childExactHost) - Number(a.childExactHost) ||
+      Number(b.childDNSAncestor) - Number(a.childDNSAncestor) ||
       Number(b.wildcardPolicyRoot) - Number(a.wildcardPolicyRoot) ||
       Number(b.wildcardRoot) - Number(a.wildcardRoot) ||
       Number(b.exactHost) - Number(a.exactHost) ||
@@ -2043,6 +2055,7 @@ export namespace TargetMemory {
     }
     if (candidates.length > 1 &&
       Number(candidates[0].childExactHost) === Number(candidates[1].childExactHost) &&
+      Number(candidates[0].childDNSAncestor) === Number(candidates[1].childDNSAncestor) &&
       Number(candidates[0].wildcardPolicyRoot) === Number(candidates[1].wildcardPolicyRoot) &&
       Number(candidates[0].wildcardRoot) === Number(candidates[1].wildcardRoot) &&
       Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
