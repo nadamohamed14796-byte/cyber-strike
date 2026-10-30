@@ -178,7 +178,28 @@ export namespace LLM {
     // Preserve caller overrides (required/none), and never force a choice when no
     // callable tools remain after permission filtering.
     const activeTools = Object.keys(tools).filter((name) => name !== "invalid" && name !== "_noop")
-    const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
+    const latestUserMessage = [...input.messages].reverse().find((message) => message.role === "user")
+    const latestUserText =
+      typeof latestUserMessage?.content === "string"
+        ? latestUserMessage.content
+        : Array.isArray(latestUserMessage?.content)
+          ? latestUserMessage.content
+              .filter((part) => part.type === "text")
+              .map((part) => part.text)
+              .join(" ")
+          : ""
+    const actionableRequest =
+      /\\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|search|fetch|download|deploy|start|continue|resume|complete)\\b/i.test(
+        latestUserText,
+      ) ||
+      /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل)/u.test(
+        latestUserText,
+      )
+    // For an explicit action request, require one initial tool call so the model
+    // cannot silently answer with instructions instead of performing the requested
+    // work. Subsequent turns return to auto so the model can report or ask safely.
+    const toolChoice =
+      input.toolChoice ?? (activeTools.length > 0 ? (actionableRequest ? "required" : "auto") : undefined)
     if (activeTools.length > 0) {
       const toolExecutionContract = [
         "## Tool Execution Contract",
@@ -196,6 +217,7 @@ export namespace LLM {
       activeToolNames: activeTools.slice(0, 30),
       omittedToolNames: Math.max(0, activeTools.length - 30),
       toolChoice: toolChoice ?? "provider-default",
+      toolChoiceReason: input.toolChoice ? "caller-override" : actionableRequest ? "actionable-request" : "auto-default",
     })
 
     return streamText({
