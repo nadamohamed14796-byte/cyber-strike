@@ -173,6 +173,7 @@ export const RequestTable = sqliteTable(
     response_headers: text({ mode: "json" }).$type<Record<string, string>>(),
     response_content_type: text(),
     response_size: integer(),
+    response_body_hash: text(),
     processed_response: text(),
     // Complete JavaScript source for offline static analysis; kept separate from the capped LLM preview.
     javascript_source: text(),
