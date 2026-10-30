@@ -182,7 +182,17 @@
       "name": "community-tool-selection",
       "description": "Choose and verify a fit-for-purpose external tool, API, dataset, or local helper without duplicating the canonical tool catalog.",
       "verified": "unverified",
-      "tags": [],
+      "tags": [
+        "tool-selection",
+        "tooling-catalog",
+        "external-tools",
+        "cli",
+        "api",
+        "datasets",
+        "preflight",
+        "installation",
+        "verification"
+      ],
       "tech_stack": [],
       "cwe_ids": [],
       "files": [
