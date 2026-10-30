@@ -41,12 +41,12 @@ function parseArray(frontmatter: string, key: string): string[] {
   const items: string[] = []
   for (const line of lines.slice(index + 1)) {
     if (!line.trim()) continue
-    const item = line.match(/^\\s+-\\s+(.+)$/)
+    const item = line.match(/^\s+-\s+(.+)$/)
     if (item) {
       items.push(item[1].trim().replace(/^["']|["']$/g, ""))
       continue
     }
-    if (/^\\s/.test(line)) continue
+    if (/^\s/.test(line)) continue
     break
   }
   return items
