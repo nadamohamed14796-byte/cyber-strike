@@ -16,7 +16,8 @@
       "cwe_ids": [],
       "files": [
         "SKILL.md"
-      ]
+      ],
+      "category": "identity-security"
     },
     {
       "name": "attack-exceptional-conditions",
@@ -248,7 +249,8 @@
       "files": [
         "RECON_PHASE_TOOL_MATRIX.md",
         "SKILL.md"
-      ]
+      ],
+      "category": "information-gathering"
     },
     {
       "name": "src-hunter-compliance",
@@ -735,7 +737,8 @@
       "cwe_ids": [],
       "files": [
         "SKILL.md"
-      ]
+      ],
+      "category": "authentication"
     },
     {
       "name": "wstg-authz-01",
@@ -2168,7 +2171,8 @@
       "cwe_ids": [],
       "files": [
         "SKILL.md"
-      ]
+      ],
+      "category": "input-validation"
     },
     {
       "name": "wstg-inpv-01",
@@ -2841,7 +2845,8 @@
       "cwe_ids": [],
       "files": [
         "SKILL.md"
-      ]
+      ],
+      "category": "business-logic"
     },
     {
       "name": "wstg-recon-config",
@@ -2858,7 +2863,8 @@
       "cwe_ids": [],
       "files": [
         "SKILL.md"
-      ]
+      ],
+      "category": "information-gathering"
     },
     {
       "name": "wstg-sess-01",
