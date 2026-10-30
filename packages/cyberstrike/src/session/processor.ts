@@ -267,6 +267,13 @@ export namespace SessionProcessor {
                   break
 
                 case "finish-step":
+                  log.info("model step finished", {
+                    sessionID: input.sessionID,
+                    finishReason: value.finishReason,
+                    toolCalls: Object.keys(toolcalls).length,
+                    modelID: input.model.id,
+                    providerID: input.model.providerID,
+                  })
                   const usage = Session.getUsage({
                     model: input.model,
                     usage: value.usage,
