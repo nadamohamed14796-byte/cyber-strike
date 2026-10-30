@@ -6,6 +6,8 @@ import {
   requestIDFromRecentPromptTexts,
   selectTaskRequestContext,
   shouldInferSessionRequestID,
+  proxyTesterMethodologyBlock,
+  proxyTesterMethodologyPhase,
 } from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
@@ -104,4 +106,35 @@ test("persistent broker request identity follows the latest captured turn", () =
   // A follow-up with no identity block continues the most recent capture.
   expect(requestIDFromRecentPromptTexts([first, second, followUp])).toBe("req-second")
   expect(requestIDFromRecentPromptTexts([followUp])).toBeUndefined()
+})
+
+test("proxy tester IDs map to existing methodology phases and blocked phases stop dispatch", () => {
+  const mappings = [
+    ["proxy-tester-idor", "authorization_testing"],
+    ["proxy-tester-authz", "authorization_testing"],
+    ["proxy-tester-authn", "authentication_testing"],
+    ["proxy-tester-injection", "input_validation"],
+    ["proxy-tester-file-attacks", "input_validation"],
+    ["proxy-tester-business-logic", "business_logic"],
+    ["proxy-tester-mass-assignment", "api_security"],
+    ["proxy-tester-ssrf", "api_security"],
+    ["proxy-tester-llm", "api_security"],
+  ] as const
+
+  for (const [agentID, phaseID] of mappings) {
+    expect(proxyTesterMethodologyPhase(agentID)).toBe(phaseID)
+    expect(
+      proxyTesterMethodologyBlock(agentID, [{ id: phaseID, status: "blocked", blockReason: "upstream evidence missing" }]),
+    ).toEqual({ phase: phaseID, reason: "upstream evidence missing" })
+    expect(proxyTesterMethodologyBlock(agentID, [{ id: phaseID, status: "not_started" }])).toBeUndefined()
+  }
+
+  expect(proxyTesterMethodologyPhase("proxy-tester-idOR")).toBeUndefined()
+  expect(proxyTesterMethodologyBlock("proxy-analyzer", [{ id: "authorization_testing", status: "blocked" }])).toBeUndefined()
+  expect(
+    proxyTesterMethodologyBlock("proxy-tester-idor", [{ id: "scope_analysis", status: "completed" }]),
+  ).toEqual({
+    phase: "authorization_testing",
+    reason: "This testing phase is not applicable to the current target scope or has not been initialized.",
+  })
 })
