@@ -374,12 +374,15 @@ const proxyBrokerCreation = new Map<string, Promise<Session.Info>>()
  */
 async function getOrCreateProxyBrokerSession(input: {
   parentSessionID: string
-  config: Awaited<ReturnType<typeof Config.get>>
 }): Promise<Session.Info> {
+  // Resolve configuration inside the single-flight section. Every capture that
+  // arrives for this parent waits on the same creation promise before reserving
+  // its broker FIFO slot, so parallel Config reads cannot reorder captures.
   const pending = proxyBrokerCreation.get(input.parentSessionID)
   if (pending) return pending
 
   const creation = (async () => {
+    const config = await Config.get()
     const children = await Session.children(input.parentSessionID)
     const existing = children.find(
       (child) => child.title === PROXY_BROKER_TITLE || child.title === LEGACY_PROXY_BROKER_TITLE,
@@ -395,7 +398,7 @@ async function getOrCreateProxyBrokerSession(input: {
       permission: [
         { permission: "todowrite", pattern: "*", action: "deny" },
         { permission: "todoread", pattern: "*", action: "deny" },
-        ...(input.config.experimental?.primary_tools?.map((tool) => ({
+        ...(config.experimental?.primary_tools?.map((tool) => ({
           pattern: "*",
           action: "allow" as const,
           permission: tool,
@@ -799,17 +802,6 @@ export async function recoverPendingRequests(): Promise<void> {
 
   if (pending.length === 0) return
 
-  let config: Awaited<ReturnType<typeof Config.get>>
-  try {
-    config = await Config.get()
-  } catch (error) {
-    state.started = false
-    log.error("captured request recovery could not load configuration", {
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return
-  }
-
   let scheduled = 0
   let failures = 0
   const brokers = new Map<string, Session.Info>()
@@ -823,7 +815,6 @@ export async function recoverPendingRequests(): Promise<void> {
       if (!brokerSession) {
         brokerSession = await getOrCreateProxyBrokerSession({
           parentSessionID: request.session_id,
-          config,
         })
         brokers.set(request.session_id, brokerSession)
       }
@@ -1304,7 +1295,6 @@ export const SessionRoutes = lazy(() =>
 
         const brokerSession = await getOrCreateProxyBrokerSession({
           parentSessionID: sessionID,
-          config: await Config.get(),
         })
         const req = Request.retryFailed(sessionID, requestID)
         if (!req) {
@@ -1808,7 +1798,7 @@ export const SessionRoutes = lazy(() =>
         if (isHTTPRequest && !ingestDryRun) {
           const brokerSession = await getOrCreateProxyBrokerSession({
             parentSessionID: activeSessionID,
-            config: await Config.get(),
+
           })
           // Reserve before normalization so concurrent captures preserve arrival order.
           // This queue belongs only to Agent Proxy; do not register it on the Main queue.
@@ -1943,7 +1933,7 @@ export const SessionRoutes = lazy(() =>
               } else {
                 const brokerSession = await getOrCreateProxyBrokerSession({
                   parentSessionID: activeSessionID,
-                  config: await Config.get(),
+
                 })
                 IngestQueue.enqueue(brokerSession.id, retryTask)
               }
@@ -2134,7 +2124,7 @@ export const SessionRoutes = lazy(() =>
             } else {
               const brokerSession = await getOrCreateProxyBrokerSession({
                 parentSessionID: activeSessionID,
-                config: await Config.get(),
+
               })
               IngestQueue.enqueue(
                 brokerSession.id,
