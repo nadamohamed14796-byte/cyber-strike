@@ -124,10 +124,13 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           metadata: { initialized: false, found: false, saved: false, reason: "wildcard_workspace_identity_rejected", target_url: requestedURL } as TargetWorkspaceMetadata,
         }
       }
-      if (!workspace && params.create_child_workspace !== true) {
-        // When a requested host is already covered by the canonical program scope,
-        // reuse that workspace. Do not create a full child tree just to initialize
-        // or inspect one discovered host; child workspaces require explicit intent.
+      if (params.create_child_workspace !== true) {
+        // Resolve even when an exact-URL workspace exists. Legacy installations can
+        // contain both a concrete root (www.example.com) and a wildcard program
+        // root (*.example.com); accepting TargetMemory.get() first would keep
+        // writing the same program into two independent evidence ledgers.
+        // checkURLScope applies the canonical precedence rules and still fails
+        // closed when an exact workspace is unconfigured, excluded, or ambiguous.
         const decision = await TargetMemory.checkURLScope(requestedURL)
         if (decision.workspace) {
           if (!decision.allowed) {
