@@ -164,10 +164,9 @@ export const RequestTable = sqliteTable(
     protocol: text(), // "graphql" | "jsonrpc"
     operation: text(), // human label, e.g. "mutation:deleteUser"
     op_key_hash: text(),
-    // Unified structural identity (Faz 0). Explicit materialization of the dedup
-    // key: sha16(method ∥ origin ∥ normalized_path ∥ (op_key_hash ?? body_hash ?? "") ∥ query_hash).
-    // Nullable: legacy rows pre-date it and dedup via the body/query/op fallback.
-    // The unique index treats NULLs as distinct, so legacy rows never collide.
+    // Unified structural identity for endpoint/operation correlation and shared
+    // observation grouping. It is non-unique because one endpoint can be captured
+    // and analyzed many times with different values and outcomes.
     key_hash: text(),
     // Response fields
     response_status: integer(),
@@ -184,18 +183,16 @@ export const RequestTable = sqliteTable(
     index("request_normalized_idx").on(table.session_id, table.method, table.normalized_path),
     index("request_credential_idx").on(table.credential_id),
     index("request_template_idx").on(table.template_id),
-    // One row per (session, key_hash). NULLs are distinct in SQLite, so legacy
-    // key_hash=NULL rows are unaffected; this guards new rows against the
-    // exists()→add() TOCTOU by making the insert an atomic ON CONFLICT upsert.
-    uniqueIndex("request_keyhash_idx").on(table.session_id, table.key_hash),
+    // Structural grouping only: one endpoint may have many independent captured
+    // transactions, each with its own Request row and analysis turn.
+    index("request_keyhash_idx").on(table.session_id, table.key_hash),
   ],
 )
 
 /**
- * Every distinct JavaScript response body observed for a request identity.
- * RequestTable intentionally deduplicates request shapes for LLM work; this
- * append-only capture table preserves changed script versions without creating
- * duplicate request-analysis jobs.
+ * Complete JavaScript response bodies observed on captured HTTP transactions.
+ * Each transaction owns its own Request row and analysis job; this table keeps
+ * the original source independent from the bounded response preview.
  */
 export const RequestJavaScriptCaptureTable = sqliteTable(
   "request_javascript_capture",
