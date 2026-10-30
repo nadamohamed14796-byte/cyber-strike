@@ -5,6 +5,8 @@ describe("scopeItemSpecificity", () => {
   test("prefers an exact host grant over a wildcard family and a path-scoped URL over a bare host", () => {
     expect(scopeItemSpecificity("app.smartsheet.com")).toBeGreaterThan(scopeItemSpecificity("*.smartsheet.com"))
     expect(scopeItemSpecificity("https://app.smartsheet.com/api")).toBeGreaterThan(scopeItemSpecificity("app.smartsheet.com"))
+    expect(scopeItemSpecificity("app.smartsheet.com/api")).toBeGreaterThan(scopeItemSpecificity("app.smartsheet.com"))
+    expect(scopeItemSpecificity("192.0.2.0/24")).toBeLessThan(scopeItemSpecificity("app.smartsheet.com"))
     expect(scopeItemSpecificity("Wildcard: *.smartsheet.com")).toBe(scopeItemSpecificity("*.smartsheet.com"))
   })
 })
