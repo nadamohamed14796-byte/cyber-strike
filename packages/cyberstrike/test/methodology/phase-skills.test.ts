@@ -28,7 +28,7 @@ describe("Dynamic specialist dispatch contract", () => {
   test("the root prompt defers phase-independent dispatch to the shared workflow and live Task roster", async () => {
     const prompt = await Bun.file(path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")).text()
     expect(prompt).toContain("The shared Target Workflow Contract is the single authority")
-    expect(prompt).toContain("Use the live Task roster and the evidence-backed task to select the exact registered agent")
+    expect(prompt).toContain("For delegation, use the live Task roster and exact registered `subagent_type`")
     expect(prompt).not.toContain("Phase-to-Agent Decision Table")
     expect(prompt).not.toContain("### Missing Tool Installation")
     expect(prompt).not.toContain("**Phase Transition:**")
