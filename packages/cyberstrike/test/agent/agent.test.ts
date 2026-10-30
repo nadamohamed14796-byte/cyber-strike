@@ -727,6 +727,7 @@ test("duplicate agent display names never shadow stable registry keys", async ()
       await expect(Agent.get("Shared Worker")).rejects.toThrow(
         'Agent display name "Shared Worker" is ambiguous. Use a stable registry ID: worker_a, worker_b.',
       )
+      expect(await Agent.resolveID("Shared Worker")).toBeUndefined()
     },
   })
 })
