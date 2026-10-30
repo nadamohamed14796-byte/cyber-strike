@@ -7,11 +7,8 @@
 export function createToolExecutionQueue() {
   let tail: Promise<void> = Promise.resolve()
 
-  return function run<T>(operation: () => T | PromiseLike<T>): Promise<Awaited<T>> {
-    const result = tail.then(
-      async () => await operation(),
-      async () => await operation(),
-    )
+  return function run<T>(operation: () => T | PromiseLike<T>): Promise<T> {
+    const result = tail.then(operation, operation)
     tail = result.then(
       () => undefined,
       () => undefined,
