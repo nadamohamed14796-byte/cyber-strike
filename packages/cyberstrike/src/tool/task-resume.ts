@@ -33,6 +33,19 @@ export function requestIDFromPromptText(text: string): string | undefined {
 }
 
 /**
+ * Resolve the active request from a persistent broker transcript. Follow-up
+ * messages may omit an identity block, so walk backward to the most recent
+ * user turn that actually carries a trusted request identity section.
+ */
+export function requestIDFromRecentPromptTexts(texts: readonly string[]): string | undefined {
+  for (let index = texts.length - 1; index >= 0; index--) {
+    const requestID = requestIDFromPromptText(texts[index] ?? "")
+    if (requestID) return requestID
+  }
+  return undefined
+}
+
+/**
  * Select request context without silently attaching a task to unrelated traffic.
  * An explicit ID is authoritative; otherwise only one in-flight request is safe
  * to infer. Multiple in-flight rows are ambiguous and must be resolved by ID.
