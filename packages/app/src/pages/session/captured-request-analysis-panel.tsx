@@ -1,4 +1,4 @@
-import { createEffect, createMemo, Show } from "solid-js"
+import { createEffect, createMemo, For, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 
@@ -73,6 +73,17 @@ export function CapturedRequestAnalysisPanel() {
     return `${current.method ?? "HTTP"} ${current.origin ?? ""}${current.normalized_path ?? ""}`.trim()
   })
 
+  const requestLabel = (item: CapturedRequestRow) =>
+    `${item.method ?? "HTTP"} ${item.origin ?? ""}${item.normalized_path ?? ""}`.trim()
+
+  const requestStatusLabel = (item: CapturedRequestRow) => {
+    if (item.status === "processing") return "Analyzing"
+    if (item.status === "queued") return "Waiting"
+    if (item.status === "processed") return "Done"
+    if (item.status === "failed") return "Failed"
+    return item.status ?? "Received"
+  }
+
   function enterAgentProxy() {
     const childID = brokerSession()?.id
     if (!childID) return
@@ -123,6 +134,40 @@ export function CapturedRequestAnalysisPanel() {
             <p class="mt-2 text-10-regular text-text-weaker">
               {queuedCount()} queued · {processingCount()} analyzing · {processedCount()} done · {failedCount()} failed
             </p>
+
+            <div
+              aria-label="Numbered Extension request queue"
+              class="mt-2 max-h-36 overflow-y-auto rounded-md border border-border-weak-base"
+            >
+              <For each={requests()}>
+                {(item, index) => (
+                  <div
+                    class="flex min-w-0 items-center gap-2 border-b border-border-weak-base px-2 py-1 last:border-b-0"
+                    classList={{
+                      "bg-surface-raised-base": item.status === "processing",
+                    }}
+                  >
+                    <span class="w-7 shrink-0 text-10-semibold tabular-nums text-text-weaker">
+                      #{index() + 1}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-10-regular text-text-base" title={requestLabel(item)}>
+                      {requestLabel(item)}
+                    </span>
+                    <span
+                      class="shrink-0 text-10-medium"
+                      classList={{
+                        "text-icon-warning-base": item.status === "queued" || item.status === "processing",
+                        "text-icon-success-base": item.status === "processed",
+                        "text-icon-danger-base": item.status === "failed",
+                        "text-text-weaker": !["queued", "processing", "processed", "failed"].includes(item.status ?? ""),
+                      }}
+                    >
+                      {requestStatusLabel(item)}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
           </div>
 
           <button
