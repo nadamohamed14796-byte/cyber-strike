@@ -4,6 +4,22 @@
 // within-turn duplicate suppressor (session/prompt.ts resolveTools) and the
 // cross-turn monologue detector (session/stuck/stuck-detector.ts).
 
+/**
+ * Decide whether native-subagent loop safeguards apply to this execution.
+ * Agents with mode="all" are also valid primary agents, so only enable these
+ * safeguards when such an agent is actually running in a child session. This
+ * keeps standalone primary sessions unchanged while protecting Proxy Agent
+ * broker/delegated sessions from no-progress and duplicate-call loops.
+ */
+export function isNativeSubagentRun(input: {
+  agent: { mode: "subagent" | "primary" | "all"; native?: boolean }
+  session: { parentID?: string | null }
+}): boolean {
+  if (input.agent.native !== true) return false
+  if (input.agent.mode === "subagent") return true
+  return input.agent.mode === "all" && Boolean(input.session.parentID)
+}
+
 /** Deterministic, key-sorted JSON so `{a,b}` and `{b,a}` hash identically. */
 export function stableStringify(value: unknown): string {
   return JSON.stringify(sortKeys(value))
