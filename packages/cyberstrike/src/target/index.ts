@@ -2675,31 +2675,41 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         .get(),
     )
     if (!rootSessionExists) return null
+    const MAX_CONTEXT_RELATED_SESSIONS = 5_000
     const relatedSessionIDs = new Set<string>([sessionID])
     let frontier = [sessionID]
+    let omittedRelatedSessions = false
 
     // Include child-agent sessions without scanning every session in the project.
-    while (frontier.length > 0) {
+    // This is a prompt-time preview cap only; session records and evidence remain
+    // persisted and can be queried directly by their owning tools.
+    while (frontier.length > 0 && relatedSessionIDs.size < MAX_CONTEXT_RELATED_SESSIONS) {
       const children = Database.use((db) => {
         const discovered: string[] = []
-        // SQLite bind parameters are finite; query in small batches without imposing
-        // a maximum number of child sessions or dropping any IDs.
+        // SQLite bind parameters are finite; query in small batches and stop once
+        // the prompt preview has enough related sessions.
         for (let offset = 0; offset < frontier.length; offset += 500) {
+          const remaining = MAX_CONTEXT_RELATED_SESSIONS - relatedSessionIDs.size - discovered.length
+          if (remaining <= 0) {
+            omittedRelatedSessions = true
+            break
+          }
           const parentIDs = frontier.slice(offset, offset + 500)
-          discovered.push(
-            ...db
-              .select({ id: SessionTable.id })
-              .from(SessionTable)
-              .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, parentIDs)))
-              .all()
-              .map((row) => row.id),
-          )
+          const rows = db
+            .select({ id: SessionTable.id })
+            .from(SessionTable)
+            .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, parentIDs)))
+            .limit(remaining + 1)
+            .all()
+          if (rows.length > remaining) omittedRelatedSessions = true
+          discovered.push(...rows.slice(0, remaining).map((row) => row.id))
         }
         return [...new Set(discovered)].filter((id) => !relatedSessionIDs.has(id))
       })
       for (const child of children) relatedSessionIDs.add(child)
       frontier = children
     }
+    if (frontier.length > 0) omittedRelatedSessions = true
 
     const sessionIDs = [...relatedSessionIDs]
     // This context is a prompt-time preview, not the canonical request/intel
@@ -3025,6 +3035,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       "Before any active request, verify the selected asset's saved scope against the official program policy. Every ancestor scope and exclusion also applies. If any manifest is missing, unconfigured, invalid, ambiguous, or excludes the URL, stop; never infer authorization from a target URL or discovery alone.",
       "Reuse the run's saved setup scope_check decision for the canonical target/workspace; do not call scope_check again for each selected asset, URL, or request. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must enforce the persisted scope internally for every outbound URL, including exclusions and ancestor scopes.",
       "Memory completeness: this is a prioritized context preview, not proof that omitted notes or assets do not exist. Use target_notes_read to search and page through saved notes before concluding that a prior observation or experiment is absent.",
+      ...(omittedRelatedSessions ? ["RELATED SESSION PREVIEW PARTIAL: only the first " + MAX_CONTEXT_RELATED_SESSIONS + " sessions in this parent/child tree were included in this prompt. Other sessions and their evidence remain saved; query the relevant child session directly before concluding that its evidence is absent."] : []),
       ...(omittedNoteCount > 0 ? [
         "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " selected-asset current notes, " + omittedJournalNoteCount + " selected-asset journal entries, " + omittedParentNoteCount + " program/root current notes, " + omittedParentJournalCount + " program/root journal entries, " + omittedAncestorNoteCount + " intermediate-ancestor current notes, " + omittedAncestorJournalCount + " intermediate-ancestor journal entries, and " + omittedDatabaseNoteCount + " additional notes outside the bounded prompt preview were not included. All remain saved. Read each omitted workspace using target_notes_read with target_url values: " + [selected.targetURL, ...(programRoot.id === selected.id ? [] : [programRoot.targetURL]), ...lineage.filter((item) => item.id !== programRoot.id && item.id !== selected.id).map((item) => item.targetURL)].join(", ") + ". Page through results until has_more_notes is false; set include_history=true for current-note revisions.",
       ] : []),
