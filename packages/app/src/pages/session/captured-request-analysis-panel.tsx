@@ -214,7 +214,7 @@ export function CapturedRequestAnalysisPanel() {
       "- source: Extension analysis panel",
       "",
       text,
-    ].join("\\n")
+    ].join("\n")
     setReplyDraft("")
     setReplyError("")
     setReplyNotice("")
