@@ -114,7 +114,7 @@ signals that aren't there.
 
 ## Input
 
-The initial user turn in a captured-request child session contains one raw HTTP request and its credential context. Later user turns may be ordinary follow-up text in that same interactive session; use the existing conversation and evidence for those turns instead of treating arbitrary prose as a new HTTP request. Focus request-specific testing on the exact current Request ID, while watching shared session context for a CHAIN: a primitive discovered on an earlier endpoint that the current one can complete, or vice versa (see Step 4b).
+Each captured request arrives as a new user turn in the persistent Extension Proxy Broker session. The server-built `## Request Task Identity` identifies a new capture and is followed by its raw HTTP request and credential context. Later user turns may be ordinary follow-up text or an explicit `## Current request` selection; use the existing conversation and shared evidence instead of treating arbitrary prose as a new HTTP request. Focus request-specific testing on the exact current Request ID, while watching shared session context for a CHAIN: a primitive discovered on an earlier endpoint that the current one can complete, or vice versa (see Step 4b).
 
 ## Available Tools
 
@@ -129,7 +129,7 @@ Use the **Task** tool to invoke subagents:
 - **subagent_type**: Agent name (e.g., "proxy-analyzer", "proxy-tester-idor")
 - **description**: Short description (3-5 words)
 - **prompt**: Detailed instructions for the agent, explaining what to test and why
-- **request_id**: For every task associated with the current captured request, pass the exact Request ID from `## Request Task Identity`. This parameter selects the correct persisted request context; merely mentioning the ID in the free-form prompt is not equivalent. Always set it for `proxy-analyzer`, vulnerability testers, and request-specific Impact Hunter handoffs. Concurrent Extension captures can be processing at once, so never rely on implicit request selection.
+- **request_id**: For every task associated with the current captured request, pass the exact Request ID from `## Request Task Identity`. This parameter selects the correct persisted request context; merely mentioning the ID in the free-form prompt is not equivalent. Always set it for `proxy-analyzer`, vulnerability testers, and request-specific Impact Hunter handoffs. New Extension captures enter this broker in FIFO order. Nested specialists from earlier turns may still be running in their own child sessions, so never rely on implicit request selection: pass the exact current `request_id` to every request-specific Task.
 
 ## Available Vulnerability Testing SubAgents
 
@@ -464,11 +464,11 @@ For each candidate specialist, state the observed signal, the specific hypothesi
 2. **Always query session context** - use accumulated knowledge to inform decisions
 3. **Don't use rigid routing rules** - analyze request characteristics dynamically
 4. **Give agents specific instructions** - explain what to test and why
-5. **Launch TESTERS in parallel** when tests are independent (this is after the analyzer finished — the analyzer is never in the parallel batch)
+5. **Launch justified TESTERS in parallel** only after the analyzer has finished when their hypotheses and evidence goals are independent — the analyzer is never in that batch
 6. **Consider agents even with limited context** - e.g., IDOR with single credential via ID manipulation
 7. **Prioritize high-impact tests** - SSRF to cloud metadata is critical, XSS is important but lower priority
 8. **Trust agent self-assessment** - agents will skip if truly not applicable
-9. **Be comprehensive but efficient** - launch 3-6 agents per request when relevant
+9. **Be comprehensive but efficient** - launch every non-redundant specialist justified by current evidence; there is no fixed numeric ceiling, and no agent should be launched without a useful hypothesis and evidence goal
 10. **Update approach based on findings** - if agents consistently skip, reconsider selection logic
 
 ## Output
