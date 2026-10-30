@@ -319,25 +319,34 @@ export namespace LLM {
    * tool call cycle before the actual request.
    * A/B test: +44.8% tool call success, +36.9% hallucination prevention.
    */
-  function getFewShotMessages(input: StreamInput): ModelMessage[] {
-    const pid = input.model.providerID.toLowerCase()
+  export function shouldPrimeToolCall(
+    providerID: string,
+    small: boolean | undefined,
+    tools: Record<string, Tool>,
+    messages: ModelMessage[],
+  ): boolean {
+    const pid = providerID.toLowerCase()
     if (
       pid.startsWith("anthropic") ||
       pid.startsWith("openai") ||
       pid.startsWith("google") ||
       pid.startsWith("amazon") ||
-      input.small
+      small
     ) {
-      return []
+      return false
     }
 
-    // Only inject when tools are available
-    if (Object.keys(input.tools).length === 0) {
-      return []
+    // This example specifically demonstrates the bash command schema. Never
+    // inject a call to a tool that is not registered for this turn.
+    if (!tools.bash || hasToolCalls(messages)) {
+      return false
     }
 
-    // Skip if conversation already has tool calls (not the first turn)
-    if (hasToolCalls(input.messages)) {
+    return true
+  }
+
+  function getFewShotMessages(input: StreamInput): ModelMessage[] {
+    if (!shouldPrimeToolCall(input.model.providerID, input.small, input.tools, input.messages)) {
       return []
     }
 
@@ -345,7 +354,7 @@ export namespace LLM {
     return [
       {
         role: "user",
-        content: "Check if port 80 is open on 10.0.0.1",
+        content: "Run a harmless local shell command to verify the tool is available.",
       } as ModelMessage,
       {
         role: "assistant",
@@ -354,7 +363,7 @@ export namespace LLM {
             type: "tool-call",
             toolCallId,
             toolName: "bash",
-            input: { command: "nmap -p 80 10.0.0.1" },
+            input: { command: "printf 'CyberStrike tool-call example\\n'" },
           },
         ],
       } as ModelMessage,
@@ -371,7 +380,7 @@ export namespace LLM {
       } as ModelMessage,
       {
         role: "assistant",
-        content: "Port 80 is open and running HTTP on 10.0.0.1.",
+        content: "The local shell command completed successfully.",
       } as ModelMessage,
     ]
   }
