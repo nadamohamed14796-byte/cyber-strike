@@ -185,14 +185,14 @@ describe("scope_check uses persisted target scope when a workspace is supplied",
     await Instance.provide({
       directory: tmp.path,
       async fn() {
-        const wildcard = await TargetMemory.configureScope("https://*.example.test", {
-          include: ["*.example.test"],
-          authorizationSource: "Canonical wildcard program scope",
-          authorizationReference: "https://example.test/policy",
-        })
         await TargetMemory.configureScope("https://www.example.test", {
           include: ["www.example.test"],
           authorizationSource: "Legacy exact-host scope",
+          authorizationReference: "https://example.test/policy",
+        })
+        const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+          include: ["*.example.test"],
+          authorizationSource: "Canonical wildcard program scope",
           authorizationReference: "https://example.test/policy",
         })
 
