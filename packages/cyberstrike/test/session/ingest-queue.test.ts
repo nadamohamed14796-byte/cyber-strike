@@ -386,59 +386,69 @@ describe("Extension ingest transcript visibility", () => {
   })
 })
 
-describe("Single live analysis transcript entry", () => {
-  test("reuses one parent transcript message for sequential captured requests", async () => {
+describe("Per-request live analysis transcript entries", () => {
+  test("keeps sequential request notices separate while sharing the broker session reference", async () => {
     await withInstance(async () => {
-      const session = await Session.create({ title: "single-live-analysis-entry-test" })
+      const session = await Session.create({ title: "per-request-live-analysis-entry-test" })
       const model = { providerID: "test-provider", modelID: "test-model" }
+      const brokerSessionID = "shared-proxy-broker-session"
       const first = await IngestSummary.createLiveNotice({
         sessionID: session.id,
         agent: "proxy-agent",
         model,
         text: "## Captured request — ANALYZING\\nRequest: GET /first",
-        requestAnalysis: { requestID: "request-first", method: "GET", url: "https://example.test/first" },
+        requestAnalysis: {
+          requestID: "request-first",
+          analysisSessionID: brokerSessionID,
+          method: "GET",
+          url: "https://example.test/first",
+        },
       })
       const second = await IngestSummary.createLiveNotice({
         sessionID: session.id,
         agent: "proxy-agent",
         model,
         text: "## Captured request — ANALYZING\\nRequest: GET /second",
-        requestAnalysis: { requestID: "request-second", method: "GET", url: "https://example.test/second" },
+        requestAnalysis: {
+          requestID: "request-second",
+          analysisSessionID: brokerSessionID,
+          method: "GET",
+          url: "https://example.test/second",
+        },
       })
 
-      expect(second.messageID).toBe(first.messageID)
-      expect(second.partID).toBe(first.partID)
-      const messages = await Session.messages({ sessionID: session.id })
-      const texts = messages.flatMap((message) => message.parts)
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-      expect(texts).toHaveLength(1)
-      expect(texts[0]).toContain("GET /second")
-      expect(texts[0]).not.toContain("GET /first")
+      expect(second.messageID).not.toBe(first.messageID)
+      expect(second.partID).not.toBe(first.partID)
+      expect(second.requestAnalysis.analysisSessionID).toBe(first.requestAnalysis.analysisSessionID)
 
       await IngestSummary.updateLiveNotice({
         sessionID: session.id,
         live: first,
-        text: "STALE earlier request output",
+        text: "First request finished",
+        completed: true,
+        status: "processed",
       })
-      const afterStaleWrite = await Session.messages({ sessionID: session.id })
-      const afterStaleText = afterStaleWrite.flatMap((message) => message.parts)
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-      expect(afterStaleText).toHaveLength(1)
-      expect(afterStaleText[0]).toContain("GET /second")
-      expect(afterStaleText[0]).not.toContain("STALE earlier request output")
-
+      // A late write for a completed request is ignored and cannot overwrite
+      // the separate live entry for the next request.
+      await IngestSummary.updateLiveNotice({
+        sessionID: session.id,
+        live: first,
+        text: "STALE first request output",
+      })
       await IngestSummary.updateLiveNotice({
         sessionID: session.id,
         live: second,
-        text: "Latest request /second remains visible",
+        text: "Second request remains live",
       })
-      const afterCurrentWrite = await Session.messages({ sessionID: session.id })
-      const afterCurrentText = afterCurrentWrite.flatMap((message) => message.parts)
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-      expect(afterCurrentText[0]).toContain("Latest request /second remains visible")
+
+      const messages = await Session.messages({ sessionID: session.id })
+      const parts = messages.flatMap((message) => message.parts)
+        .filter((part) => part.type === "text" && (part.metadata as { kind?: string } | undefined)?.kind === "ingest-summary")
+      expect(parts).toHaveLength(2)
+      const texts = parts.filter((part) => part.type === "text").map((part) => part.text)
+      expect(texts).toContain("First request finished")
+      expect(texts).toContain("Second request remains live")
+      expect(texts).not.toContain("STALE first request output")
       await Session.remove(session.id)
     })
   })
