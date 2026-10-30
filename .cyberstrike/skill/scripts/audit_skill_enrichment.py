@@ -13,8 +13,21 @@ URL=re.compile(r"https?://[^\s)]+")
 CLI=re.compile(r"`(?:[a-zA-Z0-9_.-]+\s+[^`]+|python3\s+[^`]+)`")
 INSTALL=re.compile(r"\b(install|download|official releases|verify|version|availability)\b",re.I)
 
+def has_shared_catalog_reference(content:str)->bool:
+    """A direct skill may inherit tool guidance from the one canonical catalog."""
+    if "TOOLING_CATALOG.md" not in content:
+        return False
+    return bool(re.search(
+        r"(?:single|shared|canonical).{0,160}(?:TOOLING_CATALOG\\.md|tool(?:ing)? catalog|catalog)|"
+        r"(?:TOOLING_CATALOG\\.md|tool(?:ing)? catalog|catalog).{0,160}(?:single|shared|canonical)",
+        content,
+        re.IGNORECASE|re.DOTALL,
+    ))
+
+
 def inspect(path:Path,root:Path)->dict:
     content=path.read_text(encoding="utf-8",errors="replace")
+    shared_catalog_ref=has_shared_catalog_reference(content)
     starts=sorted({content.find(m) for m in SCAN_MARKERS if content.find(m)>=0})
     start=starts[0] if starts else -1
     sections=[]
@@ -31,7 +44,7 @@ def inspect(path:Path,root:Path)->dict:
     has_install=bool(INSTALL.search(section))
     ui=sorted(set(UI_FIRST.findall(section)))
     missing=[]
-    if start<0: missing.append("agent_tooling_section")
+    if start<0 and not shared_catalog_ref: missing.append("agent_tooling_section")
     if marker_count > 1: missing.append("duplicate_tooling_sections")
     if not tool_heading: missing.append("tooling_section")
     if not has_ref: missing.append("official_resources")
@@ -39,20 +52,36 @@ def inspect(path:Path,root:Path)->dict:
     if not has_install: missing.append("installation_or_verification")
     if ui: missing.append("remove_human_UI_as_agent_dependency")
     return {"skill":path.parent.name,"path":path.relative_to(root).as_posix(),"tooling_section":tool_heading,
+            "shared_catalog_reference":shared_catalog_ref,
             "official_resources":has_ref,"agent_executable_command":has_cli,"installation_or_verification":has_install,
             "human_UI_mentions_in_tooling_section":ui,"tooling_section_count":marker_count,"missing":missing}
+
+def self_test()->int:
+    assert has_shared_catalog_reference(
+        "Use the `TOOLING_CATALOG.md` companion as the one shared reference for tools. "
+        "Do not copy its inventory into individual skills."
+    )
+    assert has_shared_catalog_reference(
+        "Consult the single `TOOLING_CATALOG.md` reference for candidate tools."
+    )
+    assert not has_shared_catalog_reference("List local tools and install them.")
+    print("self-test: PASS")
+    return 0
+
 
 def main()->int:
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root",type=Path,default=DEFAULT_ROOT)
     ap.add_argument("--json",action="store_true")
     ap.add_argument("--strict",action="store_true")
+    ap.add_argument("--self-test",action="store_true")
     args=ap.parse_args()
+    if args.self_test: return self_test()
     if not args.root.is_dir():
         print(f"skill root not found: {args.root}",file=sys.stderr);return 2
     paths=sorted((d/"SKILL.md" for d in args.root.iterdir() if d.is_dir() and d.name not in EXCLUDED and (d/"SKILL.md").is_file()),key=lambda p:p.parent.name)
     skills=[inspect(p,args.root) for p in paths]
-    summary={"direct_custom_skills":len(skills),"with_tooling_section":sum(s["tooling_section"] for s in skills),
+    summary={"direct_custom_skills":len(skills),"with_tooling_section":sum(s["tooling_section"] for s in skills),"with_shared_catalog_reference":sum(s["shared_catalog_reference"] for s in skills),
              "with_official_resources":sum(s["official_resources"] for s in skills),"with_agent_commands":sum(s["agent_executable_command"] for s in skills),
              "with_install_or_verify_guidance":sum(s["installation_or_verification"] for s in skills),
              "sections_with_human_UI_tool_mentions":sum(bool(s["human_UI_mentions_in_tooling_section"]) for s in skills),
