@@ -155,8 +155,9 @@ export namespace Observation {
         eq(RequestObservationTable.op_group_hash, opGroupHash),
       )).all(),
     )
-    const keyHashes = [...new Set(obs.map((o) => o.key_hash))]
+    const keyHashes = [...new Set(obs.map((o) => o.key_hash))].sort()
     const credentials = [...new Set(obs.map((o) => o.credential_id))]
+      .sort((a, b) => (a ?? "").localeCompare(b ?? ""))
     const byParam = new Map<
       string,
       { loc: string; byCred: Map<string | null, { values: Set<string>; redacted: boolean }> }
@@ -172,14 +173,16 @@ export namespace Observation {
         byParam.set(slot.name, param)
       }
     }
-    const params = [...byParam.entries()].map(([name, param]) => ({
+    const params = [...byParam.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, param]) => ({
       name,
       loc: param.loc,
-      byCredential: [...param.byCred.entries()].map(([credentialID, value]) => ({
-        credentialID,
-        values: [...value.values],
-        redacted: value.redacted,
-      })),
+      byCredential: [...param.byCred.entries()]
+        .sort(([a], [b]) => (a ?? "").localeCompare(b ?? ""))
+        .map(([credentialID, value]) => ({
+          credentialID,
+          values: [...value.values].sort(),
+          redacted: value.redacted,
+        })),
     }))
     return { opGroupHash, keyHashes, credentials, params }
   }
