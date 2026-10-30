@@ -149,4 +149,47 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
       },
     })
   })
+
+  test("init reuses the wildcard canonical root when a legacy exact-host root also exists", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+            include: ["*.example.test"],
+            authorizationSource: "Program wildcard scope fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+          await TargetMemory.configureScope("https://www.example.test", {
+            include: ["www.example.test"],
+            authorizationSource: "Legacy exact-host root fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+
+          const info = await TargetWorkspaceTool.init()
+          const result = await info.execute({
+            action: "init",
+            target_url: "https://www.example.test",
+          }, {
+            sessionID: "ses_canonical_root_reuse_test",
+            messageID: "msg_canonical_root_reuse_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          } as never)
+
+          expect(result.metadata.initialized).toBe(true)
+          expect(result.output).toContain("Target: " + wildcard.workspace.targetURL)
+          expect(result.output).toContain("Workspace: " + wildcard.workspace.workspacePath)
+          expect(TargetMemory.list()).toHaveLength(2)
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
+
 })
