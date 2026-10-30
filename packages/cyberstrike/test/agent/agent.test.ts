@@ -179,6 +179,8 @@ test("Impact Hunter is a terminal investigator with evidence tools but no defaul
         "web_get_vuln_detail",
         "correlate_javascript",
         "validate_finding",
+        "chain_link",
+        "validate_chain",
         "verification_attempt",
         "false_positive_memory",
         "report_vulnerability",
