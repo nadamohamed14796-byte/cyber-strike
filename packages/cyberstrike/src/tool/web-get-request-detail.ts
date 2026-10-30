@@ -88,9 +88,10 @@ export const WebGetRequestDetailTool = Tool.define("web_get_request_detail", {
     // differ (for example, distinct formAction values) but belong to the same
     // method + origin + normalized route + protocol operation.
     const operationTree = Observation.operationTreeForRequest(sessionID, request.id)
-    if (operationTree && operationTree.keyHashes.length > 1) {
+    if (operationTree && (operationTree.keyHashes.length > 1 || operationTree.requests.length > 1)) {
       detail.related_operation_values = {
         key_hashes: operationTree.keyHashes,
+        request_ids: operationTree.requests,
         credentials: operationTree.credentials,
         params: operationTree.params,
       }
