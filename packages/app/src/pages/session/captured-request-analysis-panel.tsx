@@ -103,8 +103,12 @@ export function CapturedRequestAnalysisPanel() {
     const id = analysisSessionID()
     return !!id && (sync.data.session_status[id]?.type ?? "idle") !== "idle"
   })
+  // The broker is shared by every capture under the Main Agent. Disable manual
+  // follow-ups while any capture is normalizing, queued, or running so they cannot
+  // be inserted between two serialized request turns.
+  const brokerQueueBusy = createMemo(() => (sync.data.session_queue_status?.[parentID()]?.pending ?? 0) > 0)
   const replyDisabled = createMemo(
-    () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || replySending(),
+    () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || brokerQueueBusy() || replySending(),
   )
   const requestParts = createMemo(() => parseRequest(request()?.raw_request))
   const queryParams = createMemo(() => {
@@ -205,7 +209,7 @@ export function CapturedRequestAnalysisPanel() {
     const sessionID = analysisSessionID()
     const requestID = selected()?.requestID
     const lastUserMessage = childUserMessages().at(-1)
-    if (!text || !sessionID || !requestID || !lastUserMessage || replySending() || childBusy()) return
+    if (!text || !sessionID || !requestID || !lastUserMessage || replySending() || childBusy() || brokerQueueBusy()) return
 
     const submittedDraft = replyDraft()
     const brokerFollowUp = [
