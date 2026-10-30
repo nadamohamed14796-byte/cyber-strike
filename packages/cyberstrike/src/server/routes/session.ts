@@ -1931,7 +1931,6 @@ export const SessionRoutes = lazy(() =>
               } else {
                 const brokerSession = await getOrCreateProxyBrokerSession({
                   parentSessionID: activeSessionID,
-
                 })
                 IngestQueue.enqueue(brokerSession.id, retryTask)
               }
@@ -2122,7 +2121,6 @@ export const SessionRoutes = lazy(() =>
             } else {
               const brokerSession = await getOrCreateProxyBrokerSession({
                 parentSessionID: activeSessionID,
-
               })
               IngestQueue.enqueue(
                 brokerSession.id,
