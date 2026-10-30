@@ -41,6 +41,12 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://notatt.com/", entries)).toEqual([])
   })
 
+  test("indexes JavaScript files as exact typed entries", () => {
+    const entries = ["JavaScript: https://cdn.example.com/app.js"]
+    expect(matchingScopeItems("https://cdn.example.com/app.js?v=2", entries)).toEqual(entries)
+    expect(matchingScopeItems("https://cdn.example.com/other.js", entries)).toEqual([])
+  })
+
   test("indexes typed HackerOne web assets and keeps non-web assets non-authorizing", () => {
     expect(matchingScopeItems("https://example.com/", ["Wildcard: *.example.com"])).toEqual(["Wildcard: *.example.com"])
     expect(matchingScopeItems("https://example.com/app1/users", ["URL: example.com/app1"])).toEqual(["URL: example.com/app1"])
