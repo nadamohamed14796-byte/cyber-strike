@@ -79,4 +79,74 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
       },
     })
   })
+
+  test("rejects a wildcard configure_scope target instead of creating a second workspace", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const info = await TargetWorkspaceTool.init()
+          const result = await info.execute({
+            action: "configure_scope",
+            target_url: "https://*.example.test",
+            include: ["*.example.test"],
+            user_confirmed_scope_list: true,
+          }, {
+            sessionID: "ses_wildcard_configure_test",
+            messageID: "msg_wildcard_configure_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          } as never)
+
+          expect(result.metadata.saved).toBe(false)
+          expect(result.metadata.reason).toBe("wildcard_workspace_identity_rejected")
+          expect(TargetMemory.list()).toHaveLength(0)
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
+
+  test("configure_scope on an authorized subdomain updates its canonical root", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const root = await TargetMemory.configureScope("https://www.example.test", {
+            include: ["*.example.test"],
+            authorizationSource: "Program wildcard scope fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+          const info = await TargetWorkspaceTool.init()
+          const result = await info.execute({
+            action: "configure_scope",
+            target_url: "https://app.example.test",
+            include: ["api.example.test"],
+            merge_existing: true,
+          }, {
+            sessionID: "ses_subdomain_scope_update_test",
+            messageID: "msg_subdomain_scope_update_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          } as never)
+
+          expect(result.metadata.saved).toBe(true)
+          expect(result.output).toContain("Target: " + root.workspace.targetURL)
+          expect(TargetMemory.list().map((item) => item.targetURL)).toEqual([root.workspace.targetURL])
+          expect((await TargetMemory.getScope(root.workspace.targetURL))?.scopeItems).toContain("api.example.test")
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
 })
