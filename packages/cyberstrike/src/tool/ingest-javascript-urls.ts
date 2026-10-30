@@ -318,14 +318,23 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
-    const workspace = await TargetMemory.get(params.target_url)
-    if (!workspace) {
-      return { title: "JavaScript URL ingestion stopped", output: "No existing target workspace matches target_url. Initialize the canonical target workspace first.", metadata: { error: "workspace_missing" } }
+    // target_url may identify either the canonical root workspace or an
+    // authorized host covered by that root's saved scope. Resolve it through the
+    // same persisted scope gate used by every fetch instead of requiring an
+    // exact host-key lookup (which incorrectly demanded one workspace per
+    // subdomain and split a single program into duplicate ledgers).
+    const resolution = await TargetMemory.checkURLScope(params.target_url)
+    if (!resolution.allowed || !resolution.workspace) {
+      return {
+        title: "JavaScript URL ingestion stopped",
+        output: "No JavaScript URLs were fetched. The supplied target_url could not be resolved to one authorized canonical workspace: " + resolution.reason + ". Pass the existing root workspace URL shown by target_workspace(action=\"list\"); do not create a per-host child workspace to work around this result.",
+        metadata: { error: "workspace_scope_resolution_failed", reason: resolution.reason, target_url: params.target_url } ,
+      }
     }
-
-    const scope = await TargetMemory.getScope(params.target_url)
+    const workspace = resolution.workspace
+    const scope = resolution.scope ?? await TargetMemory.getScope(workspace.targetURL)
     if (!scope || scope.status !== "configured") {
-      return { title: "JavaScript URL ingestion stopped", output: "The target workspace has no valid configured scope. No URLs were fetched.", metadata: { error: "scope_unconfigured" } }
+      return { title: "JavaScript URL ingestion stopped", output: "The resolved canonical target workspace has no valid configured scope. No URLs were fetched.", metadata: { error: "scope_unconfigured", target_url: workspace.targetURL } }
     }
 
     const root = path.join(workspace.workspacePath, "javascript")
