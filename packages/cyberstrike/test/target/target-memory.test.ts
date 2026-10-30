@@ -269,8 +269,11 @@ test("persists an explicit target scope with authorization provenance and exclus
       expect(excluded.reason).toContain("exclusion")
       const wrongPort = await TargetMemory.checkURLScope("https://api.example.com:8443/v1/users")
       expect(wrongPort.allowed).toBe(false)
+      // A host wildcard is protocol-independent; the program workspace scheme does not narrow it.
       const wrongScheme = await TargetMemory.checkURLScope("http://api.example.com/v1/users")
-      expect(wrongScheme.allowed).toBe(false)
+      expect(wrongScheme.allowed).toBe(true)
+      const wildcardLookalike = await TargetMemory.checkURLScope("http://api.example.com.attacker.test/v1/users")
+      expect(wildcardLookalike.allowed).toBe(false)
       const disk = await fs.readFile(path.join(configured.workspace.workspacePath, "scope", "scope.json"), "utf-8")
       expect(disk).not.toContain("must-not-persist")
       await expect(TargetMemory.configureScope("https://example.com", {
