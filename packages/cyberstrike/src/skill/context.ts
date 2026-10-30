@@ -6,23 +6,44 @@ import { Instance } from "../project/instance"
 export namespace SkillContext {
   const log = Log.create({ service: "skill-context" })
 
-  const loaded = new Map<string, { name: string; directory: string; catalog: ReturnType<typeof Skill.state>; content: string; tokens: number }>()
+  export type ContextScope = {
+    sessionID: string
+    agent: string
+  }
 
-  function key(name: string) {
-    return `${Instance.directory}\\0${name}`
+  type LoadedSkill = {
+    name: string
+    directory: string
+    sessionID?: string
+    agent?: string
+    catalog: ReturnType<typeof Skill.state>
+    content: string
+    tokens: number
+  }
+
+  const loaded = new Map<string, LoadedSkill>()
+
+  function key(name: string, scope?: ContextScope) {
+    return Instance.directory + "\0" + (scope?.sessionID ?? "") + "\0" + (scope?.agent ?? "") + "\0" + name
+  }
+
+  function matches(entry: LoadedSkill, scope?: ContextScope) {
+    if (entry.directory !== Instance.directory) return false
+    if (!scope) return true
+    return entry.sessionID === scope.sessionID && entry.agent === scope.agent
   }
 
   function estimateTokens(text: string): number {
     return Math.ceil(text.length / 4)
   }
 
-  function findLoaded(name: string) {
+  function findLoaded(name: string, scope?: ContextScope) {
     const catalog = Skill.state()
     const canonical = SkillIndex.resolveReference(name)
     const normalized = (canonical ?? name).trim().toLocaleLowerCase("en-US")
     for (const [id, entry] of loaded) {
       if (
-        entry.directory === Instance.directory &&
+        matches(entry, scope) &&
         entry.catalog === catalog &&
         entry.name.trim().toLocaleLowerCase("en-US") === normalized
       ) {
@@ -32,7 +53,7 @@ export namespace SkillContext {
     return undefined
   }
 
-  export async function load(name: string): Promise<string | undefined> {
+  export async function load(name: string, scope?: ContextScope): Promise<string | undefined> {
     // Build the exact alias index before resolving technique IDs, directory slugs,
     // and case-insensitive names. Cache by the skill's canonical name so aliases
     // cannot occupy multiple context slots or double-count tokens.
@@ -42,7 +63,7 @@ export namespace SkillContext {
       if (Skill.state() !== catalog) continue
 
       const canonical = SkillIndex.resolveReference(name) ?? name.trim()
-      const id = key(canonical)
+      const id = key(canonical, scope)
       const cached = loaded.get(id)
       if (cached?.catalog === catalog) return cached.content
       if (cached) loaded.delete(id)
@@ -54,7 +75,7 @@ export namespace SkillContext {
         return undefined
       }
 
-      const canonicalID = key(skill.name)
+      const canonicalID = key(skill.name, scope)
       const existing = loaded.get(canonicalID)
       if (existing?.catalog === catalog) return existing.content
       if (existing) loaded.delete(canonicalID)
@@ -63,6 +84,8 @@ export namespace SkillContext {
       loaded.set(canonicalID, {
         name: skill.name,
         directory: Instance.directory,
+        sessionID: scope?.sessionID,
+        agent: scope?.agent,
         catalog,
         content: skill.content,
         tokens,
@@ -74,41 +97,41 @@ export namespace SkillContext {
     throw new Error(`Skill catalog changed repeatedly while loading "${name}". Retry the skill operation.`)
   }
 
-  export function unload(name: string): boolean {
-    const existing = findLoaded(name)
+  export function unload(name: string, scope?: ContextScope): boolean {
+    const existing = findLoaded(name, scope)
     if (!existing) return false
     log.info("skill unloaded from context", { name: existing.entry.name, tokens: existing.entry.tokens })
     loaded.delete(existing.id)
     return true
   }
 
-  export function active(): string[] {
+  export function active(scope?: ContextScope): string[] {
     const catalog = Skill.state()
     return Array.from(
       new Set(
         Array.from(loaded.values())
-          .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
+          .filter((entry) => matches(entry, scope) && entry.catalog === catalog)
           .map((entry) => entry.name),
       ),
     )
   }
 
-  export function tokenCount(): number {
+  export function tokenCount(scope?: ContextScope): number {
     let total = 0
     const catalog = Skill.state()
     for (const entry of loaded.values()) {
-      if (entry.directory === Instance.directory && entry.catalog === catalog) total += entry.tokens
+      if (matches(entry, scope) && entry.catalog === catalog) total += entry.tokens
     }
     return total
   }
 
-  export function isLoaded(name: string): boolean {
-    return Boolean(findLoaded(name))
+  export function isLoaded(name: string, scope?: ContextScope): boolean {
+    return Boolean(findLoaded(name, scope))
   }
 
-  export function clear() {
-    for (const [id, entry] of loaded) if (entry.directory === Instance.directory) loaded.delete(id)
-    log.info("context cleared", { directory: Instance.directory })
+  export function clear(scope?: ContextScope) {
+    for (const [id, entry] of loaded) if (matches(entry, scope)) loaded.delete(id)
+    log.info("context cleared", { directory: Instance.directory, sessionID: scope?.sessionID, agent: scope?.agent })
   }
 
   export type Suggestion = {
@@ -120,6 +143,7 @@ export namespace SkillContext {
   export function suggest(
     findings: Array<{ skill_id: string; severity?: string; cwe_id?: string; tech_stack?: string[] }>,
     allowedSkills?: ReadonlySet<string>,
+    scope?: ContextScope,
   ): Suggestion[] {
     const result: Suggestion[] = []
     const allowed = allowedSkills
@@ -140,7 +164,7 @@ export namespace SkillContext {
     const catalog = Skill.state()
     const active = new Set(
       Array.from(loaded.values())
-        .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
+        .filter((entry) => matches(entry, scope) && entry.catalog === catalog)
         .map((entry) => entry.name),
     )
     // Findings already present in the input are completed context, not new
