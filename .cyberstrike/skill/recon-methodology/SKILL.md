@@ -1,6 +1,7 @@
 ---
 name: recon-methodology
 description: "Plan and execute evidence-led, scope-locked reconnaissance that produces a deduplicated, prioritized testing queue"
+category: information-gathering
 version: "1.2.0"
 author: "CyberStrike contributors; consolidated with upstream attribution"
 tags: [recon, enumeration, osint, subdomain, asset-inventory, scope, infrastructure-lifecycle, api-contracts, dependency-risk]
