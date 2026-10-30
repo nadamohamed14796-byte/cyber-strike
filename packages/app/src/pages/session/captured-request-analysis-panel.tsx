@@ -127,12 +127,12 @@ export function CapturedRequestAnalysisPanel() {
     const requestID = selected()?.requestID
     if (!requestID) return []
     let activeRequestID: string | undefined
-    const result: typeof childUserMessages extends () => infer T ? T : never = []
+    const result: ReturnType<typeof childUserMessages> = []
     for (const message of childUserMessages()) {
       const text = (sync.data.part[message.id] ?? [])
         .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
         .map((part) => part.text)
-        .join("\\n")
+        .join("\n")
       const explicitRequestID = requestIDFromBrokerTurn(text)
       if (explicitRequestID) activeRequestID = explicitRequestID
       if (activeRequestID === requestID) result.push(message)
