@@ -46,6 +46,29 @@ describe("tool.skill", () => {
     }
   })
 
+  test("skill access fails closed when the caller agent identity cannot be resolved", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          await expect(
+            tool.execute(
+              { action: "list" },
+              { ...baseCtx, agent: "not-a-registered-agent", ask: async () => {} },
+            ),
+          ).rejects.toThrow(/refusing to bypass skill permissions/)
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("list and search paginate large skill catalogs", async () => {
     await using tmp = await tmpdir({
       git: true,
