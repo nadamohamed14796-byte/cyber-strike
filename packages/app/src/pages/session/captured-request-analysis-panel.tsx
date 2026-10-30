@@ -1,10 +1,6 @@
-import { createEffect, createMemo, For, Show } from "solid-js"
+import { createEffect, createMemo, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
-
-type CapturedRequestRow = {
-  id: string
-}
 
 const PROXY_BROKER_TITLES = new Set([
   "Agent Proxy",
@@ -35,15 +31,8 @@ export function CapturedRequestAnalysisPanel() {
     ),
   )
 
-  const requests = createMemo(() =>
-    (((sync.data.request[parentID()] ?? []) as unknown as CapturedRequestRow[]).slice()).sort(
-      (a, b) => a.id.localeCompare(b.id),
-    ),
-  )
-
-  // This is a cumulative received-request counter, not a live queue view.
-  // Keep every captured request visible as a stable number after it finishes.
-  const queueRequests = requests
+  // Cumulative number of all requests received by this parent session.
+  const requestCount = createMemo(() => sync.data.request[parentID()]?.length ?? 0)
 
   function enterAgentProxy() {
     const childID = brokerSession()?.id
@@ -60,15 +49,12 @@ export function CapturedRequestAnalysisPanel() {
         <div class="flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-center gap-2">
             <h2 class="shrink-0 text-13-semibold text-text-strong">Extension Agent</h2>
-            <div aria-label="Queue positions" class="flex min-w-0 flex-wrap items-center gap-1">
-              <For each={queueRequests()}>
-                {(_, index) => (
-                  <span class="inline-flex size-6 items-center justify-center rounded bg-surface-base text-10-semibold tabular-nums text-text-weak">
-                    {index() + 1}
-                  </span>
-                )}
-              </For>
-            </div>
+            <span
+              aria-label={`${requestCount()} captured requests`}
+              class="inline-flex min-w-6 items-center justify-center rounded bg-surface-base px-2 py-1 text-11-semibold tabular-nums text-text-weak"
+            >
+              {requestCount()}
+            </span>
           </div>
 
           <button
