@@ -669,6 +669,25 @@ test("renamed agents retain stable invocation and permission identities", async 
   })
 })
 
+test("duplicate agent display names never shadow stable registry keys", async () => {
+  await using tmp = await tmpdir({
+    config: {
+      agent: {
+        worker_a: { name: "Shared Worker", mode: "subagent" },
+        worker_b: { name: "Shared Worker", mode: "subagent" },
+      },
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      expect(await Agent.get("worker_a")).toBeDefined()
+      expect(await Agent.get("worker_b")).toBeDefined()
+      expect(await Agent.get("Shared Worker")).toBeUndefined()
+    },
+  })
+})
+
 test("agent name can be overridden", async () => {
   await using tmp = await tmpdir({
     config: {
