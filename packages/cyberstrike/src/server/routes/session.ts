@@ -2696,12 +2696,24 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionPrompt.PromptInput.omit({ sessionID: true })),
       async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+        const targetSession = await Session.get(sessionID)
+        const isProxyBroker = targetSession.title === PROXY_BROKER_TITLE && !!targetSession.parentID
+        if (isProxyBroker && (IngestQueue.pendingCount(targetSession.parentID!) > 0 || IngestQueue.isPaused(targetSession.parentID!))) {
+          return c.json(
+            { error: "Extension requests are queued or processing. Retry this Proxy Agent follow-up when the broker queue is idle." },
+            409,
+          )
+        }
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
-          const sessionID = c.req.valid("param").sessionID
-          const body = c.req.valid("json")
-          const msg = await SessionPrompt.prompt({ ...body, sessionID }).catch((e) => {
+          const msg = await SessionPrompt.prompt({
+            ...body,
+            sessionID,
+            ...(isProxyBroker ? { agent: "proxy-agent" } : {}),
+          }).catch((e) => {
             if (e instanceof Error && e.message === "session prompt cancelled") return
             throw e
           })
@@ -2736,20 +2748,37 @@ export const SessionRoutes = lazy(() =>
         return stream(c, async () => {
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
-          SessionPrompt.prompt({ ...body, sessionID }).catch((error) => {
-            // prompt_async deliberately returns before the model finishes. Never
-            // discard a later failure: the client otherwise sees an accepted
-            // message with no assistant response and no diagnostic.
-            if (error instanceof Error && error.message === "session prompt cancelled") return
-            const message = error instanceof Error ? error.message : String(error)
-            log.error("async session prompt failed", { sessionID, error })
-            Bus.publish(Session.Event.Error, {
-              sessionID,
-              error: new NamedError.Unknown({
-                message: `Session prompt failed: ${message}`,
-              }).toObject(),
-            })
-          })
+          const targetSession = await Session.get(sessionID)
+          const isProxyBroker = targetSession.title === PROXY_BROKER_TITLE && !!targetSession.parentID
+          const runPrompt = async () => {
+            try {
+              await SessionPrompt.prompt({
+                ...body,
+                sessionID,
+                ...(isProxyBroker ? { agent: "proxy-agent" } : {}),
+              })
+            } catch (error) {
+              // prompt_async deliberately returns before the model finishes. Never
+              // discard a later failure: the client otherwise sees an accepted
+              // message with no assistant response and no diagnostic.
+              if (error instanceof Error && error.message === "session prompt cancelled") return
+              const message = error instanceof Error ? error.message : String(error)
+              log.error("async session prompt failed", { sessionID, error })
+              Bus.publish(Session.Event.Error, {
+                sessionID,
+                error: new NamedError.Unknown({
+                  message: `Session prompt failed: ${message}`,
+                }).toObject(),
+              })
+            }
+          }
+          if (isProxyBroker) {
+            // Manual broker follow-ups share the same FIFO as Extension captures.
+            // This closes the UI polling race and keeps every turn on proxy-agent.
+            IngestQueue.enqueue(targetSession.parentID!, runPrompt, targetSession.parentID!)
+            return
+          }
+          void runPrompt()
         })
       },
     )
