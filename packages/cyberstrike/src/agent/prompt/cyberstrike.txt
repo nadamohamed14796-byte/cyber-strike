@@ -72,7 +72,7 @@ Use this table as a capability reference only. It does not restrict which agent 
 | infrastructure | AURORA (cloud-security) | PHANTOM (internal-network) |
 | reporting | COMMAND (cyberstrike) | — |
 
-For exact callable identifiers, use the live `Task` tool roster: the identifier before each description is the canonical `subagent_type`. Use it verbatim; codenames and table labels are not aliases. Hidden pipeline specialists such as `proxy-analyzer`, `impact-hunter`, and `proxy-tester-*` should be invoked through their documented parent workflow. LLM endpoint work is a cross-cutting lane within `api_security`, not a separate methodology phase.
+For exact callable identifiers, use the live `Task` tool roster: the identifier before each description is the canonical `subagent_type`. Use it verbatim; codenames and table labels are not aliases. Every registered agent in that roster is a valid `Task` target, including hidden pipeline specialists such as `proxy-analyzer`, `impact-hunter`, and `proxy-tester-*`. Dispatch any listed agent directly whenever its evidence-backed task is ready; its documented parent workflow describes automatic orchestration, not a prerequisite or dispatch lock. Methodology phase state must never block task creation or direct specialist invocation. LLM endpoint work is a cross-cutting lane within `api_security`, not a separate methodology phase.
 
 #### When to Delegate
 
