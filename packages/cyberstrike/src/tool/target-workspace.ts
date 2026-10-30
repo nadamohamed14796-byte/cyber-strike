@@ -111,6 +111,19 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     if (params.action === "init") {
       const requestedURL = required(params.target_url, "target_url")
       let workspace = await TargetMemory.get(requestedURL)
+      // A wildcard is an authorization expression, not a concrete workspace
+      // identity. If no legacy workspace already exists for that identifier,
+      // refuse to create another root/ledger from it; configure the wildcard on
+      // the existing concrete canonical root instead.
+      let wildcardTarget = false
+      try { wildcardTarget = new URL(requestedURL).hostname.startsWith("*.") } catch {}
+      if (!workspace && wildcardTarget) {
+        return {
+          title: "Wildcard scope cannot create a target workspace",
+          output: "No workspace was created. A wildcard such as " + requestedURL + " belongs in the saved scope manifest, not in target_url. Reuse the existing concrete canonical root shown by target_workspace(action=\"list\") and configure the wildcard there. This prevents duplicate root workspaces and evidence ledgers.",
+          metadata: { initialized: false, found: false, saved: false, reason: "wildcard_workspace_identity_rejected", target_url: requestedURL } as TargetWorkspaceMetadata,
+        }
+      }
       if (!workspace && params.create_child_workspace !== true) {
         // When a requested host is already covered by the canonical program scope,
         // reuse that workspace. Do not create a full child tree just to initialize
