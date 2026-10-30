@@ -57,7 +57,18 @@ type TargetWorkspaceMetadata = {
   note_count?: number
   child_count?: number
   count?: number
-  targets?: Array<{ id: string; url: string; path: string; parent_id: string | null; asset_type: TargetAssetType }>
+  targets?: Array<{
+    id: string
+    url: string
+    path: string
+    parent_id: string | null
+    asset_type: TargetAssetType
+    legacy_duplicate?: boolean
+    canonical_target_id?: string
+    canonical_target_url?: string
+  }>
+  canonical_count?: number
+  legacy_overlap_count?: number
   note_id?: string
   note_created?: boolean
   note_updated?: boolean
