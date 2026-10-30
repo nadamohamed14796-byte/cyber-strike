@@ -577,7 +577,6 @@ export namespace Agent {
             // the model attempts calls that permission enforcement rejects.
             // `task` MUST be allowed explicitly or delegation breaks.
             "*": "deny",
-            task: "allow",
             // The orchestrator reads skill companion files and the canonical
             // workspace manifest/notes before routing captured requests.
             task: "allow",
