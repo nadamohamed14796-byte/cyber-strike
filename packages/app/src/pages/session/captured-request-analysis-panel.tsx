@@ -38,6 +38,24 @@ function parseRequest(raw?: string) {
   return { headers: head.split("\n").slice(1).filter(Boolean), body }
 }
 
+function requestIDFromBrokerTurn(text: string): string | undefined {
+  let inIdentitySection = false
+  for (const line of text.split(/\r?\n/)) {
+    if (/^## (?:Request Task Identity|Current request)\s*$/.test(line)) {
+      inIdentitySection = true
+      continue
+    }
+    if (/^## /.test(line)) {
+      if (inIdentitySection) break
+      continue
+    }
+    if (!inIdentitySection) continue
+    const match = line.match(/^\s*-\s*(?:Request ID|request_id):\s*([^\r\n]+)\s*$/i)
+    if (match?.[1]) return match[1].trim()
+  }
+  return undefined
+}
+
 export function CapturedRequestAnalysisPanel() {
   const params = useParams()
   const navigate = useNavigate()
@@ -102,6 +120,25 @@ export function CapturedRequestAnalysisPanel() {
     return id ? (sync.data.message[id] ?? []) : []
   })
   const childUserMessages = createMemo(() => childMessages().filter((message) => message.role === "user"))
+  // A persistent broker contains many captured request turns. Keep each panel
+  // focused on the selected request while allowing explicitly tagged follow-ups
+  // to switch back to an older request without mixing the other turns' activity.
+  const requestTurnMessages = createMemo(() => {
+    const requestID = selected()?.requestID
+    if (!requestID) return []
+    let activeRequestID: string | undefined
+    const result: typeof childUserMessages extends () => infer T ? T : never = []
+    for (const message of childUserMessages()) {
+      const text = (sync.data.part[message.id] ?? [])
+        .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
+        .map((part) => part.text)
+        .join("\\n")
+      const explicitRequestID = requestIDFromBrokerTurn(text)
+      if (explicitRequestID) activeRequestID = explicitRequestID
+      if (activeRequestID === requestID) result.push(message)
+    }
+    return result
+  })
   const replyModelMessage = createMemo(
     () =>
       childUserMessages().at(-1) ??
@@ -485,7 +522,7 @@ export function CapturedRequestAnalysisPanel() {
             <main class="min-h-0 overflow-y-auto p-3">
               <div class="mb-2 flex items-center justify-between gap-2">
                 <h3 class="text-11-semibold uppercase tracking-wide text-text-weaker">Live agent activity</h3>
-                <span class="text-10-regular text-text-weaker">{childUserMessages().length} turn(s)</span>
+                <span class="text-10-regular text-text-weaker">{requestTurnMessages().length} turn(s)</span>
               </div>
               <Show when={retryNotice()}>
                 <p role="status" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-text-base">{retryNotice()}</p>
@@ -507,13 +544,13 @@ export function CapturedRequestAnalysisPanel() {
                 }
               >
                 <div class="flex flex-col gap-3">
-                  <For each={childUserMessages()}>
+                  <For each={requestTurnMessages()}>
                     {(message) => (
                       <div class="min-w-0 rounded-lg border border-border-weak-base py-2">
                         <SessionTurn
                           sessionID={analysisSessionID()!}
                           messageID={message.id}
-                          lastUserMessageID={childUserMessages().at(-1)?.id}
+                          lastUserMessageID={requestTurnMessages().at(-1)?.id}
                           stepsExpanded={expanded()[message.id] ?? true}
                           onStepsExpandedToggle={() =>
                             setExpanded((previous) => ({
