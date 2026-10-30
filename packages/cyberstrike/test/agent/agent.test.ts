@@ -151,14 +151,14 @@ test("direct captured-request analyzer uses the single automatic Impact Hunter h
       expect(agent?.prompt).toContain("automatically starts or resumes")
       expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
       expect(agent?.prompt).not.toContain("start a separate impact-hunter")
-      // General task spawning stays denied; report_vulnerability owns the narrow handoff.
+      // Report_vulnerability owns automatic Hunter escalation; ordinary delegation remains available.
       expect(evalPerm(agent, "task")).toBe("allow")
       expect(evalPerm(agent, "report_vulnerability")).toBe("allow")
     },
   })
 })
 
-test("Impact Hunter is a terminal investigator with evidence tools but no default task spawning", async () => {
+test("Impact Hunter can delegate while retaining its finding-specific escalation contract", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -169,7 +169,7 @@ test("Impact Hunter is a terminal investigator with evidence tools but no defaul
       expect(agent?.hidden).toBe(true)
       expect(agent?.prompt).toContain("chain_link")
       expect(agent?.prompt).toContain("validate_chain")
-      expect(evalPerm(agent, "task")).toBe("deny")
+      expect(evalPerm(agent, "task")).toBe("allow")
       // Impact Hunter must be able to discover reference skills and read their
       // companion files; starting the subagent is not enough if either tool is denied.
       expect(evalPerm(agent, "skill")).toBe("allow")
