@@ -197,6 +197,21 @@ test("Impact Hunter is a terminal investigator with evidence tools but no defaul
   })
 })
 
+test("proxy-agent can run standalone and remain available as a delegated subagent", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const proxy = await Agent.get("proxy-agent")
+      expect(proxy).toBeDefined()
+      expect(proxy?.mode).toBe("all")
+      expect(evalPerm(proxy, "task")).toBe("allow")
+      expect(proxy?.prompt).toContain("Standalone primary mode")
+      expect(proxy?.prompt).toContain("Extension broker mode")
+    },
+  })
+})
+
 test("cyberstrike agent has correct default properties", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
