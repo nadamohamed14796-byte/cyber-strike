@@ -328,12 +328,12 @@ export function CapturedRequestAnalysisPanel() {
           }}
           class="absolute right-4 bottom-32 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
         >
-          {displayStatus() === "analyzing" ? "View live request analysis" : "View last request analysis"}
+          {displayStatus() === "analyzing" ? "Open Agent Proxy" : "Open Agent Proxy"}
         </button>
       </Show>
       <Show when={selected() && open()}>
         <section
-          aria-label="Captured request analysis"
+          aria-label="Agent Proxy"
           class="absolute z-[80] right-3 top-14 bottom-32 w-[min(880px,calc(100%_-_24px))] min-h-[280px] overflow-hidden rounded-xl border border-border-base bg-background-base shadow-2xl flex flex-col"
         >
           <header class="flex items-start justify-between gap-3 border-b border-border-weak-base bg-background-stronger px-4 py-3">
@@ -347,7 +347,7 @@ export function CapturedRequestAnalysisPanel() {
                     "bg-icon-warning-base": displayStatus() === "analyzing",
                   }}
                 />
-                <h2 class="text-14-semibold text-text-strong">Captured request analysis</h2>
+                <h2 class="text-14-semibold text-text-strong">Agent Proxy</h2>
                 <span class="rounded px-2 py-0.5 text-10-semibold bg-surface-base text-text-weak">{statusLabel()}</span>
               </div>
               <p class="mt-1 truncate text-12-medium text-text-base">{selected()?.method} {selected()?.url}</p>
@@ -393,7 +393,7 @@ export function CapturedRequestAnalysisPanel() {
                   navigate(`/${params.dir}/session/${id}`)
                 }}
               >
-                Open full session
+                Open Agent Proxy session
               </button>
               <button
                 type="button"
