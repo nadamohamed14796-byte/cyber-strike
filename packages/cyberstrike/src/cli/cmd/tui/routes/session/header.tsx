@@ -1,5 +1,5 @@
-import { type Accessor, createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js"
-import { useRoute, useRouteData } from "@tui/context/route"
+import { type Accessor, createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
+import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { pipe, sumBy } from "remeda"
 import { useTheme } from "@tui/context/theme"
@@ -49,28 +49,6 @@ export function Header() {
   const session = createMemo(() => sync.session.get(route.sessionID)!)
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const queueStatus = createMemo(() => sync.data.session_queue_status?.[route.sessionID])
-  const { navigate } = useRoute()
-  const proxyBroker = createMemo(() => {
-    const parentID = session()?.id
-    if (!parentID || session()?.parentID) return undefined
-    return sync.data.session.find(
-      (item) =>
-        item.parentID === parentID &&
-        (item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
-    )
-  })
-  const capturedRequests = createMemo(() =>
-    (sync.data.request[route.sessionID] ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
-  )
-  // Main shows queue positions only. Request details and progress stay in
-  // the persistent Agent Proxy child session.
-  const queueRequests = createMemo(() =>
-    capturedRequests().filter((item) => item.status === "processing" || item.status === "queued"),
-  )
-  const enterProxyBroker = () => {
-    const child = proxyBroker()
-    if (child) navigate({ type: "session", sessionID: child.id })
-  }
 
   const cost = createMemo(() => {
     const total = pipe(
@@ -186,45 +164,6 @@ export function Header() {
                   <ContextInfo context={context} cost={cost} usage={treeUsage} />
                 </box>
               </box>
-              <Show when={proxyBroker() && capturedRequests().length > 0}>
-                <box
-                  flexDirection="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  gap={2}
-                  padding={1}
-                  backgroundColor={theme.backgroundElement}
-                >
-                  <box flexDirection="row" alignItems="center" gap={1} flexGrow={1}>
-                    <text fg={theme.accent}>
-                      <b>Extension Agent</b>
-                    </text>
-                    <For each={queueRequests()}>
-                      {(_, index) => (
-                        <box
-                          paddingLeft={1}
-                          paddingRight={1}
-                          backgroundColor={theme.backgroundPanel}
-                        >
-                          <text fg={theme.text}>{index() + 1}</text>
-                        </box>
-                      )}
-                    </For>
-                  </box>
-                  <box
-                    onMouseOver={() => setHover("next")}
-                    onMouseOut={() => setHover(null)}
-                    onMouseUp={enterProxyBroker}
-                    backgroundColor={hover() === "next" ? theme.backgroundPanel : theme.backgroundElement}
-                    paddingLeft={1}
-                    paddingRight={1}
-                  >
-                    <text fg={theme.accent}>
-                      <b>Enter →</b>
-                    </text>
-                  </box>
-                </box>
-              </Show>
             </box>
           </Match>
         </Switch>
