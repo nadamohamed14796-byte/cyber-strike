@@ -55,7 +55,7 @@ export function CapturedRequestAnalysisPanel() {
   }
 
   return (
-    <Show when={brokerSession() && requests().length > 0}>
+    <Show when={brokerSession()}>
       <section
         aria-label="Extension Agent queue"
         class="absolute right-4 bottom-32 z-[80] w-[min(390px,calc(100%_-_32px))] rounded-xl border border-border-base bg-background-base p-3 shadow-xl"
