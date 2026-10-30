@@ -2787,7 +2787,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     for (const observed of observedURLs) {
       try {
         const url = new URL(observed)
-        let pathname = url.pathname.replace(/\\/+$/, "")
+        let pathname = url.pathname.replace(/\/+$/, "")
         while (pathname && pathname !== "/") {
           workspaceCandidates.add(url.origin + pathname)
           const slash = pathname.lastIndexOf("/")
