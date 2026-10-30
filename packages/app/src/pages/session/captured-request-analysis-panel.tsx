@@ -148,8 +148,8 @@ export function CapturedRequestAnalysisPanel() {
   // exists. Poll the server queue while the panel is open so manual replies
   // cannot overtake a capture that has already reached the socket endpoint.
   createEffect(() => {
-    const sessionID = parentID()
-    if (!sessionID || !open()) {
+    const brokerSessionID = analysisSessionID()
+    if (!brokerSessionID || !open()) {
       setBrokerQueuePending(false)
       return
     }
@@ -158,7 +158,7 @@ export function CapturedRequestAnalysisPanel() {
       try {
         const result = await sdk.client.session.queueStatus()
         if (!active) return
-        const status = (result.data as Record<string, { pending?: number }> | undefined)?.[sessionID]
+        const status = (result.data as Record<string, { pending?: number }> | undefined)?.[brokerSessionID]
         setBrokerQueuePending((status?.pending ?? 0) > 0)
       } catch {
         // Persisted request status remains a second source of truth if polling fails.
