@@ -265,7 +265,7 @@ test("cyberstrike prompt allows direct invocation of every registered specialist
     directory: tmp.path,
     fn: async () => {
       const cs = await Agent.get("cyberstrike")
-      expect(cs?.prompt).toContain("Use the live Task roster and the evidence-backed task to select the exact registered agent")
+      expect(cs?.prompt).toContain("For delegation, use the live Task roster and exact registered `subagent_type`")
       expect(cs?.prompt).toContain("methodology phase, parent-workflow position, or phase recommendations as a dispatch gate")
       expect(cs?.prompt).not.toContain("Phase-to-Agent Decision Table")
     },
