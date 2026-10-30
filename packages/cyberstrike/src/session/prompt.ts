@@ -58,7 +58,6 @@ import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, Re
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
-import { createToolExecutionQueue } from "@/tool/execution-queue"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -731,12 +730,6 @@ export namespace SessionPrompt {
         messages: msgs,
       })
 
-      // AI SDK providers may invoke tool calls from one assistant step concurrently.
-      // Serialize every invocation for this step so stateful tools, persistence, and
-      // dependent operations observe completed results in call order. The queue is
-      // local to this assistant message; child sessions have their own queue.
-      const executeToolInOrder = createToolExecutionQueue()
-
       // Inject StructuredOutput tool if JSON schema mode enabled
       if (lastUser.format?.type === "json_schema") {
         tools["StructuredOutput"] = createStructuredOutputTool({
@@ -745,18 +738,6 @@ export namespace SessionPrompt {
             structuredOutput = output
           },
         })
-      }
-
-      // Wrap copies rather than mutating shared MCP tool instances. This prevents
-      // execute wrappers from accumulating across turns and keeps all tools in one
-      // deterministic per-step queue.
-      for (const [key, item] of Object.entries(tools)) {
-        const execute = item.execute
-        if (!execute) continue
-        tools[key] = {
-          ...item,
-          execute: (args, options) => executeToolInOrder(() => execute(args, options)),
-        }
       }
 
       // Loop-termination enforcement (Layer 1): on the capped/last turn, remove every
