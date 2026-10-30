@@ -52,6 +52,15 @@ test("an explicit request ID never falls back to a different request", () => {
   expect(selectTaskRequestContext(requests, "req-missing")).toEqual({ reason: "request_not_found" })
 })
 
+test("implicit context chooses the oldest queued request when the broker is between turns", () => {
+  const requests = [
+    { id: "request-01", status: "queued", time: { updated: 10 } },
+    { id: "request-10", status: "queued", time: { updated: 100 } },
+    { id: "request-02", status: "queued", time: { updated: 20 } },
+  ]
+  expect(selectTaskRequestContext(requests).request?.id).toBe("request-01")
+})
+
 test("implicit request context is inferred only when unambiguous", () => {
   const requests = [
     { id: "req-finished", status: "processed", time: { updated: 30 } },
