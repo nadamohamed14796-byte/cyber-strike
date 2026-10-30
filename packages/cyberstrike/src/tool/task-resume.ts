@@ -45,6 +45,20 @@ export function requestIDFromRecentPromptTexts(texts: readonly string[]): string
   return undefined
 }
 
+
+/**
+ * Resolve request identity from the caller transcript when it is a request-aware
+ * orchestrator. The Proxy Agent needs this in both standalone (mode=all) and
+ * delegated (subagent) operation; ordinary primary agents must not scan their
+ * unrelated chat history for captured-request markers.
+ */
+export function shouldInferSessionRequestID(caller?: {
+  name?: string
+  mode?: "subagent" | "primary" | "all"
+}): boolean {
+  return caller?.mode === "subagent" || caller?.name === "proxy-agent"
+}
+
 /**
  * Select request context without silently attaching a task to unrelated traffic.
  * An explicit ID is authoritative; otherwise only one in-flight request is safe
