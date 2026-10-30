@@ -118,10 +118,9 @@ export function Prompt(props: PromptProps) {
     const messages = sync.data.message[props.sessionID]
     if (!messages) return undefined
 
-    // A captured-request notice is a synthetic user-role transcript entry in
-    // the parent session. It carries agent="proxy-agent" for display, not to
-    // switch the Main Recon prompt to a subagent when the session is reopened.
-    // Real Proxy Agent child sessions must still restore proxy-agent for replies.
+    // Legacy captured-request notices may still exist in old parent transcripts.
+    // They must not switch the Main Agent prompt to proxy-agent after reopening.
+    // Real Agent Proxy child sessions must still restore proxy-agent for replies.
     const isSubagentSession = !!sync.session.get(props.sessionID)?.parentID
     return messages.filter((message) => message.role === "user").filter((message) => {
       const candidates = local.agent.list()
