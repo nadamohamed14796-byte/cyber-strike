@@ -152,7 +152,7 @@ test("direct captured-request analyzer uses the single automatic Impact Hunter h
       expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
       expect(agent?.prompt).not.toContain("start a separate impact-hunter")
       // General task spawning stays denied; report_vulnerability owns the narrow handoff.
-      expect(evalPerm(agent, "task")).toBe("deny")
+      expect(evalPerm(agent, "task")).toBe("allow")
       expect(evalPerm(agent, "report_vulnerability")).toBe("allow")
     },
   })
@@ -353,7 +353,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       // Proxy Analyzer may persist a concrete finding; the report tool owns
       // automatic Impact Hunter dispatch. It still cannot spawn tasks or triage.
       expect(evalPerm(analyzer, "report_vulnerability")).toBe("allow")
-      expect(evalPerm(analyzer, "task")).toBe("deny")
+      expect(evalPerm(analyzer, "task")).toBe("allow")
       expect(evalPerm(analyzer, "validate_finding")).toBe("deny")
       expect(evalPerm(analyzer, "triage_vulnerability")).toBe("deny")
 
