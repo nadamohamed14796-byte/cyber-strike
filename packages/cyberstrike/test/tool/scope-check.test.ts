@@ -134,14 +134,18 @@ describe("canonical wildcard root workspace selection", () => {
     await Instance.provide({
       directory: tmp.path,
       async fn() {
-        const wildcardRoot = await TargetMemory.configureScope("https://*.example.com", {
-          include: ["*.example.com"],
-          authorizationSource: "Wildcard program scope",
-          authorizationReference: "https://program.example/policy",
-        })
+        // Reproduce an older concrete root that already existed before the
+        // program wildcard was imported. Creating it after the wildcard would
+        // correctly make it an explicit child workspace, whose own scope boundary
+        // must remain authoritative.
         await TargetMemory.configureScope("https://www.example.com", {
           include: ["example.com", "app.example.com"],
           authorizationSource: "Legacy concrete root scope",
+          authorizationReference: "https://program.example/policy",
+        })
+        const wildcardRoot = await TargetMemory.configureScope("https://*.example.com", {
+          include: ["*.example.com"],
+          authorizationSource: "Wildcard program scope",
           authorizationReference: "https://program.example/policy",
         })
 
