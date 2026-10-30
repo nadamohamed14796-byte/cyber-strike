@@ -175,6 +175,7 @@ export namespace Request {
           response_size: processed?.originalSize ?? null,
           processed_response: processed?.content ?? null,
           javascript_source: processed?.javascriptSource ?? null,
+          html_source: processed?.htmlSource ?? null,
           time_created: now,
           time_updated: now,
         })
@@ -486,6 +487,69 @@ export namespace Request {
         .get(),
     )
     return row ? rowToInfo(row) : undefined
+  }
+
+  /**
+   * Find a previously completed, byte-for-byte equivalent capture for the same
+   * credential and UI/access context. Different credentials are never folded
+   * together: they are essential cross-account and cross-tenant evidence.
+   *
+   * This is analysis-work reuse only. The current request row and observations
+   * remain independent and retain their own Request ID.
+   */
+  export function findEquivalentProcessed(request: Info): Info | undefined {
+    if (!request.id || !request.key_hash || !request.credential_id || !request.raw_request) return undefined
+
+    const current = Database.use((db) =>
+      db.select().from(RequestTable)
+        .where(and(eq(RequestTable.id, request.id), eq(RequestTable.session_id, request.session_id)))
+        .get(),
+    )
+    if (!current || current.response_status == null || current.response_size == null) return undefined
+
+    // A truncated text preview is not enough to establish exact response equality.
+    const contentType = (current.response_content_type ?? "").toLowerCase()
+    const hasCompleteSource =
+      current.html_source != null ||
+      current.javascript_source != null ||
+      current.response_size <= 100 * 1024
+    if (!hasCompleteSource) return undefined
+
+    const candidates = Database.use((db) =>
+      db.select().from(RequestTable).where(and(
+        eq(RequestTable.session_id, request.session_id),
+        eq(RequestTable.status, "processed"),
+        eq(RequestTable.key_hash, request.key_hash!),
+        eq(RequestTable.credential_id, request.credential_id!),
+        eq(RequestTable.method, request.method),
+        eq(RequestTable.normalized_path, request.normalized_path),
+        request.origin ? eq(RequestTable.origin, request.origin) : isNull(RequestTable.origin),
+        request.body_hash ? eq(RequestTable.body_hash, request.body_hash) : isNull(RequestTable.body_hash),
+        request.query_hash ? eq(RequestTable.query_hash, request.query_hash) : isNull(RequestTable.query_hash),
+        eq(RequestTable.raw_request, request.raw_request!),
+      )).orderBy(asc(RequestTable.id)).all(),
+    )
+
+    const sameJSON = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+    const prior = candidates.find((candidate) =>
+      candidate.id !== request.id &&
+      candidate.response_status === current.response_status &&
+      candidate.response_content_type === current.response_content_type &&
+      candidate.response_size === current.response_size &&
+      candidate.processed_response === current.processed_response &&
+      candidate.html_source === current.html_source &&
+      candidate.javascript_source === current.javascript_source &&
+      sameJSON(candidate.response_headers, current.response_headers) &&
+      sameJSON(candidate.element_roles, current.element_roles) &&
+      sameJSON(candidate.ui_context, current.ui_context) &&
+      candidate.trigger_element === current.trigger_element &&
+      candidate.page_url === current.page_url &&
+      sameJSON(candidate.page_visited_by, current.page_visited_by),
+    )
+    if (!prior) return undefined
+
+    log.debug?.("equivalent processed captured request found", { requestID: request.id, priorRequestID: prior.id })
+    return rowToInfo(prior)
   }
 
   /**
