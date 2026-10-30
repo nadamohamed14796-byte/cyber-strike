@@ -93,7 +93,7 @@ function confirmedScopeCandidate(input: string): URL | undefined {
     try {
       const url = new URL(/^https?:\/\//i.test(identifier) ? identifier : "https://" + identifier)
       const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(url.pathname)
-      const sourceMapFile = Boolean(typedJavaScript && /^source[ \t]+map$/i.test(typedJavaScript[1]) && /\.map$/i.test(url.pathname))
+      const sourceMapFile = (Boolean(typedJavaScript && /^source[ \t]+map$/i.test(typedJavaScript[1])) && /\.map$/i.test(url.pathname)) || /\.(?:js|mjs|cjs)\.map$/i.test(url.pathname)
       if (
         (url.protocol !== "http:" && url.protocol !== "https:") ||
         !url.hostname || url.hostname.includes("*") || url.username || url.password ||
