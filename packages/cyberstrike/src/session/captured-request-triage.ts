@@ -58,7 +58,7 @@ export function isConfirmedEmptyStaticHTML(input: EmptyStaticResponseInput): boo
   if (/<\s*(?:script|form|input|button|select|option|textarea|a|iframe|frame|object|embed|img|picture|video|audio|canvas|svg|link|style|base|template|noscript)\b/i.test(remaining)) {
     return false
   }
-  if (/\bon[a-z]+\s*=|\b(?:src|href|action|formaction|srcdoc)\s*=/i.test(remaining)) return false
+  if (/\bon[a-z]+\s*=|\b(?:src|href|action|formaction|srcdoc|background|poster|data|srcset|manifest|style)\s*=/i.test(remaining)) return false
   if (/\bhttp-equiv\s*=\s*["']?refresh\b/i.test(remaining)) return false
 
   remaining = remaining
