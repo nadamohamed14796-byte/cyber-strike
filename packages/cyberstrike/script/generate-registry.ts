@@ -30,9 +30,26 @@ function parseScalar(frontmatter: string, key: string): string | undefined {
 }
 
 function parseArray(frontmatter: string, key: string): string[] {
-  const match = frontmatter.match(new RegExp("^" + key + ":\\s*\\[(.*)\\]", "m"))
-  if (!match) return []
-  return match[1].split(",").map((item) => item.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
+  const lines = frontmatter.split("\n")
+  const index = lines.findIndex((line) => new RegExp("^" + key + ":\\s*").test(line))
+  if (index < 0) return []
+  const value = lines[index].slice(key.length + 1).trim()
+  if (value.startsWith("[") && value.endsWith("]")) {
+    return value.slice(1, -1).split(",").map((item) => item.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
+  }
+  if (value) return [value.replace(/^["']|["']$/g, "")]
+  const items: string[] = []
+  for (const line of lines.slice(index + 1)) {
+    if (!line.trim()) continue
+    const item = line.match(/^\\s+-\\s+(.+)$/)
+    if (item) {
+      items.push(item[1].trim().replace(/^["']|["']$/g, ""))
+      continue
+    }
+    if (/^\\s/.test(line)) continue
+    break
+  }
+  return items
 }
 
 function discoverSkillFiles(directory: string, found: Map<string, string[]>) {
