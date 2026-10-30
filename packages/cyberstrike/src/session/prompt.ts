@@ -49,6 +49,7 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
 import { MethodologyContext } from "@/methodology/context"
+import { shouldInjectMethodologyContext } from "./methodology-context-routing"
 import { TargetMemory } from "@/target"
 import { ResearchContext, promptResearchSignals } from "@/learning/research-context"
 import { AgentPerformance } from "@/methodology/performance"
@@ -799,7 +800,7 @@ export namespace SessionPrompt {
       // coverage gates, or phase-specific skill routing into its prompt. Captured
       // requests must be triaged immediately even when Main Recon has not started.
       // Other agents retain the normal lane-scoped methodology context.
-      if (lastUser.agent !== "proxy-agent") {
+      if (shouldInjectMethodologyContext(lastUser.agent)) {
         const methodologyCtx = await MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
         if (methodologyCtx) system.push(methodologyCtx)
       }
