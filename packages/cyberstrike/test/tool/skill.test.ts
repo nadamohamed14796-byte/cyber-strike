@@ -54,7 +54,7 @@ describe("tool.skill", () => {
           const skillDir = path.join(dir, ".cyberstrike", "skill", name)
           await Bun.write(
             path.join(skillDir, "SKILL.md"),
-            ["---", "name: " + name, "description: Pagination fixture skill.", "---", "", "# " + name, ""].join("\n"),
+            ["---", "name: " + name, "description: Pagination fixture skill.", "tags: [" + (name === "tool-skill-b" ? "routing-test" : "other-test") + "]", "---", "", "# " + name, ""].join("\n"),
           )
         }
       },
@@ -81,6 +81,11 @@ describe("tool.skill", () => {
           const secondSearchPage = await tool.execute({ action: "search", query: "tool-skill", limit: 2, offset: 2 }, ctx)
           expect(secondSearchPage.output).toContain("tool-skill-c")
           expect(secondSearchPage.output).toContain("showing 3-3 of 3")
+
+          const taggedSearch = await tool.execute({ action: "search", tag: "routing-test" }, ctx)
+          expect(taggedSearch.output).toContain("tool-skill-b")
+          expect(taggedSearch.output).not.toContain("tool-skill-a")
+          expect(taggedSearch.output).not.toContain("tool-skill-c")
         },
       })
     } finally {
