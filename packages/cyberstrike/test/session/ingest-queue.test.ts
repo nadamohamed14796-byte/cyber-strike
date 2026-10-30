@@ -820,6 +820,39 @@ describe("Request processing outcome persistence", () => {
   })
 })
 
+describe("Request.isConfirmedEmptyStatic", () => {
+  test("uses the persisted complete HTML body and rejects active documents", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-empty-html-test" })
+      const blankHTML = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Blank</title></head><body></body></html>"
+      const activeHTML = "<!doctype html><html><body><script>boot()</script></body></html>"
+      const create = (path: string, html: string) => {
+        const item = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: path,
+          origin: "https://example.test",
+          rawRequest: `GET ${path} HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\n`,
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+            body: html,
+          },
+        })
+        if (!item) throw new Error("HTML request fixture was not inserted")
+        return item
+      }
+
+      const blank = create("/b/blank.htm", blankHTML)
+      const active = create("/app", activeHTML)
+      expect(blank.processed_response).toContain("This is an HTML response")
+      expect(Request.isConfirmedEmptyStatic(blank.id)).toBe(true)
+      expect(Request.isConfirmedEmptyStatic(active.id)).toBe(false)
+      await Session.remove(session.id)
+    })
+  })
+})
+
 describe("Request.findEquivalentProcessed", () => {
   test("reuses only an exact completed capture for the same credential and access context", async () => {
     await withInstance(async () => {
