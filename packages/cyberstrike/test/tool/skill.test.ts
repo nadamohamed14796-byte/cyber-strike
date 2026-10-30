@@ -69,6 +69,67 @@ describe("tool.skill", () => {
     }
   })
 
+  test("loaded skill context is isolated between agent sessions", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "workspace-skill-alias")
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          ["---", "name: workspace-skill", "description: Session isolation fixture.", "---", "", "# Shared skill", "SHARED_SKILL_CONTEXT_MARKER", ""].join("\n"),
+        )
+      },
+    })
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const parentCtx: Tool.Context = {
+            ...baseCtx,
+            sessionID: "parent-session",
+            agent: "parent-agent",
+            ask: async () => {},
+          }
+          const childCtx: Tool.Context = {
+            ...baseCtx,
+            sessionID: "child-session",
+            agent: "child-agent",
+            ask: async () => {},
+          }
+          const parentScope = { sessionID: parentCtx.sessionID, agent: parentCtx.agent }
+          const childScope = { sessionID: childCtx.sessionID, agent: childCtx.agent }
+
+          const parentLoad = await tool.execute({ action: "load", name: "workspace-skill-alias" }, parentCtx)
+          expect(parentLoad.title).toBe("Loaded skill: workspace-skill")
+          expect(SkillContext.active(parentScope)).toEqual(["workspace-skill"])
+          expect(SkillContext.active(childScope)).toEqual([])
+          expect((await tool.execute({ action: "list", loaded: true }, childCtx)).title).toBe("No skills loaded")
+
+          const parentTokens = SkillContext.tokenCount(parentScope)
+          const childLoad = await tool.execute({ action: "load", name: "workspace-skill" }, childCtx)
+          expect(childLoad.title).toBe("Loaded skill: workspace-skill")
+          expect(SkillContext.active(parentScope)).toEqual(["workspace-skill"])
+          expect(SkillContext.active(childScope)).toEqual(["workspace-skill"])
+          expect(SkillContext.tokenCount(parentScope)).toBe(parentTokens)
+          expect(SkillContext.tokenCount(childScope)).toBeGreaterThan(0)
+
+          const unloaded = await tool.execute({ action: "unload", name: "workspace-skill-alias" }, parentCtx)
+          expect(unloaded.title).toBe("Unloaded: workspace-skill")
+          expect(SkillContext.active(parentScope)).toEqual([])
+          expect(SkillContext.active(childScope)).toEqual(["workspace-skill"])
+          expect((await tool.execute({ action: "list", loaded: true }, childCtx)).output).toContain("workspace-skill")
+          SkillContext.clear()
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
   test("list and search paginate large skill catalogs", async () => {
     await using tmp = await tmpdir({
       git: true,
