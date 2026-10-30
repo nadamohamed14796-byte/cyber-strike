@@ -548,7 +548,9 @@ export namespace Agent {
       "proxy-agent": {
         name: "proxy-agent",
         description: DESC_WEB_PROXY_AGENT.split("\n")[0].trim(),
-        mode: "subagent",
+        // The same orchestrator can be selected directly as a primary agent or
+        // delegated by any other agent through Task. "all" preserves both paths.
+        mode: "all",
         native: true,
         steps: STEP_CAPS.orchestrator,
         // NOTE: proxy-agent runs on the FULL run model (no useSmallModel). Routing
