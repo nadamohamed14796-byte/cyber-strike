@@ -189,7 +189,7 @@ export namespace LLM {
               .join(" ")
           : ""
     const actionableRequest =
-      /\\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|search|fetch|download|deploy|start|continue|resume|complete)\\b/i.test(
+      /\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|search|fetch|download|deploy|start|continue|resume|complete)\b/i.test(
         latestUserText,
       ) ||
       /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل)/u.test(
