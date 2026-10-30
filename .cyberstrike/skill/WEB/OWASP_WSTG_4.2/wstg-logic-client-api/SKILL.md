@@ -1,6 +1,7 @@
 ---
 name: wstg-logic-client-api
 description: WSTG business logic, client-side, and API security testing
+category: business-logic
 tags: [logic, client-side, api, graphql, cors, websocket, wstg]
 version: "1.0"
 ---
