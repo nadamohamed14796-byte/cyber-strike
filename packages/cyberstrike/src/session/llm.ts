@@ -195,11 +195,11 @@ export namespace LLM {
       /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل)/u.test(
         latestUserText,
       )
-    // For an explicit action request, require one initial tool call so the model
-    // cannot silently answer with instructions instead of performing the requested
-    // work. Subsequent turns return to auto so the model can report or ask safely.
-    const toolChoice =
-      input.toolChoice ?? (activeTools.length > 0 ? (actionableRequest ? "required" : "auto") : undefined)
+    // Keep the stream's default in auto mode so the model can finish with text.
+    // For an explicit action request, require a tool only on the first model step;
+    // later steps return to auto and can produce the final response.
+    const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
+    const requireInitialToolCall = !input.toolChoice && activeTools.length > 0 && actionableRequest
     if (activeTools.length > 0) {
       const toolExecutionContract = [
         "## Tool Execution Contract",
@@ -217,10 +217,13 @@ export namespace LLM {
       activeToolNames: activeTools.slice(0, 30),
       omittedToolNames: Math.max(0, activeTools.length - 30),
       toolChoice: toolChoice ?? "provider-default",
-      toolChoiceReason: input.toolChoice ? "caller-override" : actionableRequest ? "actionable-request" : "auto-default",
+      toolChoiceReason: input.toolChoice ? "caller-override" : requireInitialToolCall ? "required-first-step" : "auto-default",
     })
 
     return streamText({
+      prepareStep: requireInitialToolCall
+        ? ({ stepNumber }) => ({ toolChoice: stepNumber === 0 ? "required" : "auto" })
+        : undefined,
       onError(error) {
         l.error("stream error", {
           error,
