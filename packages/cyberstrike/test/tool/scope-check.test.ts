@@ -143,7 +143,7 @@ describe("canonical wildcard root workspace selection", () => {
           authorizationSource: "Legacy concrete root scope",
           authorizationReference: "https://program.example/policy",
         })
-        const wildcardRoot = await TargetMemory.configureScope("https://*.example.com", {
+        const wildcardRoot = await TargetMemory.configureScope("https://example.com", {
           include: ["*.example.com"],
           authorizationSource: "Wildcard program scope",
           authorizationReference: "https://program.example/policy",
