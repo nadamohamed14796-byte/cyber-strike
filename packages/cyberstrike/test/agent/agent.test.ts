@@ -248,6 +248,19 @@ test("cyberstrike agent has correct default properties", async () => {
   })
 })
 
+test("cyberstrike prompt allows direct invocation of every registered specialist", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const cs = await Agent.get("cyberstrike")
+      expect(cs?.prompt).toContain("Every registered agent in that roster is a valid `Task` target")
+      expect(cs?.prompt).toContain("not a prerequisite or dispatch lock")
+      expect(cs?.prompt).not.toContain("should be invoked through their documented parent workflow")
+    },
+  })
+})
+
 test("proxy vulnerability agents can retrieve shared global research and validation tools", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
