@@ -69,6 +69,7 @@ Background execution:
 - Preserve the task_id and resume that exact task later when its results are needed. Never start a duplicate just because the background task has not finished.
 
 
-Finding handoff contract:
-- Every subagent except `impact-hunter` receives a mandatory shared handoff instruction. For any concrete vulnerability candidate, dispatch `impact-hunter` using `background: true` with finding/request IDs and full evidence context, then continue your own work.
-- The returned task_id means started, not completed. Preserve it with the finding for resumption and avoid duplicate active investigations.
+Finding escalation contract:
+- Do not use this task tool to launch Impact Hunter. A successful `report_vulnerability` call persists the finding and automatically starts or resumes its one finding-specific Impact Hunter task.
+- Use this task tool for the foreground specialist work assigned to you. Keep request-specific `request_id` values exact and do not dispatch a second Hunter for the same finding.
+- The report tool returns the Hunter `task_id` and dispatch status. Started means running, not completed; carry the task ID with the finding and do not treat it as a verdict.
