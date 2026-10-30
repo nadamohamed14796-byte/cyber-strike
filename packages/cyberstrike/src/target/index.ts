@@ -193,7 +193,7 @@ function currentOwnerKey(): string {
   return targetWorkspaceOwnerKey(Instance.project.id, projectRoot())
 }
 
-const JAVASCRIPT_SCOPE_TYPE = /^(javascript|js|source[ \t]+map)[ \t]*:[ \t]*(.+)$/i
+const JAVASCRIPT_SCOPE_TYPE = /^(javascript(?:[ \t]+(?:file|url))?|js(?:[ \t]+(?:file|url))?|script[ \t]+file|source[ \t]+map)[ \t]*:[ \t]*(.+)$/i
 
 /** Normalize one explicitly listed script or source map to an exact, query-insensitive file grant. */
 function normalizeJavaScriptFileScope(input: string, allowSourceMap = false): string | undefined {
