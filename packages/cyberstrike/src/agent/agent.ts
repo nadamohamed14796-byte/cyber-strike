@@ -568,9 +568,14 @@ export namespace Agent {
             // the model attempts calls that permission enforcement rejects.
             // `task` MUST be allowed explicitly or delegation breaks.
             "*": "deny",
+            // The orchestrator reads skill companion files and the canonical
+            // workspace manifest/notes before routing captured requests.
             task: "allow",
             question: "allow",
             skill: "allow",
+            read: "allow",
+            target_workspace: "allow",
+            target_notes_read: "allow",
             web_get_session_context: "allow",
             web_get_detail: "allow",
             web_get_request_detail: "allow",
@@ -605,6 +610,9 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            // Skill payloads can point to local playbook entries; expose the
+            // guarded read tool and read-only target-note lookup to the analyzer.
+            read: "allow",
             bash: "allow",
             webfetch: "allow",
             http_replay: "allow",
@@ -614,6 +622,7 @@ export namespace Agent {
             // Read-only shared knowledge may help interpret a concrete API/auth signal.
             research_knowledge: "allow",
             skill: "allow",
+            target_notes_read: "allow",
             target_note: "allow",
             correlate_javascript: "allow",
             web_write_role: "allow",
@@ -669,6 +678,7 @@ export namespace Agent {
             report_vulnerability: "allow",
             triage_vulnerability: "allow",
             research_knowledge: "allow",
+            target_notes_read: "allow",
             target_note: "allow",
             add_intel: "allow",
             get_coverage_notes: "allow",
@@ -733,6 +743,9 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            // Skill companion files are read through ReadTool, which still enforces
+            // project/external-directory boundaries and per-file permission checks.
+            read: "allow",
             bash: {
               // Base: bash is allowed. The permission evaluator is ORDER-BASED
               // (last matching rule wins, no specificity), so `*: allow` MUST come
@@ -792,6 +805,7 @@ export namespace Agent {
             // Public research is global, read-only context; expose it to every specialist.
             research_knowledge: "allow",
             false_positive_memory: "allow",
+            target_notes_read: "allow",
             target_note: "allow",
             validate_finding: "allow",
             correlate_javascript: "allow",
