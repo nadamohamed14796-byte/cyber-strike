@@ -2702,10 +2702,18 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     }
 
     const sessionIDs = [...relatedSessionIDs]
+    // This context is a prompt-time preview, not the canonical request/intel
+    // inventory. Reading every historical row on every prompt caused memory use to
+    // grow with the lifetime of the engagement (especially in the persistent Proxy
+    // Broker). Keep a bounded, newest-first sample here; the complete records remain
+    // in SQLite and are still available through the request/intel tools.
+    const MAX_CONTEXT_REQUEST_ROWS = 1_500
+    const MAX_CONTEXT_INTEL_ROWS = 1_500
     const requests = Database.use((db) => {
       const rows: Array<{ host: string | null; origin: string | null; normalizedPath: string; pageURL: string | null }> = []
-      for (let offset = 0; offset < sessionIDs.length; offset += 500) {
+      for (let offset = 0; offset < sessionIDs.length && rows.length < MAX_CONTEXT_REQUEST_ROWS; offset += 500) {
         const ids = sessionIDs.slice(offset, offset + 500)
+        const remaining = MAX_CONTEXT_REQUEST_ROWS - rows.length
         rows.push(
           ...db
             .select({
@@ -2716,6 +2724,8 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             })
             .from(RequestTable)
             .where(inArray(RequestTable.session_id, ids))
+            .orderBy(desc(RequestTable.time_created))
+            .limit(remaining)
             .all(),
         )
       }
@@ -2723,13 +2733,16 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     })
     const intelAssets = Database.use((db) => {
       const rows: string[] = []
-      for (let offset = 0; offset < sessionIDs.length; offset += 500) {
+      for (let offset = 0; offset < sessionIDs.length && rows.length < MAX_CONTEXT_INTEL_ROWS; offset += 500) {
         const ids = sessionIDs.slice(offset, offset + 500)
+        const remaining = MAX_CONTEXT_INTEL_ROWS - rows.length
         rows.push(
           ...db
             .select({ asset: IntelEntryTable.asset })
             .from(IntelEntryTable)
             .where(inArray(IntelEntryTable.session_id, ids))
+            .orderBy(desc(IntelEntryTable.time_created))
+            .limit(remaining)
             .all()
             .map((row) => row.asset),
         )
