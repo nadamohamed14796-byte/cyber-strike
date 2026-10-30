@@ -56,8 +56,8 @@ describe("Observation.operationTreeForRequest", () => {
             name: "formAction",
             loc: "body",
             byCredential: [
-              { credentialID: "credential-owner", values: ["fa_loadUserContacts"], redacted: false },
               { credentialID: "credential-low", values: ["fa_loadOrgGroupList"], redacted: false },
+              { credentialID: "credential-owner", values: ["fa_loadUserContacts"], redacted: false },
             ],
           },
         ])
