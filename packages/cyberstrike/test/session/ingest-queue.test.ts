@@ -375,7 +375,7 @@ describe("IngestQueue parent-child controls", () => {
       const reservation = IngestQueue.reserve(proxy, parent)
       IngestQueue.enqueueReserved(reservation, async () => {
         await TargetMemory.addNote(targetURL, {
-          kind: "observation",
+          kind: "evidence",
           title: "Extension capture evidence",
           content: "The child Proxy session recorded this request observation.",
           source: "extension-proxy-test",
