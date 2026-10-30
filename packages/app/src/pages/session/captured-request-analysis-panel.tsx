@@ -515,7 +515,7 @@ export function CapturedRequestAnalysisPanel() {
                 <p role="alert" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-icon-danger-base">Could not retry analysis: {retryError()}</p>
               </Show>
               <Show
-                when={childUserMessages().length > 0}
+                when={requestTurnMessages().length > 0}
                 fallback={
                   <div class="rounded-lg border border-border-weak-base p-4 text-12-regular text-text-weak">
                     <Show
