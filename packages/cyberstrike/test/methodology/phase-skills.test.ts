@@ -92,6 +92,7 @@ describe("Phase-critical skill pinning", () => {
       name,
       description: "Security methodology",
       tags: [],
+      signals: [],
       tech_stack: [],
       cwe_ids: [],
       chains_with: [],
