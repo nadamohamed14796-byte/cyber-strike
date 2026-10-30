@@ -512,8 +512,8 @@ export namespace Request {
   }
 
   /**
-   * Classify a request as a confirmed empty/static HTML response using the
-   * complete original body stored outside the model-facing response preview.
+   * Return the preflight classification computed from the complete original HTML
+   * body at intake. Only the compact boolean result is persisted.
    */
   export function isConfirmedEmptyStatic(id: string): boolean {
     const row = Database.use((db) =>
