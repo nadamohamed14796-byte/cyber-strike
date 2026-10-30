@@ -1077,13 +1077,18 @@ describe("captured request HTTP route scope gate", () => {
         expect(broker, "the ingest route must create the Agent Proxy child session").toBeDefined()
         expect(broker?.parentID).toBe(parent.id)
 
-        const second = await capture("/settings")
-        expect(second.status, await second.clone().text()).toBe(202)
-        const afterSecond = await Session.children(parent.id)
-        const brokers = afterSecond.filter((child) => child.title === "Agent Proxy")
+        // Concurrent captures must share the same child, not race into duplicate
+        // Agent Proxy sessions under one selected parent.
+        const concurrent = await Promise.all([capture("/settings"), capture("/billing")])
+        for (const response of concurrent) {
+          expect(response.status, await response.clone().text()).toBe(202)
+        }
+        const afterConcurrent = await Session.children(parent.id)
+        const brokers = afterConcurrent.filter((child) => child.title === "Agent Proxy")
         expect(brokers).toHaveLength(1)
         expect(brokers[0]?.id).toBe(broker?.id)
         expect(brokers[0]?.parentID).toBe(parent.id)
+        expect(Request.get(parent.id)).toHaveLength(3)
       } finally {
         const children = await Session.children(parent.id).catch(() => [])
         for (const child of children) await Session.remove(child.id).catch(() => {})
