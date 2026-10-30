@@ -64,11 +64,18 @@ type TaskToolMetadata = {
 }
 
 export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task", async (ctx) => {
-  const agents = await Agent.entries().then((x) => x.filter((entry) => entry.info.mode !== "primary"))
+  const registry = await Agent.entries()
+  const agents = registry.filter((entry) => entry.info.mode !== "primary")
 
   // Permission patterns and task arguments use stable registry keys, never
   // configurable display names. Keep the same key from discovery through Agent.get().
   const caller = ctx?.agent
+  const callerID =
+    registry.find((entry) => entry.info === caller)?.id ??
+    (() => {
+      const matches = registry.filter((entry) => entry.info.name === caller?.name)
+      return matches.length === 1 ? matches[0].id : undefined
+    })()
   const accessibleAgents = caller
     ? agents.filter((entry) => entry.id === "impact-hunter" || PermissionNext.evaluate("task", entry.id, caller.permission).action !== "deny")
     : agents
@@ -92,7 +99,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const impactHandoff = isInternalImpactHandoff({
         subagentType: params.subagent_type,
         background: params.background,
-        caller: caller?.name,
+        caller: callerID,
         callerMode: caller?.mode,
       })
 
@@ -132,7 +139,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Ordinary primary-agent tasks have no session-bound captured request;
       // avoid scanning the main transcript unless a subagent is delegating.
-      const sessionRequestID = shouldInferSessionRequestID(caller)
+      const sessionRequestID = shouldInferSessionRequestID({ name: callerID, mode: caller?.mode })
         ? requestIDFromRecentPromptTexts(
             ctx.messages
               .filter((message) => message.info.role === "user")
