@@ -26,6 +26,7 @@ describe("isConfirmedEmptyStaticHTML", () => {
 
   test("rejects truncated or mismatched HTML source", () => {
     expect(isConfirmedEmptyStaticHTML(input({ responseSize: 9999 }))).toBe(false)
+    expect(isConfirmedEmptyStaticHTML(input({ contentLength: "9999" }))).toBe(false)
   })
 
   test("keeps documents with scripts, forms, controls, links, or event handlers in analysis", () => {
