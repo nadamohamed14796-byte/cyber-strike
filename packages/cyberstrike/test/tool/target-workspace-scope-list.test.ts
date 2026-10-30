@@ -244,7 +244,7 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
             authorizationSource: "Legacy exact-host root fixture",
             authorizationReference: "https://program.example.test/policy",
           })
-          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+          const wildcard = await TargetMemory.configureScope("https://example.test", {
             include: ["*.example.test"],
             authorizationSource: "Program wildcard scope fixture",
             authorizationReference: "https://program.example.test/policy",
@@ -315,7 +315,7 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
             authorizationSource: "Legacy exact-host root fixture",
             authorizationReference: "https://program.example.test/policy",
           })
-          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+          const wildcard = await TargetMemory.configureScope("https://example.test", {
             include: ["*.example.test"],
             authorizationSource: "Program wildcard scope fixture",
             authorizationReference: "https://program.example.test/policy",
