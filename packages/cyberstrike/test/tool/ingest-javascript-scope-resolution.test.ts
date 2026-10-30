@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { TargetMemory } from "../../src/target"
+import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { IngestJavaScriptURLsTool } from "../../src/tool/ingest-javascript-urls"
 import { tmpdir } from "../fixture/fixture"
 
@@ -64,6 +65,15 @@ test("JavaScript ingestion correlates an authorized subdomain in its canonical w
         expect(metadata.correlation_saved).toBe(true)
         expect(metadata.analysis_error).toBeUndefined()
         expect(Number(metadata.analyzed_source_records)).toBeGreaterThan(0)
+
+        // The standalone correlation tool must accept the same authorized
+        // subdomain selector and resolve it to the canonical root as well.
+        const directCorrelation = await JavaScriptCorrelation.build({
+          sessionID: session.id,
+          targetURL: assetURL,
+          localOnly: true,
+        })
+        expect(directCorrelation.workspacePath).toBe(configured.workspace.workspacePath)
 
         const manifestPath = String(metadata.manifest_path)
         expect(manifestPath).toContain(configured.workspace.workspacePath)
