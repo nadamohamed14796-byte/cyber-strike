@@ -432,14 +432,12 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
   const buildPrompt = input.buildPrompt
   const agentName = "proxy-agent"
   const source = `${normalized.method} ${normalized.normalizedPath}`
-  const truncatedRawRequest = req.raw_request ?? `${req.method} ${req.normalized_path} HTTP/1.1`
   let childSessionID: string | undefined
-  let failureReason: string | undefined
   // A request is processed only after agent work and evidence persistence complete.
   // Failed work remains visible in the request inventory and is not auto-replayed.
   let finalStatus: "processed" | "failed" = "failed"
   try {
-    // Mark the dequeued request active immediately so queue waiters never open panels.
+    // Mark this request active when its FIFO slot begins processing.
     Request.updateStatus({ id: req.id, status: "processing" })
     // Resolve the configured Proxy Agent model before starting the broker turn.
     // Startup failures remain visible through the persisted request status.
