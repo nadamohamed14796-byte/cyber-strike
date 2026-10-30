@@ -667,6 +667,50 @@ test("global permission config applies to all agents", async () => {
   })
 })
 
+test("autonomous proxy pipeline agents have no default step caps", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const [orchestrator, analyzer, idor, authz] = await Promise.all([
+        Agent.get("proxy-agent"),
+        Agent.get("proxy-analyzer"),
+        Agent.get("proxy-tester-idor"),
+        Agent.get("proxy-tester-authz"),
+      ])
+      expect(orchestrator?.steps).toBeUndefined()
+      expect(analyzer?.steps).toBeUndefined()
+      expect(idor?.steps).toBeUndefined()
+      expect(authz?.steps).toBeUndefined()
+    },
+  })
+})
+
+test("explicit proxy pipeline step caps remain configurable", async () => {
+  await using tmp = await tmpdir({
+    config: {
+      agent: {
+        "proxy-agent": { steps: 7 },
+        "proxy-analyzer": { steps: 9 },
+        "proxy-tester-idor": { steps: 11 },
+      },
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const [orchestrator, analyzer, idor] = await Promise.all([
+        Agent.get("proxy-agent"),
+        Agent.get("proxy-analyzer"),
+        Agent.get("proxy-tester-idor"),
+      ])
+      expect(orchestrator?.steps).toBe(7)
+      expect(analyzer?.steps).toBe(9)
+      expect(idor?.steps).toBe(11)
+    },
+  })
+})
+
 test("agent steps/maxSteps config sets steps property", async () => {
   await using tmp = await tmpdir({
     config: {
