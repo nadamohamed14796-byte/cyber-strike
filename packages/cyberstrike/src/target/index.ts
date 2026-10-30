@@ -1845,6 +1845,7 @@ export namespace TargetMemory {
       scope?: TargetScope
       exactHost: boolean
       wildcardRoot: boolean
+      wildcardPolicyRoot: boolean
       childExactHost: boolean
       scopeScore: number
       domainScore: number
@@ -1927,6 +1928,11 @@ export namespace TargetMemory {
         scope: scope ?? undefined,
         exactHost,
         wildcardRoot,
+        // A concrete apex/root workspace whose persisted manifest explicitly
+        // contains wildcard grants is the canonical program ledger too. This
+        // takes precedence over overlapping legacy exact-host root workspaces.
+        wildcardPolicyRoot: isRootScopeContainer && Boolean(scope?.status === "configured" &&
+          scope.scopeItems.some((item) => /^(?:wildcard[ \\t]*:[ \\t]*)?\\*\\./i.test(item.trim()))),
         childExactHost,
         scopeScore,
         domainScore,
@@ -1938,6 +1944,7 @@ export namespace TargetMemory {
       // one configured wildcard root is the canonical program ledger for its
       // whole DNS family and must win over legacy concrete root duplicates.
       Number(b.childExactHost) - Number(a.childExactHost) ||
+      Number(b.wildcardPolicyRoot) - Number(a.wildcardPolicyRoot) ||
       Number(b.wildcardRoot) - Number(a.wildcardRoot) ||
       Number(b.exactHost) - Number(a.exactHost) ||
       // For remaining overlapping roots, prefer the most specific matching grant.
@@ -1952,6 +1959,7 @@ export namespace TargetMemory {
     }
     if (candidates.length > 1 &&
       Number(candidates[0].childExactHost) === Number(candidates[1].childExactHost) &&
+      Number(candidates[0].wildcardPolicyRoot) === Number(candidates[1].wildcardPolicyRoot) &&
       Number(candidates[0].wildcardRoot) === Number(candidates[1].wildcardRoot) &&
       Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
       candidates[0].scopeScore === candidates[1].scopeScore &&
