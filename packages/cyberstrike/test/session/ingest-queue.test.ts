@@ -354,6 +354,69 @@ describe("IngestQueue parent-child controls", () => {
       expect(IngestQueue.pendingCount(childB)).toBe(0)
     })
   })
+
+  test("Extension Proxy child queue runs alongside Main Agent work", async () => {
+    await withInstance(async () => {
+      const parent = "main-agent-running"
+      const proxy = "extension-proxy-running"
+      const mainStarted = defer()
+      const proxyStarted = defer()
+      const releaseMain = defer()
+      const releaseProxy = defer()
+
+      IngestQueue.enqueue(parent, async () => {
+        mainStarted.resolve()
+        await releaseMain.promise
+      })
+      await mainStarted.promise
+
+      const reservation = IngestQueue.reserve(proxy, parent, { independentFromParent: true })
+      IngestQueue.enqueueReserved(reservation, async () => {
+        proxyStarted.resolve()
+        await releaseProxy.promise
+      })
+
+      // The Proxy task must start before the Main Agent task finishes.
+      await proxyStarted.promise
+      expect(IngestQueue.pendingCount(parent)).toBe(2)
+      expect(IngestQueue.pendingCount(proxy)).toBe(1)
+
+      releaseProxy.resolve()
+      await new Promise((r) => setTimeout(r, 10))
+      expect(IngestQueue.pendingCount(parent)).toBe(1)
+      expect(IngestQueue.pendingCount(proxy)).toBe(0)
+
+      releaseMain.resolve()
+      await new Promise((r) => setTimeout(r, 10))
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+    })
+  })
+
+  test("parent pause does not gate an independent Extension Proxy queue", async () => {
+    await withInstance(async () => {
+      const parent = "paused-main-agent"
+      const proxy = "unpaused-extension-proxy"
+      const started = defer()
+      const release = defer()
+
+      IngestQueue.pause(parent)
+      const reservation = IngestQueue.reserve(proxy, parent, { independentFromParent: true })
+      IngestQueue.enqueueReserved(reservation, async () => {
+        started.resolve()
+        await release.promise
+      })
+
+      await started.promise
+      expect(IngestQueue.isPaused(parent)).toBe(true)
+      expect(IngestQueue.pendingCount(parent)).toBe(1)
+
+      release.resolve()
+      await new Promise((r) => setTimeout(r, 10))
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+      expect(IngestQueue.pendingCount(proxy)).toBe(0)
+      IngestQueue.resume(parent)
+    })
+  })
 })
 
 describe("IngestQueue isolation", () => {
