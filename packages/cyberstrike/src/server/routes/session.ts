@@ -2828,8 +2828,8 @@ export const SessionRoutes = lazy(() =>
           const body = c.req.valid("json")
           const targetSession = await Session.get(sessionID)
           const isProxyBroker =
-          (targetSession.title === PROXY_BROKER_TITLE || targetSession.title === LEGACY_PROXY_BROKER_TITLE) &&
-          !!targetSession.parentID
+            (targetSession.title === PROXY_BROKER_TITLE || targetSession.title === LEGACY_PROXY_BROKER_TITLE) &&
+            !!targetSession.parentID
           const runPrompt = async () => {
             try {
               await SessionPrompt.prompt({
