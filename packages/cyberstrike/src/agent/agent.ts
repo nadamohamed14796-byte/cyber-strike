@@ -51,6 +51,7 @@ import DESC_PROXY_TESTER_FILE_ATTACKS from "./prompt/vuln/file-attacks/descripti
 // Methodology Engine prompts — intelligence logging, coverage tracking, forced continuation
 import PROMPT_METHODOLOGY_COMMON from "./prompt/methodology/common-methodology.txt"
 import PROMPT_METHODOLOGY_CONTINUATION from "./prompt/methodology/forced-continuation.txt"
+import PROMPT_RUNTIME_DISCOVERY from "./prompt/runtime-discovery.txt"
 
 import { PermissionNext } from "@/permission/next"
 import { mergeDeep, pipe } from "remeda"
@@ -1072,6 +1073,16 @@ export namespace Agent {
     // applies when not explicitly configured, so user config still overrides.
     for (const name in result) {
       if (result[name].steps == null && name.startsWith("proxy-tester-")) result[name].steps = 60
+    }
+
+    // Attach the same live runtime/skill/signal routing contract to every
+    // task-capable agent, including built-ins, user-defined agents, orchestrators,
+    // analyzers, Impact Hunter, and all vulnerability testers. Utility-only
+    // agents have no skill permission and are intentionally excluded.
+    for (const [id, agent] of Object.entries(result)) {
+      if (["compaction", "title", "summary", "normalize-request"].includes(id)) continue
+      if (PermissionNext.evaluate("skill", "*", agent.permission).action !== "allow") continue
+      agent.prompt = [PROMPT_RUNTIME_DISCOVERY, agent.prompt].filter(Boolean).join("\\n\\n---\\n\\n")
     }
 
     return result
