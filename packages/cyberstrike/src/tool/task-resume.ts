@@ -77,8 +77,19 @@ export function selectTaskRequestContext<T extends TaskRequestContextCandidate>(
   if (processing.length === 1) return { request: processing[0] }
   if (processing.length > 1) return { reason: "ambiguous_processing_requests" }
 
-  const latest = [...requests].sort((a, b) => b.time.updated - a.time.updated)[0]
-  return latest ? { request: latest } : {}
+  // Request.get() is intake-ID ordered. Keep the fallback FIFO as well:
+  // when the broker is between turns, the oldest queued request is next.
+  // Falling back to the most recently updated row here selected the newest
+  // capture (for example request 10) and skipped the earlier queued work.
+  const oldestQueued = requests
+    .filter((item) => item.status === "queued")
+    .sort((a, b) => a.id.localeCompare(b.id))[0]
+  if (oldestQueued) return { request: oldestQueued }
+
+  // No pending work remains; an interactive follow-up may use the latest
+  // completed request as its context.
+  const latestCompleted = [...requests].sort((a, b) => b.time.updated - a.time.updated)[0]
+  return latestCompleted ? { request: latestCompleted } : {}
 }
 
 /**
