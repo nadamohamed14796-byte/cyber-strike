@@ -16,8 +16,9 @@ function input(overrides: Partial<EmptyStaticResponseInput> = {}): EmptyStaticRe
 }
 
 describe("isConfirmedEmptyStaticHTML", () => {
-  test("recognizes a complete empty HTML document without dispatching an analyzer", () => {
+  test("recognizes complete empty HTML documents without dispatching an analyzer", () => {
     expect(isConfirmedEmptyStaticHTML(input())).toBe(true)
+    expect(isConfirmedEmptyStaticHTML(input({ htmlSource: "", responseSize: 0 }))).toBe(true)
   })
 
   test("does not infer emptiness from the generic HTML response preview", () => {
