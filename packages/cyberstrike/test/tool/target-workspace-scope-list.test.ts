@@ -200,6 +200,22 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
 
           const showWithoutTarget = await info.execute({ action: "show" }, ctx as never)
           expect(showWithoutTarget.title).toContain("Target workspaces")
+
+          // Explicit lookups and list results must teach the agent which legacy
+          // row is retained only for history and which root owns future work.
+          const showLegacy = await info.execute({
+            action: "show",
+            target_url: legacy.workspace.targetURL,
+          }, ctx as never)
+          expect(showLegacy.metadata.target_id).toBe(wildcard.workspace.id)
+          expect(showLegacy.output).toContain("Target: " + wildcard.workspace.targetURL)
+
+          const listed = await info.execute({ action: "list" }, ctx as never)
+          expect(listed.metadata.legacy_overlap_count).toBe(1)
+          expect(listed.metadata.targets?.find((item) => item.id === legacy.workspace.id)?.legacy_duplicate).toBe(true)
+          expect(listed.metadata.targets?.find((item) => item.id === legacy.workspace.id)?.canonical_target_id)
+            .toBe(wildcard.workspace.id)
+          expect(listed.output).toContain("LEGACY OVERLAP");
         } finally {
           await Instance.dispose()
         }
