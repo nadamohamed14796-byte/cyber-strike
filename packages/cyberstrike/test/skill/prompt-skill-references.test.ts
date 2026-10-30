@@ -7,9 +7,21 @@ import { Skill } from "../../src/skill/skill"
 test("every exact skill load referenced by an agent prompt exists and can be hydrated", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
   const promptRoot = path.join(repoRoot, "src", "agent", "prompt")
-  const promptFiles = await Array.fromAsync(
-    new Bun.Glob("**/*.txt").scan({ cwd: promptRoot, absolute: true, onlyFiles: true }),
-  )
+  // Use Node's directory traversal instead of Bun.Glob's absolute-path mode.
+  // On the CI runner that mode yields a NUL-suffixed cwd and fs.readFile fails
+  // before the referenced-skill checks can run.
+  async function listPromptFiles(directory: string): Promise<string[]> {
+    const entries = await fs.readdir(directory, { withFileTypes: true })
+    const nested = await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(directory, entry.name)
+        if (entry.isDirectory()) return listPromptFiles(fullPath)
+        return entry.isFile() && entry.name.endsWith(".txt") ? [fullPath] : []
+      }),
+    )
+    return nested.flat()
+  }
+  const promptFiles = await listPromptFiles(promptRoot)
   const references = new Map<string, string[]>()
   const pattern = /skill\(\{\s*action:\s*["'](?:load|outline)["']\s*,\s*name:\s*["']([^"']+)["']/g
 
