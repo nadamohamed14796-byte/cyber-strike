@@ -67,6 +67,7 @@ export namespace SessionProcessor {
             }
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
             const stream = await LLM.stream(streamInput)
+            let observedToolCalls = 0
 
             for await (const value of stream.fullStream) {
               if (value.type !== "text-delta") await flushTextDelta()
@@ -149,6 +150,7 @@ export namespace SessionProcessor {
                   break
 
                 case "tool-call": {
+                  observedToolCalls++
                   const match = toolcalls[value.toolCallId]
                   if (match) {
                     const part = await Session.updatePart({
@@ -270,7 +272,7 @@ export namespace SessionProcessor {
                   log.info("model step finished", {
                     sessionID: input.sessionID,
                     finishReason: value.finishReason,
-                    toolCalls: Object.keys(toolcalls).length,
+                    toolCalls: observedToolCalls,
                     modelID: input.model.id,
                     providerID: input.model.providerID,
                   })
