@@ -128,6 +128,37 @@ describe("scope_check caller-provided patterns are not authorization", () => {
   })
 })
 
+describe("canonical wildcard root workspace selection", () => {
+  test("uses one wildcard program root instead of an overlapping concrete root ledger", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const wildcardRoot = await TargetMemory.configureScope("https://*.example.com", {
+          include: ["*.example.com"],
+          authorizationSource: "Wildcard program scope",
+          authorizationReference: "https://program.example/policy",
+        })
+        await TargetMemory.configureScope("https://www.example.com", {
+          include: ["example.com", "app.example.com"],
+          authorizationSource: "Legacy concrete root scope",
+          authorizationReference: "https://program.example/policy",
+        })
+
+        const app = await TargetMemory.checkURLScope("https://app.example.com/api")
+        expect(app.allowed).toBe(true)
+        expect(app.workspace?.id).toBe(wildcardRoot.workspace.id)
+
+        const www = await TargetMemory.checkURLScope("https://www.example.com/")
+        expect(www.allowed).toBe(true)
+        expect(www.workspace?.id).toBe(wildcardRoot.workspace.id)
+
+        await Instance.dispose()
+      },
+    })
+  })
+})
+
 describe("scope_check uses persisted target scope when a workspace is supplied", () => {
   async function execute(target: string, targetURL: string) {
     const info = await ScopeCheckTool.init()
