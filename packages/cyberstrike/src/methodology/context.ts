@@ -164,7 +164,7 @@ export function rankSkillsForPhase(
     if (entry.verified === "tampered") continue
     const name = normalizeSkillText(entry.name)
     const tags = entry.tags.map(normalizeSkillText).filter(Boolean)
-    const signals = Array.from(new Set([...entry.signals, ...entry.tags])).map(normalizeSkillText).filter(Boolean)
+    const signals = Array.from(new Set([...(entry.signals ?? []), ...entry.tags])).map(normalizeSkillText).filter(Boolean)
     const category = normalizeSkillText(entry.category ?? "")
     const description = normalizeSkillText(entry.description)
     // Empty metadata values must not match every observed technology via includes("").
@@ -247,7 +247,7 @@ export function rankSkillsForPhase(
     category: entry.category,
     owasp_id: entry.owasp_id,
     tags: entry.tags,
-    signals: Array.from(new Set([...entry.signals, ...entry.tags])),
+    signals: Array.from(new Set([...(entry.signals ?? []), ...entry.tags])),
     tech_stack: entry.tech_stack,
     cwe_ids: entry.cwe_ids,
     chains_with: entry.chains_with,
