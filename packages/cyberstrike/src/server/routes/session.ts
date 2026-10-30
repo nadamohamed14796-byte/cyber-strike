@@ -481,7 +481,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 const config = await Config.get()
                 const childSession = await getOrCreateProxyBrokerSession({
                   parentSessionID: sessionID,
-                  config,
                 })
                 const analysisSessionID = childSession.id
                 childSessionID = analysisSessionID
@@ -1798,7 +1797,6 @@ export const SessionRoutes = lazy(() =>
         if (isHTTPRequest && !ingestDryRun) {
           const brokerSession = await getOrCreateProxyBrokerSession({
             parentSessionID: activeSessionID,
-
           })
           // Reserve before normalization so concurrent captures preserve arrival order.
           // This queue belongs only to Agent Proxy; do not register it on the Main queue.
