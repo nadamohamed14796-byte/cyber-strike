@@ -48,12 +48,9 @@ import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
-import { MethodologyContext } from "@/methodology/context"
-import { shouldInjectMethodologyContext } from "./methodology-context-routing"
 import { TargetMemory } from "@/target"
 import { ResearchContext, promptResearchSignals } from "@/learning/research-context"
 import { AgentPerformance } from "@/methodology/performance"
-import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
 import { isNativeSubagentRun, isProgressTool, toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
@@ -795,15 +792,8 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
-      // The Proxy Agent is an independent request-analysis service, not a
-      // methodology phase worker. Do not inject phase state, phase directives,
-      // coverage gates, or phase-specific skill routing into its prompt. Captured
-      // requests must be triaged immediately even when Main Recon has not started.
-      // Other agents retain the normal lane-scoped methodology context.
-      if (shouldInjectMethodologyContext(lastUser.agent)) {
-        const methodologyCtx = await MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
-        if (methodologyCtx) system.push(methodologyCtx)
-      }
+      // Methodology phase state is deliberately not injected into agent prompts.
+      // Phase tracking remains available through explicit methodology tools only.
 
       // Inject only project-local target memory matching observed hosts/endpoints in this session.
       const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
