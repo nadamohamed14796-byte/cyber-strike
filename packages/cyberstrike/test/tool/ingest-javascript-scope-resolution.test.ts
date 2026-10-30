@@ -74,3 +74,58 @@ test("JavaScript ingestion correlates an authorized subdomain in its canonical w
     },
   })
 })
+
+test("JavaScript ingestion accepts an existing out-of-scope program root as a policy container", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const rootURL = "https://www.example.test"
+      const assetURL = "https://api.example.net"
+      const configured = await TargetMemory.configureScope(rootURL, {
+        include: ["api.example.net"],
+        authorizationSource: "Local policy-container JavaScript scope fixture",
+        userConfirmed: true,
+      })
+      const rootDecision = await TargetMemory.checkURLScope(rootURL)
+      expect(rootDecision.allowed).toBe(false)
+      expect(rootDecision.excludeMatches).toHaveLength(0)
+
+      const originalFetch = globalThis.fetch
+      const requested: string[] = []
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = String(input)
+        requested.push(url)
+        if (url !== assetURL + "/assets/app.js") {
+          throw new Error("Unexpected URL in local fixture: " + url)
+        }
+        return new Response(
+          'const settingsEndpoint = "/api/settings"; fetch(settingsEndpoint);',
+          { status: 200, headers: { "content-type": "application/javascript" } },
+        )
+      }) as typeof fetch
+
+      const session = await Session.create({})
+      try {
+        const tool = await IngestJavaScriptURLsTool.init()
+        const result = await tool.execute({
+          target_url: rootURL,
+          urls: [assetURL + "/assets/app.js"],
+          source: "unit-test-policy-container",
+          force_refresh: false,
+        }, toolContext(session.id))
+
+        const metadata = result.metadata as Record<string, unknown>
+        expect(requested).toEqual([assetURL + "/assets/app.js"])
+        expect(metadata.workspace).toBe(configured.workspace.workspacePath)
+        expect(metadata.collection_complete).toBe(true)
+        expect(metadata.correlation_saved).toBe(true)
+        expect(metadata.analysis_error).toBeUndefined()
+        expect(Number(metadata.analyzed_source_records)).toBeGreaterThan(0)
+      } finally {
+        globalThis.fetch = originalFetch
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
