@@ -329,19 +329,22 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     // its include list because it is only a policy container; permit that exact
     // workspace identity only when no matching exclusion or competing workspace
     // decision exists. Every fetched URL and redirect is still checked separately.
-    const exactWorkspace = await TargetMemory.get(params.target_url)
-    const exactTargetKey = TargetMemory.normalize(params.target_url).targetKey
+    let suppliedTargetKey: string | undefined
+    try {
+      suppliedTargetKey = TargetMemory.normalize(params.target_url).targetKey
+    } catch {
+      // checkURLScope already returns the structured invalid-URL decision.
+    }
     const exactRootContainer = Boolean(
-      exactWorkspace &&
-      exactWorkspace.parentTargetID === null &&
-      exactWorkspace.targetKey === exactTargetKey &&
-      resolution.excludeMatches.length === 0 &&
-      (!resolution.workspace || resolution.workspace.id === exactWorkspace.id),
+      resolution.workspace &&
+      resolution.workspace.parentTargetID === null &&
+      resolution.workspace.targetKey === suppliedTargetKey &&
+      resolution.excludeMatches.length === 0,
     )
     const workspace = resolution.allowed && resolution.workspace
       ? resolution.workspace
       : exactRootContainer
-        ? exactWorkspace
+        ? resolution.workspace
         : undefined
     if (!workspace) {
       return {
