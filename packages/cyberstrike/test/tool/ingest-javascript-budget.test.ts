@@ -327,7 +327,7 @@ test("does not overwrite a malformed JavaScript asset manifest", async () => {
   }
 }, 10_000)
 
-test("processes 1,000 distinct JavaScript URLs sequentially without a fixed worklist cap", async () => {
+test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", async () => {
   await using tmp = await tmpdir()
   const requested: string[] = []
   const server = Bun.serve({
@@ -337,7 +337,7 @@ test("processes 1,000 distinct JavaScript URLs sequentially without a fixed work
       const pathname = new URL(request.url).pathname
       requested.push(pathname)
       if (/^\/assets\/bundle-\d+\.js$/.test(pathname)) {
-        if (pathname === "/assets/bundle-999.js") {
+        if (pathname === "/assets/bundle-9999.js") {
           // Valid minimal JavaScript served with a misleading MIME type.
           return new Response("void 0;", { status: 200, headers: { "content-type": "text/plain" } })
         }
@@ -378,7 +378,7 @@ test("processes 1,000 distinct JavaScript URLs sequentially without a fixed work
           },
         })
 
-        const urls = Array.from({ length: 1_000 }, (_, index) =>
+        const urls = Array.from({ length: 10_000 }, (_, index) =>
           canonicalTarget + "/assets/bundle-" + index + ".js",
         )
         const tool = await IngestJavaScriptURLsTool.init()
@@ -414,7 +414,7 @@ test("processes 1,000 distinct JavaScript URLs sequentially without a fixed work
   } finally {
     server.stop(true)
   }
-}, 120_000)
+}, 180_000)
 
 
 
