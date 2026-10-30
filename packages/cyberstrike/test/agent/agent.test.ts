@@ -667,6 +667,29 @@ test("global permission config applies to all agents", async () => {
   })
 })
 
+test("primary, general, proxy, and tester agents inherit the continuation contract", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const [primary, general, proxy, analyzer, tester] = await Promise.all([
+        Agent.get("cyberstrike"),
+        Agent.get("general"),
+        Agent.get("proxy-agent"),
+        Agent.get("proxy-analyzer"),
+        Agent.get("proxy-tester-idor"),
+      ])
+      for (const agent of [primary, general, proxy, tester]) {
+        expect(agent?.prompt).toContain('Do not pause for "continue" between deterministic phases.')
+        expect(agent?.prompt).toContain("Continue autonomously while relevant work remains")
+      }
+      // The read-only analyzer is deliberately scoped to one request and does not
+      // run a multi-phase workflow on its own.
+      expect(analyzer).toBeDefined()
+    },
+  })
+})
+
 test("autonomous proxy pipeline agents have no default step caps", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
