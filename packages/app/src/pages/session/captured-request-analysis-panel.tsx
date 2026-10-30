@@ -94,9 +94,14 @@ export function CapturedRequestAnalysisPanel() {
     }
     return [...latestByRequest.values()].sort((a, b) => a.messageID.localeCompare(b.messageID))
   })
-  const latest = createMemo(() => analyses().at(-1))
+  // Keep the panel aligned with the oldest request currently being analyzed.
+  // As each request completes, the next FIFO item becomes the active request.
+  // When idle, default to the oldest captured request rather than the newest.
+  const currentInOrder = createMemo(
+    () => analyses().find((item) => item.status === "analyzing") ?? analyses()[0],
+  )
   const selected = createMemo(
-    () => analyses().find((item) => item.requestID === activeRequestID()) ?? latest(),
+    () => analyses().find((item) => item.requestID === activeRequestID()) ?? currentInOrder(),
   )
   const analysisSessionID = () => selected()?.analysisSessionID
   const childMessages = createMemo(() => {
@@ -187,7 +192,7 @@ export function CapturedRequestAnalysisPanel() {
   // never create an analysis notice and therefore never open this panel.
   createEffect(() => {
     const sessionID = parentID()
-    const item = latest()
+    const item = currentInOrder()
     if (!sessionID || !item) return
     const key = sessionID + ":" + item.requestID
     if (key === seenKey) return
@@ -323,7 +328,7 @@ export function CapturedRequestAnalysisPanel() {
         <button
           type="button"
           onClick={() => {
-            setActiveRequestID(latest()?.requestID)
+            setActiveRequestID(currentInOrder()?.requestID)
             setOpen(true)
           }}
           class="absolute right-4 bottom-32 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
@@ -405,7 +410,7 @@ export function CapturedRequestAnalysisPanel() {
           </header>
 
           <div class="flex shrink-0 gap-2 overflow-x-auto border-b border-border-weak-base px-3 py-2">
-            <For each={analyses().slice().reverse()}>
+            <For each={analyses()}>
               {(item) => (
                 <button
                   type="button"
