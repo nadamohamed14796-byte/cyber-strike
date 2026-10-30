@@ -925,8 +925,8 @@ function WebContextPanelList() {
             <button
               class="px-2 py-0.5 rounded text-11-medium cursor-pointer border-none"
               classList={{
-                "bg-surface-base text-text-strong": s.id === section(),
-                "bg-transparent text-text-weak hover:text-text-base": s.id !== section(),
+                "bg-surface-base text-text-strong": s.id === activeSection(),
+                "bg-transparent text-text-weak hover:text-text-base": s.id !== activeSection(),
               }}
               onClick={() => setSection(s.id)}
             >
