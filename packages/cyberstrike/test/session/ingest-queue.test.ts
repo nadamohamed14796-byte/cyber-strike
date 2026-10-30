@@ -370,7 +370,7 @@ describe("IngestQueue parent-child controls", () => {
       })
       await mainStarted.promise
 
-      const reservation = IngestQueue.reserve(proxy, parent, { independentFromParent: true })
+      const reservation = IngestQueue.reserve(proxy)
       IngestQueue.enqueueReserved(reservation, async () => {
         proxyStarted.resolve()
         await releaseProxy.promise
@@ -378,7 +378,7 @@ describe("IngestQueue parent-child controls", () => {
 
       // The Proxy task must start before the Main Agent task finishes.
       await proxyStarted.promise
-      expect(IngestQueue.pendingCount(parent)).toBe(2)
+      expect(IngestQueue.pendingCount(parent)).toBe(1)
       expect(IngestQueue.pendingCount(proxy)).toBe(1)
 
       releaseProxy.resolve()
@@ -400,7 +400,7 @@ describe("IngestQueue parent-child controls", () => {
       const release = defer()
 
       IngestQueue.pause(parent)
-      const reservation = IngestQueue.reserve(proxy, parent, { independentFromParent: true })
+      const reservation = IngestQueue.reserve(proxy)
       IngestQueue.enqueueReserved(reservation, async () => {
         started.resolve()
         await release.promise
@@ -408,7 +408,8 @@ describe("IngestQueue parent-child controls", () => {
 
       await started.promise
       expect(IngestQueue.isPaused(parent)).toBe(true)
-      expect(IngestQueue.pendingCount(parent)).toBe(1)
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+      expect(IngestQueue.pendingCount(proxy)).toBe(1)
 
       release.resolve()
       await new Promise((r) => setTimeout(r, 10))
