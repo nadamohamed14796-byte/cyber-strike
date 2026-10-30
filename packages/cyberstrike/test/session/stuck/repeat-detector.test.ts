@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { EmptyContinuationDetector, FailedToolStreakDetector, ReadOnlyRepeatDetector, RepeatDetector, toolCallSucceeded } from "../../../src/session/stuck/repeat-detector"
+import { isNativeSubagentRun } from "../../../src/session/stuck/signals"
 
 describe("RepeatDetector — cross-turn identical-call loop", () => {
   test("same signature reaching the limit across steps → nudge, then abort", () => {
@@ -229,5 +230,36 @@ describe("toolCallSucceeded — normalized tool outcomes", () => {
   test("does not mistake diagnostic metadata for failure", () => {
     expect(toolCallSucceeded({ status: "completed", tool: "correlate_javascript", metadata: { sourceFiles: 0, notes: ["no assets captured"] } })).toBe(true)
     expect(toolCallSucceeded({ status: "completed", tool: "tool", metadata: { reason: "no_matches" } })).toBe(true)
+  })
+})
+
+describe("native subagent execution guard selection", () => {
+  test("mode=all agents receive loop safeguards only in child sessions", () => {
+    expect(isNativeSubagentRun({
+      agent: { name: "proxy-agent", mode: "all", native: true },
+      session: { parentID: "root-session" },
+    })).toBe(true)
+
+    expect(isNativeSubagentRun({
+      agent: { name: "proxy-agent", mode: "all", native: true },
+      session: { parentID: null },
+    })).toBe(false)
+  })
+
+  test("ordinary subagents remain guarded and primary agents remain untouched", () => {
+    expect(isNativeSubagentRun({
+      agent: { mode: "subagent", native: true },
+      session: { parentID: null },
+    })).toBe(true)
+
+    expect(isNativeSubagentRun({
+      agent: { mode: "primary", native: true },
+      session: { parentID: "root-session" },
+    })).toBe(false)
+
+    expect(isNativeSubagentRun({
+      agent: { mode: "all", native: false },
+      session: { parentID: "root-session" },
+    })).toBe(false)
   })
 })
