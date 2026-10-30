@@ -21,6 +21,20 @@ describe("isConfirmedEmptyStaticHTML", () => {
     expect(isConfirmedEmptyStaticHTML(input({ htmlSource: "", responseSize: 0 }))).toBe(true)
   })
 
+  test("accepts inert empty layout containers but not visible page content", () => {
+    const emptyRoot = "<html><body><div id='app'><span class='placeholder'></span></div></body></html>"
+    expect(isConfirmedEmptyStaticHTML(input({
+      htmlSource: emptyRoot,
+      responseSize: Buffer.byteLength(emptyRoot, "utf8"),
+    }))).toBe(true)
+
+    const visibleText = "<html><body><main>Welcome back</main></body></html>"
+    expect(isConfirmedEmptyStaticHTML(input({
+      htmlSource: visibleText,
+      responseSize: Buffer.byteLength(visibleText, "utf8"),
+    }))).toBe(false)
+  })
+
   test("does not infer emptiness from the generic HTML response preview", () => {
     expect(isConfirmedEmptyStaticHTML(input({ htmlSource: undefined }))).toBe(false)
   })
