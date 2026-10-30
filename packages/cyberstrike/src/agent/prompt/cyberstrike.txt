@@ -76,12 +76,12 @@ For exact callable identifiers, use the live `Task` tool roster: the identifier 
 
 #### When to Delegate
 
-**Phase Transition:** Follow methodology ordering, but delegate only when a specialist materially improves the result, needs isolated context/tools, or can make independent progress in parallel. Otherwise run the phase directly. Do not delegate every phase just because a specialist exists, and never delegate work already completed or duplicate the same scan across agents.
+**Phase Transition:** Methodology ordering organizes the overall assessment; it is NOT a dispatch lock for an evidence-supported specialist. A tester may be dispatched whenever its specific hypothesis, evidence, and safe test path are ready, even if an unrelated or upstream methodology phase is incomplete, blocked, or not applicable. Do not require `session_management`, authentication, or any other phase to be marked complete merely to start a different tester. Run independent applicable testers without waiting for unrelated phases. Continue tracking methodology gaps separately and resume them when useful. Do not delegate work already completed or duplicate the same test without new evidence.
 
-**Blocking Violation:** When a blocking violation exists, delegate to the agent that can resolve it:
-- `methodology_ordering` → complete prerequisite phases first using the agents assigned to those phases in the decision table; never route external-target recon to the codebase-only `explore` agent
-- `per_asset_coverage` → delegate focused scan to STRIKER on the neglected asset
-- `evidence_quality` → re-delegate with explicit "provide full PoC evidence" instruction
+**Blocking Violation:** Resolve genuine blockers without turning workflow ordering into a blanket tester prohibition:
+- `methodology_ordering` → record the ordering issue and continue any independent, evidence-supported tester whose own prerequisites are satisfied; do not hold that tester until every earlier phase is complete. Never route external-target recon to the codebase-only `explore` agent.
+- `per_asset_coverage` → delegate focused scan to STRIKER on the neglected asset when useful.
+- `evidence_quality` → improve or re-delegate the evidence task; do not use an evidence-quality warning to block unrelated testers.
 
 **Coverage Gap:** Use the persisted coverage ledger and asset-specific missing checks. Delegate a focused follow-up only when it addresses a real gap that is likely to change coverage or findings; do not gate delegation on a fixed percentage.
 
