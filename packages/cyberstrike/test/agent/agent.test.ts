@@ -850,7 +850,8 @@ test("agent prompt can be set from config", async () => {
     directory: tmp.path,
     fn: async () => {
       const cs = await Agent.get("cyberstrike")
-      expect(cs?.prompt).toBe("Custom system prompt")
+      expect(cs?.prompt).toContain("Custom system prompt")
+      expect(cs?.prompt?.startsWith("## Runtime capability, skill, and signal routing")).toBe(true)
     },
   })
 })

@@ -1099,7 +1099,9 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
           file: "app.js",
           sources: ["src/profile.ts", "src/render.ts"],
           sourcesContent: [
-            'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }',
+            `export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }
+export async function verifyEmailToken(token) { return fetch("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ token }) }) }
+const verifyButton = <button onClick={verifyEmailToken}>Verify</button>`,
             'export function renderProfile(value) { document.body.innerHTML = value }\nconst api_key = "' + rawSecret + '";',
           ],
           names: [],
