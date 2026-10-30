@@ -25,12 +25,11 @@ describe("Recon prompt specialization", () => {
 })
 
 describe("Dynamic specialist dispatch contract", () => {
-  test("the root prompt has no static phase-to-agent routing table", async () => {
+  test("the root prompt defers phase-independent dispatch to the shared workflow and live Task roster", async () => {
     const prompt = await Bun.file(path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")).text()
-    expect(prompt).toContain("There is deliberately no phase-to-agent assignment table")
-    expect(prompt).toContain("Methodology phases, parent-workflow position, and phase-specific skill recommendations are tracking/context only")
-    expect(prompt).not.toContain("Phase-to-Agent Decision Table")
     expect(prompt).toContain("The shared Target Workflow Contract is the single authority")
+    expect(prompt).toContain("Use the live Task roster and the evidence-backed task to select the exact registered agent")
+    expect(prompt).not.toContain("Phase-to-Agent Decision Table")
     expect(prompt).not.toContain("### Missing Tool Installation")
     expect(prompt).not.toContain("**Phase Transition:**")
   })
@@ -281,31 +280,23 @@ describe("Methodology phase skill routing", () => {
     })
   })
 
-  test("the primary routing table mirrors the methodology agent registry", async () => {
+  test("phase metadata is progress guidance, not a duplicate agent-routing table", async () => {
     const promptPath = path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")
     const prompt = await Bun.file(promptPath).text()
-    const codenames: Record<string, string> = {
-      cyberstrike: "COMMAND",
-      "web-application": "STRIKER",
-      "mobile-application": "CIPHER",
-      "proxy-agent": "INTERCEPTOR",
-      "cloud-security": "AURORA",
-      "internal-network": "PHANTOM",
-    }
-    for (const [agentId, codename] of Object.entries(codenames)) {
-      expect(prompt).toContain("| " + agentId + " | " + codename + " |")
-    }
-    for (const phase of Phase.ALL) {
-      const row = prompt.split("\n").find((line) => line.startsWith("| " + phase.id + " |"))
-      expect(row, "primary prompt must include methodology phase " + phase.id).toBeDefined()
-      const [primary, secondary] = phase.agents
-      expect(row).toContain(codenames[primary] + " (" + primary + ")")
-      if (secondary) expect(row).toContain(codenames[secondary] + " (" + secondary + ")")
-      else expect(row).toContain("| — |")
-    }
-    expect(prompt).not.toContain("delegate recon to GHOST")
-    expect(prompt).not.toContain("| passive_recon | GHOST (explore) |")
-    expect(prompt).not.toContain("| active_recon | GHOST (explore) |")
+    expect(prompt).toContain("Use the live Task roster")
+    expect(prompt).not.toContain("| Phase | Primary Agent | Secondary Agent |")
+    expect(prompt).not.toContain("Phase-to-Agent Decision Table")
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const available = new Set((await Agent.entries()).map((entry) => entry.id))
+        for (const phase of Phase.ALL) {
+          for (const agentName of phase.agents) {
+            expect(available.has(agentName), phase.id + " references unavailable agent " + agentName).toBe(true)
+          }
+        }
+      },
+    })
   })
 
   test("recon phases rank their base and specialized skills without dropping skill retrieval", () => {
@@ -566,7 +557,10 @@ describe("Testing-intent routing", () => {
 
     const rootPath = path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")
     const rootPrompt = await Bun.file(rootPath).text()
-    expect(rootPrompt).toContain("explicit user opt-in for authorized targeted testing")
+    expect(rootPrompt).toContain("The shared Target Workflow Contract is the single authority")
+    const workflowPath = path.resolve(import.meta.dir, "../../src/agent/prompt/methodology/target-workflow.txt")
+    const workflow = await Bun.file(workflowPath).text()
+    expect(workflow).toContain("active-testing opt-in")
   })
 })
 
