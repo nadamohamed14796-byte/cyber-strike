@@ -21,6 +21,7 @@ import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
   requestIDFromRecentPromptTexts,
+  shouldInferSessionRequestID,
   selectTaskRequestContext,
 } from "./task-resume"
 
@@ -130,7 +131,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Ordinary primary-agent tasks have no session-bound captured request;
       // avoid scanning the main transcript unless a subagent is delegating.
-      const sessionRequestID = caller?.mode === "subagent"
+      const sessionRequestID = shouldInferSessionRequestID(caller)
         ? requestIDFromRecentPromptTexts(
             ctx.messages
               .filter((message) => message.info.role === "user")
