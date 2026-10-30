@@ -11,6 +11,35 @@ type CompiledScopeItems = {
 }
 const compiledScopeItemsCache = new WeakMap<readonly string[], CompiledScopeItems>()
 
+/**
+ * Rank overlapping persisted scope entries for deterministic workspace selection.
+ * Exact hosts outrank wildcard families; URL/path entries are most specific.
+ * This is selection metadata only: matchingScopeItems remains the authorization
+ * decision and explicit exclusions are still evaluated across the selected tree.
+ */
+export function scopeItemSpecificity(input: string): number {
+  const value = input.trim()
+  const typed = value.match(/^(domain|wildcard|url|cidr|ip address|api)[ \\t]*:[ \\t]*(.+)$/i)
+  const kind = typed?.[1].toLowerCase()
+  const identifier = (typed?.[2] ?? value).trim()
+  if (kind === "wildcard" || identifier.startsWith("*.")) {
+    return 1_000_000 + identifier.replace(/^\\*\\./, "").length
+  }
+  if (/^https?:\\/\\//i.test(identifier) || kind === "url" || (kind === "api" && identifier.includes("/"))) {
+    try {
+      const url = new URL(/^https?:\\/\\//i.test(identifier) ? identifier : "https://" + identifier)
+      return 3_000_000 + url.hostname.length * 100 + url.pathname.length
+    } catch {
+      return 0
+    }
+  }
+  if (identifier.includes("*") || /\\{[^{}]+\\}/.test(identifier)) {
+    return 500_000 + identifier.length
+  }
+  if (kind === "cidr" || identifier.includes("/")) return 100_000 + identifier.length
+  return 2_000_000 + identifier.length
+}
+
 
 /** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
 function compileScopeItems(items: readonly string[]): CompiledScopeItems {
