@@ -215,17 +215,19 @@ test("normalizes explicit JavaScript asset URLs as exact file scopes", async () 
     directory: tmp.path,
     async fn() {
       const configured = await TargetMemory.configureScope("https://program.example.test", {
-        include: ["https://cdn.example.test/assets/app.js?v=123", "Source Map: https://cdn.example.test/assets/app.js.map?hash=abc"],
+        include: ["https://cdn.example.test/assets/app.js?v=123", "https://cdn.example.test/assets/raw.js.map?hash=raw", "Source Map: https://cdn.example.test/assets/app.js.map?hash=abc"],
         authorizationSource: "Operator-confirmed JavaScript asset list",
         authorizationReference: "https://program.example.test/policy",
       })
       expect(configured.scope.scopeItems).toEqual([
         "JavaScript: https://cdn.example.test/assets/app.js",
+        "Source Map: https://cdn.example.test/assets/raw.js.map",
         "Source Map: https://cdn.example.test/assets/app.js.map",
       ])
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js?v=456")).allowed).toBe(true)
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js")).allowed).toBe(false)
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js.map?cache=2")).allowed).toBe(true)
+      expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/raw.js.map?cache=2")).allowed).toBe(true)
       expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js.map")).allowed).toBe(false)
       await Instance.dispose()
     },
