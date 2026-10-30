@@ -15,7 +15,6 @@ export type TaskRequestContextSelection<T> = {
 }
 
 const PROXY_TESTER_METHODOLOGY_PHASE = {
-  "proxy-tester-idOR": "authorization_testing",
   "proxy-tester-idor": "authorization_testing",
   "proxy-tester-authz": "authorization_testing",
   "proxy-tester-authn": "authentication_testing",
@@ -33,14 +32,24 @@ const PROXY_TESTER_METHODOLOGY_PHASE = {
  * map: passive request/architecture analysis remains available while active
  * testing prerequisites are incomplete.
  */
+export function proxyTesterMethodologyPhase(agentID: string): string | undefined {
+  return PROXY_TESTER_METHODOLOGY_PHASE[agentID as keyof typeof PROXY_TESTER_METHODOLOGY_PHASE]
+}
+
 export function proxyTesterMethodologyBlock(
   agentID: string,
   phases: readonly { id: string; status: string; blockReason?: string }[],
 ): { phase: string; reason: string } | undefined {
-  const phaseID = PROXY_TESTER_METHODOLOGY_PHASE[agentID as keyof typeof PROXY_TESTER_METHODOLOGY_PHASE]
+  const phaseID = proxyTesterMethodologyPhase(agentID)
   if (!phaseID) return undefined
   const phase = phases.find((item) => item.id === phaseID)
-  if (!phase || phase.status !== "blocked") return undefined
+  if (!phase) {
+    return {
+      phase: phaseID,
+      reason: "This testing phase is not applicable to the current target scope or has not been initialized.",
+    }
+  }
+  if (phase.status !== "blocked") return undefined
   return {
     phase: phaseID,
     reason: phase.blockReason || "Upstream methodology prerequisites are incomplete.",
