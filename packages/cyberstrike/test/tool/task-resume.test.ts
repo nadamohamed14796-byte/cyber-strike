@@ -9,6 +9,7 @@ import {
   shouldInferSessionRequestID,
   proxyTesterMethodologyBlock,
   proxyTesterMethodologyPhase,
+  shouldEnforceProxyTesterMethodology,
 } from "../../src/tool/task-resume"
 
 test("resumes only a subtask owned by the current parent session", () => {
@@ -159,4 +160,12 @@ test("proxy tester IDs map to existing methodology phases and blocked phases sto
     phase: "authorization_testing",
     reason: "This testing phase is not applicable to the current target scope or has not been initialized.",
   })
+})
+
+
+test("Extension Proxy can dispatch specialists for passive triage before methodology phases initialize", () => {
+  expect(shouldEnforceProxyTesterMethodology("proxy-agent")).toBe(false)
+  expect(shouldEnforceProxyTesterMethodology("cyberstrike")).toBe(true)
+  expect(shouldEnforceProxyTesterMethodology("proxy-tester-idor")).toBe(true)
+  expect(shouldEnforceProxyTesterMethodology(undefined)).toBe(true)
 })

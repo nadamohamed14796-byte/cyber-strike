@@ -103,15 +103,20 @@ export function CapturedRequestAnalysisPanel() {
   const selected = createMemo(
     () => analyses().find((item) => item.requestID === activeRequestID()) ?? currentInOrder(),
   )
-  const analysisSessionID = () => selected()?.analysisSessionID
+  // Every captured request points to the same persistent broker. Resolve the
+  // broker from the complete request inventory, not only the selected tab: an
+  // early failed request may not have received its broker ID before a later
+  // request successfully created the shared child session.
+  const analysisSessionID = () => analyses().find((item) => item.analysisSessionID)?.analysisSessionID
   const childMessages = createMemo(() => {
     const id = analysisSessionID()
     return id ? (sync.data.message[id] ?? []) : []
   })
   const childUserMessages = createMemo(() => childMessages().filter((message): message is UserMessage => message.role === "user"))
-  // A persistent broker contains many captured request turns. Keep each panel
-  // focused on the selected request while allowing explicitly tagged follow-ups
-  // to switch back to an older request without mixing the other turns' activity.
+  // The Extension panel is a window into the persistent broker, so its activity
+  // stream must show every captured request turn in FIFO order. Keep a separate
+  // request-specific selector only for replies that explicitly target an older tab.
+  const brokerTurnMessages = createMemo(() => childUserMessages())
   const requestTurnMessages = createMemo(() => {
     const requestID = selected()?.requestID
     if (!requestID) return []
@@ -510,8 +515,8 @@ export function CapturedRequestAnalysisPanel() {
 
             <main class="min-h-0 overflow-y-auto p-3">
               <div class="mb-2 flex items-center justify-between gap-2">
-                <h3 class="text-11-semibold uppercase tracking-wide text-text-weaker">Live agent activity</h3>
-                <span class="text-10-regular text-text-weaker">{requestTurnMessages().length} turn(s)</span>
+                <h3 class="text-11-semibold uppercase tracking-wide text-text-weaker">All Extension request activity</h3>
+                <span class="text-10-regular text-text-weaker">{brokerTurnMessages().length} turn(s)</span>
               </div>
               <Show when={retryNotice()}>
                 <p role="status" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-text-base">{retryNotice()}</p>
@@ -520,7 +525,7 @@ export function CapturedRequestAnalysisPanel() {
                 <p role="alert" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-icon-danger-base">Could not retry analysis: {retryError()}</p>
               </Show>
               <Show
-                when={requestTurnMessages().length > 0}
+                when={brokerTurnMessages().length > 0}
                 fallback={
                   <div class="rounded-lg border border-border-weak-base p-4 text-12-regular text-text-weak">
                     <Show
@@ -533,13 +538,13 @@ export function CapturedRequestAnalysisPanel() {
                 }
               >
                 <div class="flex flex-col gap-3">
-                  <For each={requestTurnMessages()}>
+                  <For each={brokerTurnMessages()}>
                     {(message) => (
                       <div class="min-w-0 rounded-lg border border-border-weak-base py-2">
                         <SessionTurn
                           sessionID={analysisSessionID()!}
                           messageID={message.id}
-                          lastUserMessageID={requestTurnMessages().at(-1)?.id}
+                          lastUserMessageID={brokerTurnMessages().at(-1)?.id}
                           stepsExpanded={expanded()[message.id] ?? true}
                           onStepsExpandedToggle={() =>
                             setExpanded((previous) => ({

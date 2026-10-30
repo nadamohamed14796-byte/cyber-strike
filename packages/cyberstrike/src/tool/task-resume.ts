@@ -36,6 +36,16 @@ export function proxyTesterMethodologyPhase(agentID: string): string | undefined
   return PROXY_TESTER_METHODOLOGY_PHASE[agentID as keyof typeof PROXY_TESTER_METHODOLOGY_PHASE]
 }
 
+/**
+ * The persistent Extension Proxy must be able to dispatch an evidence-selected
+ * specialist for passive triage even while the Main Recon methodology has not
+ * initialized that active-testing phase. Scope/authorization checks remain in
+ * the specialist tools; this only disables the premature Task-spawn gate.
+ */
+export function shouldEnforceProxyTesterMethodology(callerAgentID?: string): boolean {
+  return callerAgentID !== "proxy-agent"
+}
+
 export function proxyTesterMethodologyBlock(
   agentID: string,
   phases: readonly { id: string; status: string; blockReason?: string }[],

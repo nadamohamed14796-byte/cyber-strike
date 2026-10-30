@@ -1,4 +1,5 @@
 import { Tool } from "./tool"
+import { AgentTaskConcurrency } from "./task-concurrency"
 import DESCRIPTION from "./task.txt"
 import z from "zod"
 import { Session } from "../session"
@@ -27,6 +28,7 @@ import {
   selectTaskRequestContext,
   proxyTesterMethodologyPhase,
   proxyTesterMethodologyBlock,
+  shouldEnforceProxyTesterMethodology,
 } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
@@ -98,7 +100,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // tester cannot be started merely because its skill was discoverable or
       // because the caller explicitly selected it.
       const requiredPhase = proxyTesterMethodologyPhase(params.subagent_type)
-      if (requiredPhase) {
+      if (requiredPhase && shouldEnforceProxyTesterMethodology(callerID)) {
         const methodology = Methodology.computeState(Session.root(ctx.sessionID))
         const block = proxyTesterMethodologyBlock(params.subagent_type, methodology.phases)
         if (block) {
@@ -431,18 +433,29 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         parts: promptParts,
       }
 
+      // Keep Main Recon and Extension Proxy as independent execution lanes.
+      // Each lane may run two sibling specialists; the process-wide scheduler
+      // admits at most three agent loops so a fan-out cannot exhaust WSL memory.
+      const taskLane = `${Session.root(ctx.sessionID)}:${callerID === "proxy-agent" ? "extension" : "main"}`
+
       if (params.background) {
-        // Persist the child prompt first, then run its normal session loop without
-        // awaiting completion. The child session is already linked to this parent,
-        // so the caller can continue recon and resume the child later by task_id.
+        // Persist the child prompt immediately, then queue its detached loop through
+        // the same bounded scheduler. Queued work is retained and starts when a
+        // slot opens; it is never silently dropped.
         await SessionPrompt.prompt({ ...promptInput, noReply: true })
-        void SessionPrompt.loop({ sessionID: session.id }).catch((error) => {
-          console.error("[task] background subagent failed", {
-            sessionID: session.id,
-            agent: agent.name,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        })
+        const schedule = AgentTaskConcurrency.enqueue(
+          taskLane,
+          async () => {
+            await SessionPrompt.loop({ sessionID: session.id })
+          },
+          (error) => {
+            console.error("[task] background subagent failed", {
+              sessionID: session.id,
+              agent: agent.name,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          },
+        )
         return {
           title: params.description,
           metadata: {
@@ -451,14 +464,22 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             outcome: "background" as const,
           },
           output: [
-            `Background task started: ${params.description}`,
+            schedule === "started"
+              ? `Background task started: ${params.description}`
+              : `Background task queued: ${params.description} (waiting for an agent slot)`,
             `task_id: ${session.id} (resume this exact task_id to inspect or continue its results)`,
-            "The subagent is still running; this is not a completion or success verdict.",
+            schedule === "started"
+              ? "The subagent is still running; this is not a completion or success verdict."
+              : "The subagent prompt is saved and will start automatically when a slot opens; this is not a completion or success verdict.",
           ].join("\n"),
         }
       }
 
-      const result = await SessionPrompt.prompt(promptInput)
+      // Orchestrator-level fan-out is bounded, while nested subagent delegation
+      // remains re-entrant so a parent waiting on a child cannot deadlock the pool.
+      const result = caller?.mode === "subagent"
+        ? await SessionPrompt.prompt(promptInput)
+        : await AgentTaskConcurrency.run(taskLane, () => SessionPrompt.prompt(promptInput))
 
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
