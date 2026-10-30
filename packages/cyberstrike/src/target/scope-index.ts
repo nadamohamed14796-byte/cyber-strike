@@ -26,10 +26,10 @@ export function scopeItemSpecificity(input: string): number {
   if (kind === "wildcard" || identifier.startsWith("*.")) {
     return 1_000_000 + identifier.replace(/^\*\./, "").length
   }
-  const isUnypedPath = !kind && identifier.includes("/") &&
+  const isUntypedPath = !kind && identifier.includes("/") &&
     !/^\d+(?:\.\d+){3}\/\d+$/.test(identifier) &&
     !/^(?:\[[0-9a-f:.]+\]|[0-9a-f:.]+)\/\d{1,3}$/i.test(identifier)
-  if (/^https?:\/\//i.test(identifier) || kind === "url" || (kind === "api" && identifier.includes("/")) || isUnypedPath) {
+  if (/^https?:\/\//i.test(identifier) || kind === "url" || (kind === "api" && identifier.includes("/")) || isUntypedPath) {
     try {
       const url = new URL(/^https?:\/\//i.test(identifier) ? identifier : "https://" + identifier)
       return 3_000_000 + url.hostname.length * 100 + url.pathname.length
