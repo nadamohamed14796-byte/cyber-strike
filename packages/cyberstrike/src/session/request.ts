@@ -136,6 +136,23 @@ export namespace Request {
 
     const responseURL = requestResponseURL(input)
     const processed = input.response ? processResponse({ ...input.response, url: responseURL }) : undefined
+    const emptyStaticHTML = processed?.htmlSource
+      ? isConfirmedEmptyStaticHTML({
+          method: input.method,
+          responseStatus: processed.status,
+          responseContentType: processed.contentType,
+          responseSize: processed.originalSize,
+          htmlSource: processed.htmlSource,
+          rawRequest: input.rawRequest,
+          bodyHash: input.bodyHash,
+          queryHash: input.queryHash,
+          protocol: input.protocol,
+          operation: input.operation,
+          triggerElement: input.triggerElement,
+          elementRoles: input.elementRoles,
+          uiContext: input.uiContext,
+        })
+      : false
 
     // Every captured HTTP transaction is an independent analysis item. key_hash
     // remains a structural endpoint identity for observation grouping and correlation,
@@ -176,7 +193,7 @@ export namespace Request {
           response_size: processed?.originalSize ?? null,
           processed_response: processed?.content ?? null,
           javascript_source: processed?.javascriptSource ?? null,
-          html_source: processed?.htmlSource ?? null,
+          empty_static_html: emptyStaticHTML ? 1 : 0,
           time_created: now,
           time_updated: now,
         })
@@ -496,38 +513,12 @@ export namespace Request {
    */
   export function isConfirmedEmptyStatic(id: string): boolean {
     const row = Database.use((db) =>
-      db.select({
-        method: RequestTable.method,
-        response_status: RequestTable.response_status,
-        response_content_type: RequestTable.response_content_type,
-        response_size: RequestTable.response_size,
-        html_source: RequestTable.html_source,
-        raw_request: RequestTable.raw_request,
-        body_hash: RequestTable.body_hash,
-        query_hash: RequestTable.query_hash,
-        protocol: RequestTable.protocol,
-        operation: RequestTable.operation,
-        trigger_element: RequestTable.trigger_element,
-        element_roles: RequestTable.element_roles,
-        ui_context: RequestTable.ui_context,
-      }).from(RequestTable).where(eq(RequestTable.id, id)).get(),
+      db.select({ empty_static_html: RequestTable.empty_static_html })
+        .from(RequestTable)
+        .where(eq(RequestTable.id, id))
+        .get(),
     )
-    if (!row) return false
-    return isConfirmedEmptyStaticHTML({
-      method: row.method,
-      responseStatus: row.response_status ?? undefined,
-      responseContentType: row.response_content_type ?? undefined,
-      responseSize: row.response_size ?? undefined,
-      htmlSource: row.html_source ?? undefined,
-      rawRequest: row.raw_request ?? undefined,
-      bodyHash: row.body_hash ?? undefined,
-      queryHash: row.query_hash ?? undefined,
-      protocol: row.protocol ?? undefined,
-      operation: row.operation ?? undefined,
-      triggerElement: row.trigger_element ?? undefined,
-      elementRoles: (row.element_roles as string[] | null) ?? undefined,
-      uiContext: (row.ui_context as Record<string, unknown> | null) ?? undefined,
-    })
+    return row?.empty_static_html === 1
   }
 
   /**
@@ -550,9 +541,8 @@ export namespace Request {
 
     // A truncated text preview is not enough to establish exact response equality.
     const hasCompleteSource =
-      current.html_source != null ||
       current.javascript_source != null ||
-      current.response_size <= 100 * 1024
+      (current.response_size <= 100 * 1024 && !current.response_content_type?.toLowerCase().includes("text/html"))
     if (!hasCompleteSource) return undefined
 
     const candidates = Database.use((db) =>
@@ -577,7 +567,6 @@ export namespace Request {
       candidate.response_content_type === current.response_content_type &&
       candidate.response_size === current.response_size &&
       candidate.processed_response === current.processed_response &&
-      candidate.html_source === current.html_source &&
       candidate.javascript_source === current.javascript_source &&
       sameJSON(candidate.response_headers, current.response_headers) &&
       sameJSON(candidate.element_roles, current.element_roles) &&
