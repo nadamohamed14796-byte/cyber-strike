@@ -129,3 +129,5 @@ Use one source of truth for each responsibility. Keep shared behavior here rathe
 
 6. **Artifacts:** use structured target tools and the existing canonical root workspace for target-specific notes, inventories, checkpoints, and files. Do not guess output paths, create a workspace per host, or claim success until saved paths and counts are verified.
 
+7. **Agent identity and invocation:** the key in the Agent registry is the stable invocation ID. Configured `name` values are display labels only and may be renamed or duplicated. Any routing, task permission check, delegation argument, resume lookup, or cross-agent reference must use the stable registry key. Use `Agent.entries()` when both the key and metadata are needed; use `Agent.get()` for key lookup (or a unique display-name compatibility lookup). Never build Task tool choices from display labels. Keep agent prompts, permissions, skill references, and registered tool names aligned, and cover cross-registry links with regression tests.
+
