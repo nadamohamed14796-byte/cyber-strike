@@ -1932,7 +1932,7 @@ export namespace TargetMemory {
         // contains wildcard grants is the canonical program ledger too. This
         // takes precedence over overlapping legacy exact-host root workspaces.
         wildcardPolicyRoot: isRootScopeContainer && Boolean(scope?.status === "configured" &&
-          scope.scopeItems.some((item) => /^(?:wildcard[ \\t]*:[ \\t]*)?\\*\\./i.test(item.trim()))),
+          scope.scopeItems.some((item) => /^(?:wildcard[ \t]*:[ \t]*)?\*\./i.test(item.trim()))),
         childExactHost,
         scopeScore,
         domainScore,
