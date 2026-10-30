@@ -1753,9 +1753,13 @@ export const SessionRoutes = lazy(() =>
           sessionID = session.id
         }
         const activeSessionID = sessionID
-        const normalized = isHTTPRequest
-          ? await IngestQueue.track(activeSessionID, () => runNormalize(body, activeSessionID, ingestDryRun), activeSessionID)
-          : await runNormalize(body, activeSessionID, ingestDryRun)
+        // Reserve this capture's FIFO position before asynchronous normalization.
+        // A later request may normalize faster, but it cannot overtake this slot.
+        const captureReservation =
+          isHTTPRequest && !ingestDryRun ? IngestQueue.reserve(activeSessionID, activeSessionID) : undefined
+        let reservationTransferred = false
+        try {
+        const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
 
         // Never route a malformed extension capture into the ordinary parent-chat
         // branch. That fallback writes into the active text window and can hijack
@@ -1871,16 +1875,19 @@ export const SessionRoutes = lazy(() =>
               ? Request.retryFailed(sessionID, existingRequest.id)
               : undefined
             if (retriedRequest) {
-              IngestQueue.enqueue(
-                sessionID,
-                () => analyzeCapturedRequest({
+              const retryTask = () =>
+                analyzeCapturedRequest({
                   sessionID,
                   req: retriedRequest,
                   model: body.model,
                   buildPrompt: () => buildPersistedRequestPrompt(sessionID, retriedRequest),
-                }),
-                sessionID,
-              )
+                })
+              if (captureReservation) {
+                IngestQueue.enqueueReserved(captureReservation, retryTask)
+                reservationTransferred = true
+              } else {
+                IngestQueue.enqueue(sessionID, retryTask, sessionID)
+              }
             }
 
             // Even without an analysis retry, preserve a changed JavaScript body
@@ -2061,11 +2068,13 @@ export const SessionRoutes = lazy(() =>
             // Captured HTTP traffic always enters through the proxy orchestrator subagent.
             // Do not let an ingest payload redirect a browser request into the primary chat
             // agent or an unrelated specialist; plain-text ingest retains its explicit agent option.
-            IngestQueue.enqueue(
-              sessionID,
-              () => analyzeCapturedRequest({ sessionID, req, model: body.model, buildPrompt }),
-              sessionID,
-            )
+            const requestTask = () => analyzeCapturedRequest({ sessionID, req, model: body.model, buildPrompt })
+            if (captureReservation) {
+              IngestQueue.enqueueReserved(captureReservation, requestTask)
+              reservationTransferred = true
+            } else {
+              IngestQueue.enqueue(sessionID, requestTask, sessionID)
+            }
           }
         } else {
           // Non-HTTP request (plain text message)
@@ -2098,6 +2107,11 @@ export const SessionRoutes = lazy(() =>
         }
         c.status(202)
         return c.json({ sessionID })
+        } finally {
+          if (captureReservation && !reservationTransferred) {
+            IngestQueue.skipReserved(captureReservation)
+          }
+        }
       },
     )
     .delete(
