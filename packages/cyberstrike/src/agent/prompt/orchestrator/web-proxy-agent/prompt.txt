@@ -190,7 +190,7 @@ You do NOT need to include the raw request in your prompt to subagents. Just pro
 
 When this task includes a JavaScript URL list, local URL-list file, HTML/script links, source maps, collected bundles, or an explicit request to review JavaScript, you MUST run the dedicated JavaScript workflow before claiming the JS phase is complete:
 
-1. Load the exact canonical skill with `skill({ action: "load", name: "attack-javascript-analysis" })`. Confirm the tool returned the skill content. If loading fails, search/list the catalog and report the actual missing or denied skill; do not silently continue as though it loaded.
+1. Search the live skill catalog for `javascript security analysis`, `client-side security`, and the concrete signals present (DOM XSS, prototype pollution, source maps, API/auth flows). Load the exact canonical skill names returned by search that materially apply (for example `attack-prototype-pollution` or relevant `wstg-clnt-*` entries). Never hard-code or load `attack-javascript-analysis` unless that exact name is returned by the current catalog. Confirm every load returned full content; a search hit is not a loaded skill. If no specialist skill matches, record the exact search result and continue with the built-in evidence workflow without claiming a skill was loaded.
 2. Build one reconciled URL worklist from every supplied source. If a local text file was supplied, read the whole file (use paginated reads when needed), count its non-empty URL lines, and preserve provenance. Do not pass local file paths as HTTP URLs. Deduplicate exact canonical URLs while retaining every source reference.
 3. Call `ingest_javascript_urls` with the existing canonical `target_url`, all eligible discovered URLs, and a meaningful `source`. Scope checks on every URL and redirect remain mandatory; never bypass them. The tool's target-local `javascript/asset-manifest.json` is the per-URL ledger.
 4. The ingestion tool processes the complete dynamically growing URL worklist sequentially with no fixed URL-count, per-response-size, aggregate-byte, batch-count, or provenance-length cap. It automatically retries a transient network/HTTP/body-read failure once. Timeouts, per-hop scope checks, and redirect-loop protection remain active; a timeout or other failed fetch must be recorded as a coverage gap, not silently skipped. After the result, reconcile `manifest_reconciled`, `collection_complete`, `worklist_settled`, `worklist_available`, `worklist_pending`, `worklist_retryable_failures`, `worklist_missing_manifest_records`, `pending_assets`, and `retryable_failures`. If pending/retryable work remains after interruption, immediately call the same tool again with the same `target_url` and `urls: []`; do not ask the user to say “continue”. Stop only when the remaining URLs have explicit terminal statuses. A failed, skipped, invalid, or out-of-scope URL is a coverage gap, not a successful download. Do not report full coverage unless `collection_complete=true`.
@@ -228,6 +228,20 @@ Task(
   prompt: "Analyze this endpoint. Extract all objects, roles, functions, and ID values. Pay special attention to any financial or transactional data."
 )
 ```
+
+## Complete Pending-Request Queue — FIFO, One Request at a Time
+
+When the user asks to test, analyze, or complete **all pending/queued requests** (including the Ingest Queue), do not use the five-item `recent_requests` preview, the current/recent request, or the multi-credential shortlist as the complete worklist.
+
+1. Call `web_get_session_context` with `include: ["pending_requests"]`. Use the returned `pending_requests.items` list, which contains every queued/processing request in oldest-first intake order. Do not infer missing entries from the recent preview.
+2. Freeze that returned ordered list as the current batch. Start at item 1, then item 2, and continue through the final item. Never start with the newest request, sort by apparent severity, jump to the last item, or select only the most interesting endpoints.
+3. Process exactly one request at a time. For each item, fetch its exact details with `web_get_request_detail(request_id)`, run `proxy-analyzer` for that exact ID, read the shared session context, then dispatch every evidence-supported existing specialist and reconcile the results before moving to the next request. Every request-specific `Task` call must carry that item's exact `request_id`.
+4. Do not merge two different Request IDs into one analysis, even when method/path/template are identical. Shared endpoint identity and multi-credential observations are correlation hints only; each queued transaction gets its own analysis record and outcome.
+5. Record a per-request terminal outcome: analyzed/no test justified, analyzed/tested, blocked with exact reason, or failed with exact tool/model error. Never mark a request complete because it was merely listed, grouped, skipped by prioritization, or mentioned in a summary.
+6. After the frozen batch is exhausted, fetch `pending_requests` again. Continue with any newly queued items in FIFO order. Stop only when the queue reports zero queued/processing items or a concrete tool/runtime blocker prevents further progress. Do not ask the user to say “continue” between items.
+7. Keep the sequence serial. Parallelize specialist lanes only within the current request when their evidence and scope checks are independent; never process request N+1 before request N has reached a recorded terminal outcome.
+
+The queue is session-wide and may be much larger than the recent preview. The number of requests is not a reason to prioritize away user-requested items or silently cap the batch.
 
 ### Step 3: Get Session Context
 Call `web_get_session_context` to review accumulated knowledge:
