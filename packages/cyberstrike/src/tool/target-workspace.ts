@@ -245,7 +245,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       let resolvedWildcardRoot = false
       if (resolvedWorkspace?.parentTargetID === null) {
         try {
-          resolvedWildcardRoot = new URL(resolvedWorkspace.targetURL).hostname.startsWith("*.")
+          resolvedWildcardRoot = new URL(resolvedWorkspace.targetURL).hostname.startsWith("*.") ||
+            Boolean(resolution.scope?.status === "configured" &&
+              resolution.scope.scopeItems.some((item) => /^(?:wildcard[ \\t]*:[ \\t]*)?\\*\\./i.test(item.trim())))
         } catch {
           resolvedWildcardRoot = false
         }
