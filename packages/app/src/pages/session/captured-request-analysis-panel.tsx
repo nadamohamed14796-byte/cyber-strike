@@ -63,7 +63,7 @@ export function CapturedRequestAnalysisPanel() {
     const sessionID = parentID()
     if (!sessionID) return []
     const messages = sync.data.message[sessionID] ?? []
-    const rows: Array<RequestAnalysis & { messageID: string; text: string }> = []
+    const latestByRequest = new Map<string, RequestAnalysis & { messageID: string; text: string }>()
     for (const message of messages) {
       for (const part of sync.data.part[message.id] ?? []) {
         if (part.type !== "text") continue
@@ -80,14 +80,16 @@ export function CapturedRequestAnalysisPanel() {
           !value.method ||
           !value.url
         ) continue
-        rows.push({
+        // Retries reuse the same canonical request ID. Keep its newest notice
+        // instead of showing the failed historical attempt as a duplicate card.
+        latestByRequest.set(value.requestID, {
           ...value,
           messageID: message.id,
           text: part.text,
         })
       }
     }
-    return rows.sort((a, b) => a.messageID.localeCompare(b.messageID))
+    return [...latestByRequest.values()].sort((a, b) => a.messageID.localeCompare(b.messageID))
   })
   const latest = createMemo(() => analyses().at(-1))
   const selected = createMemo(
