@@ -4,6 +4,7 @@ import {
   isInternalImpactHandoff,
   requestIDFromPromptText,
   requestIDFromRecentPromptTexts,
+  requestIDsFromTaskPrompt,
   selectTaskRequestContext,
   shouldInferSessionRequestID,
   proxyTesterMethodologyBlock,
@@ -95,6 +96,27 @@ test("request identity parser reads only known identity sections", () => {
 
   expect(requestIDFromPromptText("Request ID: not-in-a-known-section")).toBeUndefined()
   expect(requestIDFromPromptText("## Request Task Identity\n- Method: GET")).toBeUndefined()
+})
+
+test("task dispatch extracts only explicit Request ID fields from the prompt", () => {
+  expect(requestIDsFromTaskPrompt([
+    "Analyze the captured endpoint.",
+    "**Request ID**: req_18c685e02001AsLhjYeJMvnUHp",
+    "Other request references in prose must not bind this task.",
+  ].join("\n"))).toEqual(["req_18c685e02001AsLhjYeJMvnUHp"])
+
+  expect(requestIDsFromTaskPrompt([
+    "- request_id: req-captured-2",
+    "- Method: POST",
+    "- Request ID: req-captured-2",
+  ].join("\n"))).toEqual(["req-captured-2"])
+
+  expect(requestIDsFromTaskPrompt("This paragraph mentions Request ID: req-decoy but is not a field."))
+    .toEqual([])
+  expect(requestIDsFromTaskPrompt([
+    "Request ID: req-first",
+    "request_id: req-second",
+  ].join("\n"))).toEqual(["req-first", "req-second"])
 })
 
 test("persistent broker request identity follows the latest captured turn", () => {
