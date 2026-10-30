@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { SessionTurn } from "@cyberstrike-io/ui/session-turn"
+import type { UserMessage } from "@cyberstrike-io/sdk/v2/client"
 import { Identifier } from "@/utils/id"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -102,7 +103,7 @@ export function CapturedRequestAnalysisPanel() {
     const id = analysisSessionID()
     return id ? (sync.data.message[id] ?? []) : []
   })
-  const childUserMessages = createMemo(() => childMessages().filter((message) => message.role === "user"))
+  const childUserMessages = createMemo(() => childMessages().filter((message): message is UserMessage => message.role === "user"))
   // A persistent broker contains many captured request turns. Keep each panel
   // focused on the selected request while allowing explicitly tagged follow-ups
   // to switch back to an older request without mixing the other turns' activity.
@@ -115,8 +116,7 @@ export function CapturedRequestAnalysisPanel() {
         messages.map((message) => ({
           messageID: message.id,
           text: (sync.data.part[message.id] ?? [])
-            .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
-            .map((part) => part.text)
+            .flatMap((part) => (part.type === "text" && !part.synthetic && !part.ignored ? [part.text] : []))
             .join("\n"),
         })),
       ).map((turn) => [turn.messageID, turn.requestID] as const),
