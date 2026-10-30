@@ -18,8 +18,8 @@ def has_shared_catalog_reference(content:str)->bool:
     if "TOOLING_CATALOG.md" not in content:
         return False
     return bool(re.search(
-        r"(?:single|shared|canonical).{0,160}(?:TOOLING_CATALOG\\.md|tool(?:ing)? catalog|catalog)|"
-        r"(?:TOOLING_CATALOG\\.md|tool(?:ing)? catalog|catalog).{0,160}(?:single|shared|canonical)",
+        r"(?:single|shared|canonical).{0,160}(?:TOOLING_CATALOG\.md|tool(?:ing)? catalog|catalog)|"
+        r"(?:TOOLING_CATALOG\.md|tool(?:ing)? catalog|catalog).{0,160}(?:single|shared|canonical)",
         content,
         re.IGNORECASE|re.DOTALL,
     ))
@@ -37,10 +37,10 @@ def inspect(path:Path,root:Path)->dict:
         section_end=section_start+2+next_heading.start() if next_heading else len(content)
         sections.append(content[section_start:section_end])
     section="\n".join(sections)
-    tool_heading=bool(re.search(r"^#{1,4}\s+.*\b(tools?|tooling|dependencies|cli)\b",content,re.I|re.M))
+    tool_heading=bool(re.search(r"^#{1,4}\s+.*\b(tools?|tooling|dependencies|cli)\b",content,re.I|re.M)) or shared_catalog_ref
     marker_count=sum(content.count(marker) for marker in TOOL_MARKERS)
-    has_ref=bool(URL.search(section)) or bool(re.search(r"^#{1,4}\s+.*\b(references?|resources?)\b",section,re.I|re.M))
-    has_cli=bool(CLI.search(section)) or bool(re.search(r"\b(subfinder|dnsx|httpx|katana|ffuf|nuclei|sqlmap|gitleaks|trivy|jq|python3)\b",section))
+    has_ref=bool(URL.search(section)) or bool(re.search(r"^#{1,4}\s+.*\b(references?|resources?)\b",section,re.I|re.M)) or shared_catalog_ref
+    has_cli=bool(CLI.search(section)) or bool(re.search(r"\b(subfinder|dnsx|httpx|katana|ffuf|nuclei|sqlmap|gitleaks|trivy|jq|python3)\b",section)) or shared_catalog_ref
     has_install=bool(INSTALL.search(section)) or shared_catalog_ref
     ui=sorted(set(UI_FIRST.findall(section)))
     missing=[]
