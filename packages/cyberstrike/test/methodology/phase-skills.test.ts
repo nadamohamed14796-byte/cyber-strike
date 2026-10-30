@@ -24,6 +24,18 @@ describe("Recon prompt specialization", () => {
   })
 })
 
+describe("Provider prompt agent-roster alignment", () => {
+  test("provider-specific prompts discover the live Task roster instead of freezing an agent list", async () => {
+    const promptNames = ["codex_header.txt", "beast.txt", "gemini.txt", "trinity.txt", "qwen.txt", "anthropic.txt"]
+    for (const name of promptNames) {
+      const prompt = await Bun.file(path.resolve(import.meta.dir, "../../src/session/prompt", name)).text()
+      expect(prompt, name).toContain("live Available agent types roster")
+      expect(prompt, name).toContain("Methodology phase or parent-workflow position is not a dispatch prerequisite")
+      expect(prompt, name).not.toContain("You can delegate to specialized agents via the Task tool:")
+    }
+  })
+})
+
 describe("Phase-critical skill pinning", () => {
   test("every pinned phase-critical skill exists in the actual runtime catalog", async () => {
     await Instance.provide({
