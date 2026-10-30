@@ -1,6 +1,7 @@
 ---
 name: wstg-injection
 description: Evidence-led input validation and injection testing for authorized web applications
+category: input-validation
 tags: [injection, sqli, xss, ssti, xxe, command-injection, ldap, wstg]
 version: "1.1"
 ---
