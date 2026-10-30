@@ -87,3 +87,37 @@ test("target_artifact keeps canonical inventories and supporting files in compac
     },
   })
 })
+
+
+test("serializes concurrent first-writes to one artifact path without losing the winner", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const target = "https://parallel-artifacts.example.test"
+        const workspace = await TargetMemory.ensure(target)
+        const tool = await TargetArtifactTool.init()
+        const ctx = {
+          sessionID: "ses_parallel_artifacts_test",
+          messageID: "msg_parallel_artifacts_test",
+          agent: "test",
+          abort: new AbortController().signal,
+          messages: [],
+          ask: async () => undefined,
+          metadata: () => undefined,
+        } as never
+        const attempts = await Promise.all([
+          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer A evidence.\\n" }, ctx),
+          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer B evidence.\\n" }, ctx),
+        ])
+        expect(attempts.filter((result) => result.metadata.saved === true)).toHaveLength(1)
+        expect(attempts.filter((result) => result.metadata.reason === "already_exists")).toHaveLength(1)
+        const saved = await fs.readFile(path.join(workspace.workspacePath, "findings", "shared-summary.md"), "utf-8")
+        expect(["Writer A evidence.\\n", "Writer B evidence.\\n"]).toContain(saved)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
