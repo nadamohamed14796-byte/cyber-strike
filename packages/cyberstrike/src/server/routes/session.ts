@@ -180,7 +180,7 @@ function buildPromptWithCredentialContext(
     lines.push("- Baseline response status: " + (requestContext.responseStatus ?? "unknown"))
     lines.push("")
     lines.push("## Required Evidence-Driven Analysis and Memory")
-    lines.push("This is one independent captured-request task. Analyze this request only; do not launch full-target recon or unrelated scans.")
+    lines.push("This is one new captured-request turn inside the persistent Proxy Agent broker session. Analyze the exact request_id in this turn, reuse connected root-session and target evidence from earlier requests and sibling agents, and do not switch to another request or launch unrelated full-target recon.")
     lines.push("Inspect existing target/session context and relevant endpoint/JavaScript evidence before selecting a test. Reuse prior results and do not repeat tests already resolved.")
     lines.push("Separate observed facts, hypotheses, and confirmed impact. A missing header, scanner signal, unusual status, endpoint existence, or static JavaScript sink is not by itself a confirmed vulnerability.")
     lines.push("For INFO/LOW hardening signals, preserve the observation and investigate whether a concrete, in-scope attack path crosses a real security boundary. Use baseline/negative controls and safe, hypothesis-driven variations; never invent a chain or inflate severity. Raise severity only after demonstrating realistic impact and reproducible evidence. If no impact is demonstrated, keep it INFO/LOW and state why.")
@@ -362,6 +362,36 @@ type CapturedRequestAnalysisInput = {
  * Run persisted captured-request work through the same analysis path regardless
  * of whether the request arrived now or was restored after a process restart.
  */
+const PROXY_BROKER_TITLE = "Extension Proxy Broker (@proxy-agent subagent)"
+
+/**
+ * Reuse one persistent Proxy Agent child under the active main session.
+ * Every captured request becomes a new turn in this broker session; specialist
+ * Task sessions are then nested beneath it by the existing Task tool.
+ */
+async function getOrCreateProxyBrokerSession(input: {
+  parentSessionID: string
+  config: Awaited<ReturnType<typeof Config.get>>
+}): Promise<Session.Info> {
+  const children = await Session.children(input.parentSessionID)
+  const existing = children.find((child) => child.title === PROXY_BROKER_TITLE)
+  if (existing) return existing
+
+  return Session.create({
+    parentID: input.parentSessionID,
+    title: PROXY_BROKER_TITLE,
+    permission: [
+      { permission: "todowrite", pattern: "*", action: "deny" },
+      { permission: "todoread", pattern: "*", action: "deny" },
+      ...(input.config.experimental?.primary_tools?.map((tool) => ({
+        pattern: "*",
+        action: "allow" as const,
+        permission: tool,
+      })) ?? []),
+    ],
+  })
+}
+
 async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Promise<void> {
   const sessionID = input.sessionID
   const req = input.req
@@ -405,7 +435,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   sessionID,
                   agent: proxyAgent.name,
                   model,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the isolated analysis session…\n`,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the shared Proxy Agent broker session…\n`,
                   requestAnalysis: {
                     requestID: req.id,
                     method: normalized.method,
@@ -423,26 +453,15 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   )
                 }
                 const config = await Config.get()
-                const hasTaskPermission = taskPermission === "allow"
-                const childSession = await Session.create({
-                  parentID: sessionID,
-                  title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
-                  permission: [
-                    { permission: "todowrite", pattern: "*", action: "deny" },
-                    { permission: "todoread", pattern: "*", action: "deny" },
-                    ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
-                    ...(config.experimental?.primary_tools?.map((tool) => ({
-                      pattern: "*",
-                      action: "allow" as const,
-                      permission: tool,
-                    })) ?? []),
-                  ],
+                const childSession = await getOrCreateProxyBrokerSession({
+                  parentSessionID: sessionID,
+                  config,
                 })
                 const analysisSessionID = childSession.id
                 childSessionID = analysisSessionID
-                log.info("captured request subagent started", {
+                log.info("captured request routed to persistent Proxy Agent broker", {
                   sessionID,
-                  analysisSessionID,
+                  brokerSessionID: analysisSessionID,
                   requestID: req.id,
                   agent: proxyAgent.name,
                 })
@@ -497,7 +516,9 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                     todoread: false,
                     ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
                   },
-                  excludeHistory: true,
+                  // Keep the broker's prior request turns so discoveries can be
+                  // correlated across captures. The exact current request_id is
+                  // carried in this new user turn and delegated explicitly by Task.
                   parts: [{ type: "text", text: promptText }],
                 })
                 // SessionPrompt.prompt can resolve with an assistant message carrying
@@ -517,7 +538,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   failureReason = failureReason.slice(0, 500)
                 }
                 await IngestSummary.write({
-                  // Keep completion chatter in the request child session, not the active parent transcript.
+                  // Keep completion chatter in the shared Proxy Agent broker session.
                   sessionID: analysisSessionID,
                   agent: agentName,
                   model,
@@ -652,7 +673,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                       sessionID,
                       agent: agentName,
                       model: fallbackModel,
-                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
+                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the shared Proxy Agent broker session…\n`,
                       requestAnalysis: {
                         requestID: req.id,
                         method: normalized.method,
@@ -682,9 +703,9 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                     text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}${failureReason ? `\nFailure reason: ${failureReason}` : ""}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
                   }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
                 }
-                log.info("captured request subagent finished", {
+                log.info("captured request broker turn finished", {
                   sessionID,
-                  analysisSessionID: childSessionID,
+                  brokerSessionID: childSessionID,
                   requestID: req.id,
                   status: finalStatus,
                 })
@@ -769,7 +790,6 @@ export function recoverPendingRequests(): void {
             buildPrompt: () => buildPersistedRequestPrompt(request.session_id, resumable),
           }),
         request.session_id,
-        true,
       )
       state.scheduled.add(request.id)
       scheduled++
@@ -1251,7 +1271,6 @@ export const SessionRoutes = lazy(() =>
               buildPrompt: () => buildPersistedRequestPrompt(sessionID, req),
             }),
           sessionID,
-          true,
         )
 
         c.status(202)
@@ -1861,7 +1880,6 @@ export const SessionRoutes = lazy(() =>
                   buildPrompt: () => buildPersistedRequestPrompt(sessionID, retriedRequest),
                 }),
                 sessionID,
-                true,
               )
             }
 
@@ -2047,7 +2065,6 @@ export const SessionRoutes = lazy(() =>
               sessionID,
               () => analyzeCapturedRequest({ sessionID, req, model: body.model, buildPrompt }),
               sessionID,
-              true,
             )
           }
         } else {
