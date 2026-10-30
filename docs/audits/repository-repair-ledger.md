@@ -650,3 +650,12 @@ Relevant commits:
 ## Follow-up correction: verification attempt count is not a verdict threshold — 2026-10-19
 
 Earlier audit entries that describe a fixed 20-attempt minimum are historical descriptions of the earlier implementation and are superseded by the subsequent main-branch reconciliation. The current policy does not use a numeric attempt threshold. A false-positive/disproven verdict requires fully resolved applicable checks, multiple directly supported contradictions including a primary contradiction, matching evidence-backed executed-attempt outcomes, and an evidence-backed durable `DISPROVEN` outcome bound to the exact finding. Scope, authorization, or safety blockers and exhausted relevant safe checks leave the hypothesis inconclusive. Duplicate strategy/variant pairs are deduplicated; no arbitrary attempt-count minimum or maximum is imposed.
+
+## Follow-up checkpoint — 2026-10-30: direct specialist dispatch and bare-path scope indexing
+
+- Corrected the CyberStrike root prompt so every registered agent in the live Task roster, including hidden proxy specialists, is directly callable when its evidence-backed task is ready. Documented parent workflows remain orchestration guidance, not dispatch prerequisites. Added a prompt regression test.
+- Fixed matchingScopeItems() indexing for untyped host/path scope entries. They were previously classified as exact-host keys, so the indexed authorization/workspace-selection path could fail to return a valid path grant even though checkMatch() supported it.
+- Fixed scopeItemSpecificity() so bare host/path entries rank as URL/path grants above bare-host grants, preserving the intended most-specific workspace selection. CIDR entries retain CIDR specificity.
+- Added regression tests for path-boundary matching, host mismatch, sibling-prefix rejection, and path-over-host precedence.
+- Commits: direct specialist dispatch c92553df7b52f74a6cbb9faa0d4ac130df8821ae, regression 3a6a543274b77e3287f3f4f47266d0e64c7a4d57; bare-path indexing 7798d9fbc496216444914a335dc982d14d540ce0, regression 0ba4eeb15afd38748a23ad0222381fbc362ae6f0; specificity correction d2ac79899593fb3428cd05f25b07a344c824935d, regression 9bb7769f1809d73b6b6f8baee5e7ac0386f33ae4.
+- Source and regression files were fetched back from main and the expected changes were confirmed. Bun tests, typecheck, and build have not been run in this environment. Do not mark runtime verification complete.
