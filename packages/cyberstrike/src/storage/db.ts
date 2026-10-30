@@ -127,6 +127,16 @@ export namespace Database {
         }
       }
 
+      if (entry.name === "20261030210000_request-html-source" && tableExists(sqlite, "request")) {
+        if (tableColumns(sqlite, "request").has("empty_static_html")) {
+          const addEmptyStaticHTML = /ALTER TABLE request ADD COLUMN empty_static_html INTEGER NOT NULL DEFAULT 0;/i
+          if (!addEmptyStaticHTML.test(sql)) {
+            throw new Error("The request empty-HTML triage migration no longer matches its compatibility guard.")
+          }
+          sql = sql.replace(addEmptyStaticHTML, "SELECT 1;")
+        }
+      }
+
       if (entry.name === "20261017190000_request-javascript-source" && tableExists(sqlite, "request")) {
         if (tableColumns(sqlite, "request").has("javascript_source")) {
           const addJavaScriptSource = /ALTER TABLE request ADD COLUMN javascript_source TEXT;/i
