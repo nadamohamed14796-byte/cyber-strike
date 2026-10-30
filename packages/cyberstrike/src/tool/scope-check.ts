@@ -67,8 +67,13 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       let workspace
       let persisted: Awaited<ReturnType<typeof TargetMemory.getScope>>
       try {
-        workspace = await TargetMemory.get(params.target_url)
-        persisted = await TargetMemory.getScope(params.target_url)
+        // Resolve the supplied workspace URL through the same canonical selector
+        // used by active tools. Exact lookup alone could read the legacy www root
+        // while the authoritative scope decision selected an overlapping wildcard
+        // program root, producing a misleading source/manifest in the UI.
+        const workspaceResolution = await TargetMemory.checkURLScope(params.target_url)
+        workspace = workspaceResolution.workspace ?? await TargetMemory.get(params.target_url)
+        persisted = workspace ? await TargetMemory.getScope(workspace.targetURL) : undefined
         // A child without its own scope inherits the saved parent scope. Its own
         // scope, when configured, is still intersected with the parent at decision time.
         if ((!persisted || persisted.status !== "configured" || persisted.scopeItems.length === 0) && workspace?.parentTargetID) {
@@ -140,6 +145,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     const displayedMatches = allMatched.slice(0, MAX_SCOPE_MATCHES_IN_OUTPUT)
     const output = [
       "Target: " + target,
+      ...(scopeConfigured && params.target_url && workspace ? ["Canonical workspace target: " + workspace.targetURL] : []),
       informationalOnly
         ? "Matches supplied scope entries: " + (included && !excluded ? "YES" : "NO")
         : "In scope: " + (inScope ? "YES" : "NO"),
@@ -184,6 +190,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
         scopeMatchOnly: informationalOnly,
         scopeConfigured,
         scopeSource,
+        workspace_target_url: scopeConfigured ? workspace?.targetURL : undefined,
         excluded,
         include_match_count: includeMatches.length,
         exclude_match_count: excludeMatches.length,
