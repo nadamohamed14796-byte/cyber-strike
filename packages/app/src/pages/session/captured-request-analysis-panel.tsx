@@ -125,7 +125,7 @@ export function CapturedRequestAnalysisPanel() {
   })
   const replyModelMessage = createMemo(
     () =>
-      childUserMessages().at(-1) ??
+      requestTurnMessages().at(-1) ??
       (sync.data.message[parentID()] ?? [])
         .filter((message): message is UserMessage => message.role === "user" && message.agent !== "proxy-agent")
         .at(-1),
