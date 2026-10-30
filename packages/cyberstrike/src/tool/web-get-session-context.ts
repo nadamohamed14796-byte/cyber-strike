@@ -24,7 +24,7 @@ It returns:
 - recent_requests: the last 5 analyzed endpoints (id + method + path). For a request's full headers/body/response, call web_get_request_detail(id).
 - observations: the cross-credential IDOR shortlist (endpoints reached by 2+ credentials).
 
-Add 'retest_queue' to include the pending re-test queue.`
+Add 'retest_queue' to include the pending re-test queue. Add 'pending_requests' to return EVERY queued/processing captured request in original FIFO intake order; recent_requests is only a five-item preview and must never be used as the complete queue.`
 
 export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
   description,
@@ -127,6 +127,27 @@ export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
         return { request_id: r?.id ?? null, method: r?.method ?? null, path: r?.path ?? null, params: s.paramNames }
       })
     context.observations = { multi_credential_count: multiCred.length, multi_credential_endpoints: multiCred }
+
+    if (include.includes("pending_requests")) {
+      // Request.get() is ordered by ascending intake ID. Expose the complete
+      // unfinished queue so orchestration never mistakes the five-item preview
+      // for the whole queue or starts from the newest capture.
+      const pendingRequests = allRequests.filter((request) => request.status === "queued" || request.status === "processing")
+      context.pending_requests = {
+        total: pendingRequests.length,
+        queued: pendingRequests.filter((request) => request.status === "queued").length,
+        processing: pendingRequests.filter((request) => request.status === "processing").length,
+        order: "oldest-first FIFO",
+        items: pendingRequests.map((request) => ({
+          id: request.id,
+          method: request.method,
+          path: request.normalized_path,
+          origin: request.origin ?? null,
+          credential_id: request.credential_id ?? null,
+          status: request.status,
+        })),
+      }
+    }
 
     if (include.includes("retest_queue")) {
       const counts = WebRetest.count(sessionID)
