@@ -212,7 +212,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       modelID: currentModel.id,
       providerID: currentModel.provider.id,
     }
-    const agent = currentAgent.name
+    const agent = currentAgent.id
     const variant = local.model.variant.current()
 
     const clearInput = () => {
