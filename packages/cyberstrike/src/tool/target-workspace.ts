@@ -193,7 +193,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       if (wildcardTarget && !exactWorkspace) {
         return {
           title: "Wildcard scope cannot create a target workspace",
-          output: "No workspace or scope was created. A wildcard such as " + targetURL + " is a scope expression, not a workspace identity. Initialize one concrete canonical root from target_workspace(action=\\"list\\") and put the wildcard in its include list or scope file.",
+          output: "No workspace or scope was created. A wildcard such as " + targetURL + " is a scope expression, not a workspace identity. Initialize one concrete canonical root from target_workspace(action=\"list\") and put the wildcard in its include list or scope file.",
           metadata: { saved: false, reason: "wildcard_workspace_identity_rejected", target_url: targetURL } as TargetWorkspaceMetadata,
         }
       }
