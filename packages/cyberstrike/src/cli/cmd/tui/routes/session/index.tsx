@@ -135,7 +135,8 @@ export function Session() {
   const proxyAgentSession = createMemo(
     () =>
       !!session()?.parentID &&
-      (session()?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
+      (session()?.title === "Agent Proxy" ||
+        session()?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         messages().some((message) => message.role === "user" && message.agent === "proxy-agent")),
   )
   const permissions = createMemo(() => {
