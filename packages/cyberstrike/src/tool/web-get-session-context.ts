@@ -30,7 +30,7 @@ export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
   description,
   parameters: z.object({
     include: z
-      .array(z.enum(["retest_queue"]))
+      .array(z.enum(["retest_queue", "pending_requests"]))
       .optional()
       .describe(
         "Optional extra sections. The core (recent, catalog, credentials, vulnerabilities, recent_requests, observations) is always returned.",
