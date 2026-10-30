@@ -914,9 +914,10 @@ export namespace SessionPrompt {
           lines.push("", "Recommended skills for this agent (load these first):")
           for (const name of agent.skills) lines.push(`- ${name}`)
         }
-        const loaded = SkillContext.active()
+        const skillScope: SkillContext.ContextScope = { sessionID, agent: agent.name }
+        const loaded = SkillContext.active(skillScope)
         if (loaded.length > 0) {
-          lines.push("", `Currently loaded: ${loaded.join(", ")} (${SkillContext.tokenCount()} tokens)`)
+          lines.push("", `Currently loaded: ${loaded.join(", ")} (${SkillContext.tokenCount(skillScope)} tokens)`)
         }
         system.push(lines.join("\n"))
       }
