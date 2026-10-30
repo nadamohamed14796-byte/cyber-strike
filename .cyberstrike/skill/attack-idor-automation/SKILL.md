@@ -342,6 +342,25 @@ Mark a hypothesis confirmed only with direct, durable evidence collected under v
 ### Endpoint deduplication and state proof
 Keep one endpoint record keyed by method + normalized route + parameter shape, with separate observations for every parameter, identity, tenant, role, and response context. Do not create one finding or route entry per swapped ID. For each candidate, preserve owner-object, cross-account control, cross-tenant control, and a known-invalid ID baseline; mutate only a controlled object reference and verify returned object identity or authoritative state. Compare reads, updates, deletes, bulk actions, nested objects, exports, and alternate transport only when actually supported. Hand off role-operation failures to BFLA and sensitive-field-only gaps to property authorization, keeping each distinct root cause separately evidenced.
 
+## Same-tenant controls are not cross-tenant IDOR evidence
+
+Treat identity and tenant membership as separate dimensions. Record each observed tuple as:
+
+`(credential/principal, role, tenant/org, object owner, object ID, action, request ID)`.
+
+If Owner A and Low User A both use `to=68000`, and the authorized test context establishes that `68000` is their shared organization, classify the observation as a **same-tenant control**. It can help determine role-level behavior within that organization, but it cannot establish cross-tenant access. Do not label it an ambiguous cross-tenant IDOR candidate, and do not dispatch a cross-tenant validation task solely because the parameter is caller-controlled.
+
+A genuine cross-tenant comparison requires a separately authorized test principal (Owner B or another controlled account) with a known, different tenant/org identifier and a synthetic object owned by that tenant. Compare the expected owner/tenant baseline with the other tenant's principal using the same observed operation and the smallest read-only proof. Keep role, tenant, object owner, and object ID distinct; do not substitute an unrelated numeric value or enumerate IDs to manufacture a second tenant.
+
+If the current evidence contains only the shared `68000` value, record:
+- observed: Owner A and Low User A both submitted `to=68000`;
+- interpretation: same-tenant control (assuming the supplied org mapping is valid);
+- ruled out: this pair does not demonstrate cross-tenant IDOR;
+- missing evidence: a controlled principal and synthetic object belonging to a different tenant;
+- status: cross-tenant hypothesis unresolved / inconclusive, not confirmed and not disproven.
+
+Do not claim the server uses the `to` field as an organization selector unless the request/response, UI, schema, or explicit test context establishes that meaning. A matching value is a control only when the tenant mapping is independently known.
+
 ## Cross-boundary comparison matrix
 
 Use this matrix to make coverage explicit without spraying identifier guesses. Each row needs a real observed operation and a fixture controlled by the tester.
