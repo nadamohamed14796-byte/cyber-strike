@@ -593,7 +593,7 @@ export namespace MethodologyContext {
           `  FIX: Re-delegate with instruction "provide full PoC — requestSent, responseSummary (50+ chars), reasoning (100+ chars), requestCount ≥ 1"`,
         )
       } else if (v.gate === "methodology_ordering") {
-        lines.push(`  FIX: Complete prerequisite phases first before advancing`)
+        lines.push(`  NOTE: Methodology ordering is a workflow warning, not a tester-dispatch lock. Continue independent evidence-supported testers when their own scope, authorization, safety, and test-specific prerequisites are satisfied.`)
       }
     }
 
