@@ -22,7 +22,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     "Simple workflow: search by evidence, technology, or skill name; load the exact returned name; read the returned content before applying it. All catalog skills are searchable and loadable, but load only relevant skills rather than the whole catalog.",
     "",
     "Actions: load full content; search metadata; outline a preview; list available/loaded skills; suggest or chain conditional next skills; unload a skill when no longer needed.",
-    "Search and list are paginated; continue with the returned next offset when needed. A search hit or outline is not loaded content. A skill never grants scope or testing permission."
+    "Search supports exact tag, tech-stack, CWE, category, or free-text routing filters. Search and list are paginated; continue with the returned next offset when needed. A search hit or outline is not loaded content. A skill never grants scope or testing permission."
   ].join("\n")
 
   const parameters = z.object({
