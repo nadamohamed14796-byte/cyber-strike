@@ -75,8 +75,8 @@ test("request identity parser reads only known identity sections", () => {
 })
 
 test("persistent broker request identity follows the latest captured turn", () => {
-  const first = "## Request Task Identity\\n- Request ID: req-first\\n- Method: GET"
-  const second = "## Request Task Identity\\n- Request ID: req-second\\n- Method: POST"
+  const first = ["## Request Task Identity", "- Request ID: req-first", "- Method: GET"].join("\n")
+  const second = ["## Request Task Identity", "- Request ID: req-second", "- Method: POST"].join("\n")
   const followUp = "Please explain the previous result without starting a new capture."
 
   expect(requestIDFromRecentPromptTexts([first, second])).toBe("req-second")
