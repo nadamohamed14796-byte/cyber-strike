@@ -228,6 +228,7 @@ test("proxy-agent can run standalone and remain available as a delegated subagen
       expect(analyzer?.prompt).toContain("Cross-Request Correlation and Cost Discipline")
       expect(analyzer?.prompt).toContain("SAME-TENANT CONTROL")
       expect(analyzer?.prompt).toContain("different tenant")
+      expect(analyzer?.prompt).toContain("related_operation_values")
     },
   })
 })
