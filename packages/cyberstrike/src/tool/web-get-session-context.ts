@@ -12,7 +12,9 @@ import { Vulnerability } from "../session/vulnerability"
 import { ResearchContext } from "../learning/research-context"
 import { TargetMemory } from "../target"
 
-const description = `Get the bounded web-application context for this session — scoped to the endpoint you are testing, so it stays small no matter how large the session grows.
+const description = `Get the bounded shared web-application context for this session — scoped to the current endpoint, but aggregated at the Main Agent session root. When called by the Main Agent, Proxy Agent, or any nested specialist, it resolves the same root and reuses evidence across the entire session tree.
+
+This is the shared view connecting the active Main Agent, the persistent Extension Proxy Broker, and every nested Task/subagent. Requests and structured application records are stored against the root session; target memory is collected from all descendant sessions. Use this after specialist results and whenever a new request may relate to earlier discoveries. Record meaningful cross-agent relationships in the existing target notes with exact request/evidence references rather than creating parallel per-agent copies.
 
 It returns:
 - recent: the objects + functions the analyzer just extracted for the CURRENT endpoint, WITH their schema and observed values (the IDs each credential saw — your IDOR/mass-assignment substrate). This is everything you normally need; you do NOT have to fetch anything.
