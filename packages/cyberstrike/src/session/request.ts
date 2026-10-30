@@ -139,7 +139,7 @@ export namespace Request {
     const responseBodyHash = input.response
       ? createHash("sha256").update(input.response.body, "utf8").digest("hex")
       : undefined
-    const emptyStaticHTML = processed?.htmlSource
+    const emptyStaticHTML = processed?.htmlSource !== undefined
       ? isConfirmedEmptyStaticHTML({
           method: input.method,
           responseStatus: processed.status,
