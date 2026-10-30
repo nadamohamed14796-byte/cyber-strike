@@ -150,6 +150,61 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
     })
   })
 
+  test("configure_scope updates the canonical wildcard root instead of a legacy exact-host root", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const wildcard = await TargetMemory.configureScope("https://*.example.test", {
+            include: ["*.example.test"],
+            authorizationSource: "Program wildcard scope fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+          const legacy = await TargetMemory.configureScope("https://www.example.test", {
+            include: ["www.example.test"],
+            authorizationSource: "Legacy exact-host root fixture",
+            authorizationReference: "https://program.example.test/policy",
+          })
+
+          const info = await TargetWorkspaceTool.init()
+          const ctx = {
+            sessionID: "ses_configure_canonical_root_test",
+            messageID: "msg_configure_canonical_root_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          }
+          const result = await info.execute({
+            action: "configure_scope",
+            target_url: "https://www.example.test",
+            include: ["api.example.test"],
+            merge_existing: true,
+          }, ctx as never)
+
+          expect(result.metadata.saved).toBe(true)
+          expect(result.output).toContain("Target: " + wildcard.workspace.targetURL)
+          expect((await TargetMemory.getScope(wildcard.workspace.targetURL))?.scopeItems)
+            .toContain("api.example.test")
+          // Preserve the legacy ledger and its old evidence; only new writes move
+          // to the canonical root. No existing workspace is destructively deleted.
+          expect((await TargetMemory.getScope(legacy.workspace.targetURL))?.scopeItems)
+            .toEqual(["www.example.test"])
+          const appDecision = await TargetMemory.checkURLScope("https://app.example.test")
+          expect(appDecision.allowed).toBe(true)
+          expect(appDecision.workspace?.id).toBe(wildcard.workspace.id)
+
+          const showWithoutTarget = await info.execute({ action: "show" }, ctx as never)
+          expect(showWithoutTarget.title).toContain("Target workspaces")
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
+
   test("init reuses the wildcard canonical root when a legacy exact-host root also exists", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
