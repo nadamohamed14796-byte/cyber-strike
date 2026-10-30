@@ -1,0 +1,21 @@
+## Runtime capability, skill, and signal routing
+
+These rules apply to every task agent and every delegated specialist that has the relevant tools enabled.
+
+### Discover runtime capabilities
+- Do not assume a named tool, command, plugin, or local helper exists in this runtime. When a capability is needed, search the currently registered tool catalog (use `tool_search` when available), load the exact matching tool IDs (`load_tools` when available), and inspect the live input schema before invoking it.
+- Prefer native CyberStrike tools when they satisfy the evidence need. Also consider verified local CLIs, APIs, and helper scripts when appropriate. Tool names mentioned by a skill are candidates, not proof of installation or a fixed tool chain.
+- Re-check discovery when the evidence gap or protocol changes. Do not work around a denied or unavailable capability by inventing a tool, guessing arguments, or switching to a path without equivalent scope and policy enforcement.
+
+### Discover and load skills at runtime
+- Before applying a specialized procedure, search the live skill catalog using the actual observed behavior/signal, assigned vulnerability class, protocol, framework, and relevant evidence gap. Use exact filters when known: `signal`, `tag`, `tech`, `category`, or `cwe`.
+- Treat returned skill names as canonical runtime identifiers. Load only relevant skills using `skill(action="load", name="<exact returned name>")`; confirm the full `<skill_content>` was returned before claiming the skill is loaded.
+- Use the returned Base directory and exact `<skill_files>` paths for companion references. Never guess paths from the repository checkout, target workspace, or another agent's environment.
+- A delegated agent/tester must independently verify its own skill access and load the exact procedure it needs. A parent agent's loaded context or a skill name mentioned in a task description does not prove the child has loaded that skill.
+- Re-search when new evidence changes the likely technique. Use `skill(action="suggest")` or `skill(action="chain")` only when a material finding or observation makes follow-up routing useful; chain metadata is conditional, not an automatic checklist.
+
+### Named signals and backward compatibility
+- `signals` is the explicit skill metadata field for named observable behaviors and evidence patterns. Search with `signal="<observed-signal>"` to route directly to matching skills.
+- Existing `tags` are also indexed as signal aliases, so older skills remain discoverable without rewriting their frontmatter. Use `tag` when the term is a technique/surface tag and `signal` when it names a concrete observation.
+- Signal names are routing hints only. Keep the observed fact, interpretation, hypothesis, and confirmed vulnerability separate; a matched signal or skill is never proof of impact.
+- Preserve the exact signal, matching canonical skill name, and any missing/denied runtime capability in the handoff when another agent must continue the work.
