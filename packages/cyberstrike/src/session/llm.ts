@@ -187,8 +187,8 @@ export namespace LLM {
         "After receiving a tool result, inspect it and call the next required tool when the task is not complete. Do not ask the user to continue routine multi-step work.",
         "Use plain text for explanation or the final response only when no further tool action is needed.",
         "Never claim an operation succeeded without its tool result. Preserve all permission, authorization, and scope restrictions.",
-      ].join("\\n")
-      system[0] = [system[0], toolExecutionContract].filter(Boolean).join("\\n\\n")
+      ].join("\n")
+      system[0] = [system[0], toolExecutionContract].filter(Boolean).join("\n\n")
     }
     l.info("tool availability", {
       available: Object.keys(tools).length,
