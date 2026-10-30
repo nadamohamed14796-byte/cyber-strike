@@ -538,8 +538,8 @@ export default function Page() {
           return Boolean(metadata?.requestAnalysis)
         }),
       )
-      // Captured-request notices are represented by the dedicated analysis panel,
-      // not as duplicate chat turns.
+      // Hide legacy synthetic requestAnalysis transcript entries. Current Extension
+      // status is read from the request inventory and shown by the Agent Proxy card.
       return ordinary
     },
     emptyUserMessages,
