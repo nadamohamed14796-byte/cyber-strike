@@ -1941,7 +1941,11 @@ export const SessionRoutes = lazy(() =>
                 IngestQueue.enqueueReserved(captureReservation, retryTask)
                 reservationTransferred = true
               } else {
-                IngestQueue.enqueue(sessionID, retryTask, sessionID)
+                const brokerSession = await getOrCreateProxyBrokerSession({
+                  parentSessionID: activeSessionID,
+                  config: await Config.get(),
+                })
+                IngestQueue.enqueue(brokerSession.id, retryTask)
               }
             }
 
