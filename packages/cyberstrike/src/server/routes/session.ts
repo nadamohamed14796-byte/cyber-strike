@@ -1774,7 +1774,7 @@ export const SessionRoutes = lazy(() =>
               scopeDecision.reason === "captured request URL is invalid"
             if (requestedSessionID) {
               await IngestSummary.notice(
-                sessionID: requestedSessionID,
+                requestedSessionID,
                 `Captured request rejected before analysis: ${methodLabel} ${pathLabel} — it was not stored or analyzed. Reason: ${scopeDecision.reason}.`,
               ).catch((error) => log.warn("parent scope-rejection notice failed", { sessionID: requestedSessionID, error: String(error) }))
             }
