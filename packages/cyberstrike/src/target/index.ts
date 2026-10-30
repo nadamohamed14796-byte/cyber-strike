@@ -215,11 +215,11 @@ function normalizeJavaScriptFileScope(input: string, allowSourceMap = false): st
     /[{}]/.test(url.pathname)
   ) return undefined
   const scriptFile = /\.(?:js|mjs|cjs|jsx)$/i.test(url.pathname)
-  const sourceMapFile = allowSourceMap && /\.map$/i.test(url.pathname)
+  const sourceMapFile = (allowSourceMap && /\.map$/i.test(url.pathname)) || /\.(?:js|mjs|cjs)\.map$/i.test(url.pathname)
   if (!scriptFile && !sourceMapFile) return undefined
   url.search = ""
   url.hash = ""
-  return (allowSourceMap ? "Source Map: " : "JavaScript: ") + url.origin + url.pathname
+  return (sourceMapFile ? "Source Map: " : "JavaScript: ") + url.origin + url.pathname
 }
 
 function isExactUserConfirmedScopeItem(input: string): boolean {
