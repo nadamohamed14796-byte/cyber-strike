@@ -609,7 +609,7 @@ export namespace Agent {
         native: true,
         hidden: true,
         useSmallModel: true, // architecture extraction, not exploitation — run cheap
-        prompt: PROMPT_PROXY_ANALYZER,
+        prompt: `${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_PROXY_ANALYZER}`,
         prependRequestContext: true,
         permission: PermissionNext.merge(
           defaults,
@@ -652,7 +652,7 @@ export namespace Agent {
         native: true,
         hidden: true,
         color: "red",
-        prompt: PROMPT_IMPACT_HUNTER,
+        prompt: `${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_IMPACT_HUNTER}`,
         prependRequestContext: true,
         permission: PermissionNext.merge(
           defaults,
