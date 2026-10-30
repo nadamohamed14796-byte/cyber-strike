@@ -27,7 +27,7 @@ describe("Proxy Agent methodology isolation", () => {
     expect(brokerSource).not.toContain("Methodology.computeState")
     expect(brokerSource).not.toContain("MethodologyContext.generate")
 
-    const analyzeEnd = routeSource.indexOf("\\nasync function ", analyzeStart + 1)
+    const analyzeEnd = routeSource.indexOf("\nasync function ", analyzeStart + 1)
     const analysisSource = routeSource.slice(analyzeStart, analyzeEnd < 0 ? undefined : analyzeEnd)
     expect(analysisSource).toContain("getOrCreateProxyBrokerSession")
     expect(analysisSource).toContain("SessionPrompt.prompt")
