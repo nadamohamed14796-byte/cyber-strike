@@ -1,20 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import { shouldInjectMethodologyContext } from "../../src/session/methodology-context-routing"
 
-describe("Proxy Agent methodology isolation", () => {
-  test("does not inject Recon methodology context into the Proxy Agent", () => {
-    expect(shouldInjectMethodologyContext("proxy-agent")).toBe(false)
-  })
-
-  test("keeps methodology context enabled for other agents", () => {
-    for (const agent of ["cyberstrike", "proxy-analyzer", "web-application", undefined]) {
-      expect(shouldInjectMethodologyContext(agent)).toBe(true)
+describe("methodology is not an agent dispatch gate", () => {
+  test("does not inject methodology context into any agent", () => {
+    for (const agent of [
+      "cyberstrike",
+      "proxy-agent",
+      "proxy-analyzer",
+      "web-application",
+      "proxy-tester-idor",
+      "impact-hunter",
+      "cloud-security",
+      "internal-network",
+      "unknown-agent",
+      undefined,
+    ]) {
+      expect(shouldInjectMethodologyContext(agent)).toBe(false)
     }
   })
-  test("the session prompt applies the routing helper at methodology injection", async () => {
+
+  test("session prompting retains no phase-dependent agent context", async () => {
     const promptSource = await Bun.file(`${import.meta.dir}/../../src/session/prompt.ts`).text()
     expect(promptSource).toContain("if (shouldInjectMethodologyContext(lastUser.agent))")
-    expect(promptSource).toContain("MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))")
+    const routingSource = await Bun.file(`${import.meta.dir}/../../src/session/methodology-context-routing.ts`).text()
+    expect(routingSource).toContain("return false")
   })
 
   test("captured requests are sent to the Proxy Agent without a Recon-phase precondition", async () => {
@@ -27,7 +36,7 @@ describe("Proxy Agent methodology isolation", () => {
     expect(brokerSource).not.toContain("Methodology.computeState")
     expect(brokerSource).not.toContain("MethodologyContext.generate")
 
-    const analyzeEnd = routeSource.indexOf("\nasync function ", analyzeStart + 1)
+    const analyzeEnd = routeSource.indexOf("\\nasync function ", analyzeStart + 1)
     const analysisSource = routeSource.slice(analyzeStart, analyzeEnd < 0 ? undefined : analyzeEnd)
     expect(analysisSource).toContain("getOrCreateProxyBrokerSession")
     expect(analysisSource).toContain("SessionPrompt.prompt")
@@ -35,5 +44,4 @@ describe("Proxy Agent methodology isolation", () => {
     expect(analysisSource).not.toContain("MethodologyContext.generate")
     expect(routeSource).toContain('agent: (await Agent.resolveID(proxyAgent)) ?? agentName')
   })
-
 })
