@@ -30,6 +30,9 @@ describe("Dynamic specialist dispatch contract", () => {
     expect(prompt).toContain("There is deliberately no phase-to-agent assignment table")
     expect(prompt).toContain("Methodology phases, parent-workflow position, and phase-specific skill recommendations are tracking/context only")
     expect(prompt).not.toContain("Phase-to-Agent Decision Table")
+    expect(prompt).toContain("The shared Target Workflow Contract is the single authority")
+    expect(prompt).not.toContain("### Missing Tool Installation")
+    expect(prompt).not.toContain("**Phase Transition:**")
   })
 })
 
