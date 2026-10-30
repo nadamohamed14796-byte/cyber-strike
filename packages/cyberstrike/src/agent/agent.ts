@@ -1067,7 +1067,8 @@ export namespace Agent {
       return agent.name
     }
 
-    const primaryVisible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
+    // "all" agents such as Agent Proxy can be selected explicitly, never implicitly.
+    const primaryVisible = Object.values(agents).find((a) => a.mode === "primary" && a.hidden !== true)
     if (!primaryVisible) throw new Error("no primary visible agent found")
     return primaryVisible.name
   }
