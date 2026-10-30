@@ -495,6 +495,30 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
                 })
 
+                // Deterministic runtime preflight: keep every captured request row and
+                // its observations, but do not spend a model turn on a proven empty
+                // document or a byte-for-byte repeat already completed for this same
+                // credential and UI/access context. Cross-credential captures are never
+                // considered duplicates.
+                const emptyStatic = Request.isConfirmedEmptyStatic(req.id)
+                const equivalent = emptyStatic ? undefined : Request.findEquivalentProcessed(req)
+                const skipReason = emptyStatic
+                  ? "Confirmed empty/static HTML response: no forms, controls, scripts, external resources, query/body inputs, or visible content."
+                  : equivalent
+                    ? `Exact repeat of previously processed request ${equivalent.id} for the same credential and access context; this capture remains stored as a separate observation.`
+                    : undefined
+
+                if (skipReason) {
+                  latestAgentText = "Runtime preflight completed without an LLM/Subagent dispatch. " + skipReason
+                  sharedEvidenceDelta = "Preflight skip: " + skipReason
+                  finalStatus = "processed"
+                  log.info("captured request skipped deep analysis after deterministic preflight", {
+                    sessionID,
+                    requestID: req.id,
+                    priorRequestID: equivalent?.id,
+                    reason: emptyStatic ? "confirmed-empty-static-html" : "exact-processed-repeat",
+                  })
+                } else {
                 // Respect ordered user permission overrides, but never fail silently.
                 const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
                 if (taskPermission !== "allow") {
@@ -702,6 +726,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   })
                 } else {
                   finalStatus = "processed"
+                }
                 }
               } catch (error) {
                 failureReason = (error instanceof Error ? error.message : String(error)).slice(0, 500)
