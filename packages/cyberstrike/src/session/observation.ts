@@ -1,7 +1,7 @@
 import { Database } from "../storage/db"
 import { RequestObservationTable } from "./session.sql"
 import { Identifier } from "../id/id"
-import { eq, and } from "../storage/db"
+import { eq, and, asc, inArray } from "../storage/db"
 import { RequestTable } from "./session.sql"
 
 // Per-credential observed-value accumulation (Faz 3).
@@ -139,6 +139,13 @@ export namespace Observation {
     opGroupHash: string
     keyHashes: string[]
     credentials: (string | null)[]
+    requests: {
+      requestID: string
+      keyHash: string
+      credentialID: string | null
+      status: string
+      responseStatus: number | null
+    }[]
     params: {
       name: string
       loc: string
@@ -183,7 +190,30 @@ export namespace Observation {
           redacted: value.redacted,
         })),
     }))
-    return { opGroupHash, keyHashes, credentials, params }
+    const requests = keyHashes.length
+      ? Database.use((db) =>
+          db.select({
+            requestID: RequestTable.id,
+            keyHash: RequestTable.key_hash,
+            credentialID: RequestTable.credential_id,
+            status: RequestTable.status,
+            responseStatus: RequestTable.response_status,
+          })
+            .from(RequestTable)
+            .where(and(
+              eq(RequestTable.session_id, sessionID),
+              inArray(RequestTable.key_hash, keyHashes),
+            ))
+            .orderBy(asc(RequestTable.id))
+            .all()
+            .map((request) => ({
+              ...request,
+              keyHash: request.keyHash!,
+              status: String(request.status),
+            })),
+        )
+      : []
+    return { opGroupHash, keyHashes, credentials, requests, params }
   }
 
   /**
