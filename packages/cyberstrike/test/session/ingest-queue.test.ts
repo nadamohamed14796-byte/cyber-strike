@@ -1041,6 +1041,59 @@ describe("captured request payload preservation", () => {
 })
 
 describe("captured request HTTP route scope gate", () => {
+  test("creates exactly one Agent Proxy child under the selected parent and reuses it for later captures", async () => {
+    await withInstance(async () => {
+      const previousDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN
+      delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
+      const parent = await Session.create({ title: "proxy-child-session-parent-test" })
+      try {
+        await TargetMemory.configureScope("https://program-proxy-child.example.test", {
+          include: ["https://proxy-child-app.example.test/"],
+          authorizationSource: "Agent Proxy child-session integration test",
+          userConfirmed: true,
+        })
+
+        const capture = async (path: string) => Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionID: parent.id,
+              scheme: "https",
+              text: "GET " + path + " HTTP/1.1\\r\\nHost: proxy-child-app.example.test\\r\\n\\r\\n",
+            }),
+          },
+        )
+
+        const first = await capture("/profile")
+        expect(first.status, await first.clone().text()).toBe(202)
+        let children = await Session.children(parent.id)
+        for (let attempt = 0; attempt < 30 && !children.some((child) => child.title === "Agent Proxy"); attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          children = await Session.children(parent.id)
+        }
+        const broker = children.find((child) => child.title === "Agent Proxy")
+        expect(broker, "the ingest route must create the Agent Proxy child session").toBeDefined()
+        expect(broker?.parentID).toBe(parent.id)
+
+        const second = await capture("/settings")
+        expect(second.status, await second.clone().text()).toBe(202)
+        const afterSecond = await Session.children(parent.id)
+        const brokers = afterSecond.filter((child) => child.title === "Agent Proxy")
+        expect(brokers).toHaveLength(1)
+        expect(brokers[0]?.id).toBe(broker?.id)
+        expect(brokers[0]?.parentID).toBe(parent.id)
+      } finally {
+        const children = await Session.children(parent.id).catch(() => [])
+        for (const child of children) await Session.remove(child.id).catch(() => {})
+        await Session.remove(parent.id).catch(() => {})
+        if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
+        else process.env.CYBERSTRIKE_INGEST_DRY_RUN = previousDryRun
+      }
+    })
+  })
+
   test("rejects an out-of-scope request before creating a request record or proxy broker", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "ingest-scope-gate-test" })
