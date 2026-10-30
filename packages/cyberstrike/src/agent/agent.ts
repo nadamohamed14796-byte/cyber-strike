@@ -1047,8 +1047,21 @@ export namespace Agent {
     return result
   })
 
+  /** Resolve an agent by its stable registry key or by a unique configured display name. */
   export async function get(agent: string) {
-    return state().then((x) => x[agent])
+    const registry = await state()
+    if (registry[agent]) return registry[agent]
+    const matches = Object.values(registry).filter((entry) => entry.name === agent)
+    return matches.length === 1 ? matches[0] : undefined
+  }
+
+  /**
+   * Return stable registry keys alongside agent metadata.
+   * Invocation, permission matching, and delegation must use the key; display names
+   * are configurable and therefore must never be used as registry identifiers.
+   */
+  export async function entries() {
+    return Object.entries(await state()).map(([id, info]) => ({ id, info }))
   }
 
   export async function list() {
