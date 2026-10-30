@@ -374,7 +374,7 @@ export namespace LLM {
             type: "tool-result",
             toolCallId,
             toolName: "bash",
-            output: { type: "text", value: "PORT   STATE SERVICE\n80/tcp open  http" },
+            output: { type: "text", value: "CyberStrike tool-call example" },
           },
         ],
       } as ModelMessage,
