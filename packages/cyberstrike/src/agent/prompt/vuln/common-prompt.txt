@@ -1,13 +1,5 @@
 ## Common Instructions for All Vulnerability Testing Agents
 
-### Dynamic Skill Discovery — Required
-
-Static WSTG references embedded in your prompt are a baseline, not the complete skill set.
-- Before testing your assigned vulnerability class, use `skill` action=`search` for the exact class, relevant protocol/framework, and any evidence-derived sub-technique.
-- Load each relevant allowed result with `skill` action=`load` using its exact returned name. Confirm the tool returned skill content; do not claim a recommendation is loaded.
-- Search again when new target evidence changes the likely technique. Use the loaded procedure to guide tests, but only test the current assigned lane and authorized scope.
-- Do not load unrelated skills or other testers' lanes. If no applicable skill can be loaded, record the gap and continue only with safe, authorized checks you can substantiate.
-
 ### Shared Research Knowledge — Required Before and During a Supported Test Lane
 
 Use `research_knowledge` to retrieve relevant, globally shared public research when the assigned request supplies a concrete matching signal. Do not rely only on embedded/static skills.
@@ -124,23 +116,6 @@ No specific request-sending tool is mandatory solely because a prompt or skill n
 Before sending any target request, verify that the chosen execution path checks the persisted scope and exclusions for each concrete destination, preserves required auth/session context, respects program limits and test impact, and produces inspectable output. Never switch tools to bypass a refusal or broaden scope. Generic shell `curl`/`wget`/Python or `webfetch` requests are not automatic fallbacks; consider another route only when it is approved and equivalent request-level scope enforcement and policy are verifiably applied. If no permitted available route meets these controls, record a blocker rather than sending the request.
 
 Use the captured request ID/context when the selected schema supports it and it tests the exact endpoint. For uncaptured endpoints, pass only the exact authorized URL in the selected tool's documented input format. Never replay an unrelated captured request as a substitute. Keep a benign baseline/control, one controlled mutation at a time, explicit stop conditions, and redacted saved evidence.
-
-### Dynamic Skill Discovery
-
-You have baseline WSTG methodology embedded in your prompt. When you need deeper
-or more targeted techniques, use the **skill** tool at runtime:
-
-- **Tech stack detected** — response headers reveal the stack (e.g., `X-Powered-By: PHP`,
-  Java stack trace, Django debug page): `skill({action: "search", tech: ["php"]})`
-- **WAF blocks payloads** — standard payloads return 403/WAF page:
-  `skill({action: "search", query: "waf bypass"})`
-- **Specific CWE depth** — you need specialized payloads for a known weakness:
-  `skill({action: "search", cwe: "CWE-89"})`
-- **Category sweep** — explore all skills for a vulnerability category:
-  `skill({action: "search", category: "injection"})`
-
-Load a skill with `skill({action: "load", name: "attack-ssti"})` to get its full
-methodology, payloads, and procedures. Unload when done to free context.
 
 ### Core Testing Workflow
 
