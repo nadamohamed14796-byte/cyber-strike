@@ -1,4 +1,4 @@
-import { type Accessor, createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
+import { type Accessor, createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js"
 import { useRoute, useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { pipe, sumBy } from "remeda"
@@ -62,24 +62,11 @@ export function Header() {
   const capturedRequests = createMemo(() =>
     (sync.data.request[route.sessionID] ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
   )
-  const currentRequest = createMemo(
-    () =>
-      capturedRequests().find((item) => item.status === "processing") ??
-      capturedRequests().find((item) => item.status === "queued"),
+  // Main shows queue positions only. Request details and progress stay in
+  // the persistent Agent Proxy child session.
+  const queueRequests = createMemo(() =>
+    capturedRequests().filter((item) => item.status === "processing" || item.status === "queued"),
   )
-  const currentRequestNumber = createMemo(() => {
-    const current = currentRequest()
-    return current ? capturedRequests().findIndex((item) => item.id === current.id) + 1 : 0
-  })
-  const requestCounts = createMemo(() => {
-    const rows = capturedRequests()
-    return {
-      queued: rows.filter((item) => item.status === "queued").length,
-      processing: rows.filter((item) => item.status === "processing").length,
-      processed: rows.filter((item) => item.status === "processed").length,
-      failed: rows.filter((item) => item.status === "failed").length,
-    }
-  })
   const enterProxyBroker = () => {
     const child = proxyBroker()
     if (child) navigate({ type: "session", sessionID: child.id })
@@ -202,32 +189,27 @@ export function Header() {
               <Show when={proxyBroker() && capturedRequests().length > 0}>
                 <box
                   flexDirection="row"
+                  alignItems="center"
                   justifyContent="space-between"
                   gap={2}
                   padding={1}
                   backgroundColor={theme.backgroundElement}
                 >
-                  <box flexDirection="column" gap={0} flexGrow={1}>
+                  <box flexDirection="row" alignItems="center" gap={1} flexGrow={1}>
                     <text fg={theme.accent}>
                       <b>Extension Agent</b>
                     </text>
-                    <Show
-                      when={currentRequest()}
-                      fallback={
-                        <text fg={theme.textMuted}>
-                          Queue complete · {requestCounts().processed} done · {requestCounts().failed} failed
-                        </text>
-                      }
-                    >
-                      <text fg={theme.text}>
-                        {requestCounts().processing > 0
-                          ? `Analyzing request #${currentRequestNumber()} / ${capturedRequests().length}`
-                          : `Next request #${currentRequestNumber()} is queued`}
-                      </text>
-                    </Show>
-                    <text fg={theme.textMuted} wrapMode="none">
-                      {requestCounts().queued} queued · {requestCounts().processing} analyzing · {requestCounts().processed} done · {requestCounts().failed} failed
-                    </text>
+                    <For each={queueRequests()}>
+                      {(_, index) => (
+                        <box
+                          paddingLeft={1}
+                          paddingRight={1}
+                          backgroundColor={theme.backgroundPanel}
+                        >
+                          <text fg={theme.text}>{index() + 1}</text>
+                        </box>
+                      )}
+                    </For>
                   </box>
                   <box
                     onMouseOver={() => setHover("next")}
