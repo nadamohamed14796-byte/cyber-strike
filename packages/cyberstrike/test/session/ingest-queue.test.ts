@@ -1061,7 +1061,7 @@ describe("captured request HTTP route scope gate", () => {
             body: JSON.stringify({
               sessionID: parent.id,
               scheme: "https",
-              text: "GET " + path + " HTTP/1.1\\r\\nHost: proxy-child-app.example.test\\r\\n\\r\\n",
+              text: "GET " + path + " HTTP/1.1\r\nHost: proxy-child-app.example.test\r\n\r\n",
             }),
           },
         )
