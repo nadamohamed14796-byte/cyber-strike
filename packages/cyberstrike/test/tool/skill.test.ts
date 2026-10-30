@@ -138,7 +138,7 @@ describe("tool.skill", () => {
           const skillDir = path.join(dir, ".cyberstrike", "skill", name)
           await Bun.write(
             path.join(skillDir, "SKILL.md"),
-            ["---", "name: " + name, "description: Pagination fixture skill.", "tags: [" + (name === "tool-skill-b" ? "routing-test" : "other-test") + "]", "tech_stack: [" + (name === "tool-skill-b" ? "node" : "python") + "]", "---", "", "# " + name, ""].join("\n"),
+            ["---", "name: " + name, "description: Pagination fixture skill.", "tags: [" + (name === "tool-skill-b" ? "routing-test" : "other-test") + "]", ...(name === "tool-skill-b" ? ['signals: ["role-switch", "object-boundary"]'] : []), "tech_stack: [" + (name === "tool-skill-b" ? "node" : "python") + "]", "---", "", "# " + name, ""].join("\n"),
           )
         }
       },
@@ -170,6 +170,18 @@ describe("tool.skill", () => {
           expect(taggedSearch.output).toContain("tool-skill-b")
           expect(taggedSearch.output).not.toContain("tool-skill-a")
           expect(taggedSearch.output).not.toContain("tool-skill-c")
+
+          const explicitSignalSearch = await tool.execute({ action: "search", signal: "role-switch" }, ctx)
+          expect(explicitSignalSearch.output).toContain("tool-skill-b")
+          expect(explicitSignalSearch.output).toContain("signals=role-switch, object-boundary, routing-test")
+          expect(explicitSignalSearch.output).not.toContain("tool-skill-a")
+          expect(explicitSignalSearch.output).not.toContain("tool-skill-c")
+
+          // Existing tags remain discoverable through the signal vocabulary.
+          const legacySignalSearch = await tool.execute({ action: "search", signal: "routing-test" }, ctx)
+          expect(legacySignalSearch.output).toContain("tool-skill-b")
+          expect(legacySignalSearch.output).not.toContain("tool-skill-a")
+          expect(legacySignalSearch.output).not.toContain("tool-skill-c")
 
           const combinedSearch = await tool.execute(
             { action: "search", query: "tool-skill", tag: "routing-test", tech: ["node"] },
