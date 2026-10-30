@@ -19,7 +19,7 @@ const compiledScopeItemsCache = new WeakMap<readonly string[], CompiledScopeItem
  */
 export function scopeItemSpecificity(input: string): number {
   const value = input.trim()
-  const typed = value.match(/^(domain|wildcard|url|cidr|ip address|api)[ \t]*:[ \t]*(.+)$/i)
+  const typed = value.match(/^(domain|wildcard|url|javascript|js|cidr|ip address|api)[ \t]*:[ \t]*(.+)$/i)
   const kind = typed?.[1].toLowerCase()
   const identifier = (typed?.[2] ?? value).trim()
   if (kind === "wildcard" || identifier.startsWith("*.")) {
@@ -58,7 +58,7 @@ function compileScopeItems(items: readonly string[]): CompiledScopeItems {
   const wildcardPatterns: string[] = []
   for (const entry of items) {
     const item = entry.trim()
-    if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:/i.test(item)) typedEntries.push(item)
+    if (/^(?:domain|wildcard|url|javascript|js|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:/i.test(item)) typedEntries.push(item)
     else if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
     else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
     else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
