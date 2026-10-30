@@ -460,7 +460,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 // with the exact permission reason recorded as a failed request.
                 liveNotice = await IngestSummary.createLiveNotice({
                   sessionID,
-                  agent: proxyAgent.name,
+                  agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
                   model,
                   text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the shared Proxy Agent broker session…\n`,
                   requestAnalysis: {
@@ -533,7 +533,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 })
                 const agentResult = await SessionPrompt.prompt({
                   sessionID: analysisSessionID,
-                  agent: proxyAgent.name,
+                  agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
                   model,
                   // Match TaskTool's subagent runtime: specialist delegation remains
                   // available only when the proxy-agent's permission profile allows it.
