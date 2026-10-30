@@ -593,6 +593,17 @@ export function Prompt(props: PromptProps) {
 
   async function submit() {
     if (props.disabled) return
+    if (
+      isProxyAgentSession() &&
+      (sync.data.session_queue_status?.[props.sessionID ?? ""]?.pending ?? 0) > 0
+    ) {
+      toast.show({
+        variant: "warning",
+        message: "Extension requests are still queued or processing. Your draft is safe; send it after the request queue is idle.",
+        duration: 4000,
+      })
+      return
+    }
     if (autocomplete?.visible) return
     if (!store.prompt.input) return
     const trimmed = store.prompt.input.trim()
