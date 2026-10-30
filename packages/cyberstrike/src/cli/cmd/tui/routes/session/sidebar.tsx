@@ -63,9 +63,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return out
   })
   const requests = createMemo(() => sync.data.request[props.sessionID] ?? [])
-  // Show every request received by the Extension Agent as a cumulative number.
-  // Completed requests remain represented; no active/waiting status is exposed.
-  const extensionQueueRequests = createMemo(() => requests().slice().sort((a, b) => a.id.localeCompare(b.id)))
+  // Cumulative total of all requests received by the Extension Agent.
+  const extensionRequestCount = createMemo(() => requests().length)
   const enterProxyBroker = () => {
     const child = proxyBroker()
     if (child) navigate({ type: "session", sessionID: child.id })
@@ -253,13 +252,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   <b>Extension Agent</b>
                 </text>
                 <box flexDirection="row" alignItems="center" gap={1}>
-                  <For each={extensionQueueRequests()}>
-                    {(_, index) => (
-                      <box paddingLeft={1} paddingRight={1} backgroundColor={theme.backgroundElement}>
-                        <text fg={theme.text}>{index() + 1}</text>
-                      </box>
-                    )}
-                  </For>
+                  <box paddingLeft={1} paddingRight={1} backgroundColor={theme.backgroundElement}>
+                    <text fg={theme.text}>{extensionRequestCount()}</text>
+                  </box>
                   <box
                     onMouseUp={enterProxyBroker}
                     backgroundColor={theme.backgroundElement}
