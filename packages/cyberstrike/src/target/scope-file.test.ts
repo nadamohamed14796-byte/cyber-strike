@@ -127,6 +127,17 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("preserves JavaScript and JS HackerOne asset types as explicit typed scope entries", () => {
+    expect(parseScopeFileContents([
+      "identifier,asset_type",
+      "https://example.com/assets/app.js,JavaScript",
+      "https://example.com/static/vendor.js,JS",
+    ].join("\n"))).toEqual([
+      "JavaScript: https://example.com/assets/app.js",
+      "JavaScript: https://example.com/static/vendor.js",
+    ])
+  })
+
   test("parses quoted TSV fields without shifting columns", () => {
     const tsv = [
       "identifier\tasset_type\tinstruction\teligible_for_submission\teligible_for_bounty",
