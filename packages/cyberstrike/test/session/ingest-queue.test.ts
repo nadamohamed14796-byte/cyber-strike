@@ -1039,3 +1039,37 @@ describe("captured request payload preservation", () => {
     })
   })
 })
+
+describe("captured request HTTP route scope gate", () => {
+  test("rejects an out-of-scope request before creating a request record or proxy broker", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "ingest-scope-gate-test" })
+      try {
+        await TargetMemory.configureScope("https://program-root.example.test", {
+          include: ["https://authorized-app.example.test/safe"],
+          authorizationSource: "Session ingest route scope-gate test",
+          userConfirmed: true,
+        })
+
+        const response = await Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionID: session.id,
+              scheme: "https",
+              text: "GET /admin/profile HTTP/1.1\\r\\nHost: authorized-app.example.test\\r\\n\\r\\n",
+            }),
+          },
+        )
+
+        expect(response.status).toBe(403)
+        expect(Request.get(session.id)).toHaveLength(0)
+        expect(await Session.children(session.id)).toHaveLength(0)
+      } finally {
+        await Session.remove(session.id).catch(() => {})
+      }
+    })
+  })
+})
