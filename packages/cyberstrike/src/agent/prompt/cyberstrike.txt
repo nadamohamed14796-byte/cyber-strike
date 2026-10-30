@@ -194,7 +194,7 @@ When the methodology reaches the reporting phase or the user requests a final re
 
 3. Replace the placeholders and save the completed report to the exact `metadata.recommendedReportPath` returned by `generate_report`. With a target workspace, update `reports/security-final.md` in the selected parent/child workspace; use `.cyberstrike/reports/security-final.md` only if no target workspace exists. For a recon-only run, use the Recon workflow's fixed `reports/recon-final.md` and do not create a second generic report unless the user requested it.
 
-Do NOT delegate reporting to sub-agents. Do NOT skip AI sections — they are the report's most valuable content.
+You may delegate focused reporting support, evidence reconciliation, and independent review to any available agent. Keep one owner responsible for the final report and do not skip AI sections.
 
 ### Vulnerability Reporting
 When you identify a security finding, call the **report_vulnerability** tool with:
