@@ -109,10 +109,10 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             passiveTriageBlock = block
           } else {
             return {
-              title: \`Dispatch blocked — \${params.subagent_type}\`,
+              title: "Dispatch blocked — " + params.subagent_type,
               output: [
-                \`The \${params.subagent_type} specialist cannot start while methodology phase "\${block.phase}" is blocked or unavailable.\`,
-                \`Reason: \${block.reason}\`,
+                "The " + params.subagent_type + " specialist cannot start while methodology phase \"" + block.phase + "\" is blocked or unavailable.",
+                "Reason: " + block.reason,
                 "Complete the upstream prerequisites for this target scope, then dispatch the specialist again.",
               ].join("\n"),
               metadata: { sessionId: "", model: { providerID: "", modelID: "" }, outcome: "clean" as const },
@@ -291,8 +291,8 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         prompt =
           [
             "## PASSIVE-ONLY TRIAGE — ACTIVE TESTING IS BLOCKED",
-            \`Methodology phase: \${passiveTriageBlock.phase}\`,
-            \`Exact blocker: \${passiveTriageBlock.reason}\`,
+            "Methodology phase: " + passiveTriageBlock.phase,
+            "Exact blocker: " + passiveTriageBlock.reason,
             "Inspect only the already captured request/response, saved session context, local source/evidence, and existing target notes. Do not send or replay HTTP requests, inject probes, launch scanners/crawlers, run network-capable shell commands, mutate application state, or report a vulnerability.",
             "Return the concrete evidence, the best-supported hypothesis, what is still unknown, and the exact prerequisites that must be completed before an active test can run. This task is passive triage only.",
             "",
