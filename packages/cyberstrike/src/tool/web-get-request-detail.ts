@@ -11,7 +11,7 @@ Returns the full HTTP request including headers, body, and response data for a s
 
 Use this when you need to examine a specific request in detail (e.g., to analyze parameters for testing).
 Set include_ui_context to true to also get UI form context (field names, types, hidden params) — useful for mass assignment and injection testing.
-For overview of all requests, use web_get_session_context with include: ["requests"].`
+For the full queued/processing FIFO, use web_get_session_context with include: ["pending_requests"]; recent_requests is only a five-item preview.`
 
 export const WebGetRequestDetailTool = Tool.define("web_get_request_detail", {
   description,
