@@ -477,7 +477,12 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Orchestrator-level fan-out is bounded, while nested subagent delegation
       // remains re-entrant so a parent waiting on a child cannot deadlock the pool.
-      const result = caller?.mode === "subagent"
+      // Proxy Agent runs directly inside the persistent Broker rather than
+      // through TaskTool, so its sibling specialists must acquire scheduler slots.
+      // Other subagents already occupy a parent slot; their nested foreground
+      // delegation stays re-entrant to avoid parent/child pool deadlocks.
+      const isManagedSubagent = caller?.mode === "subagent" && callerID !== "proxy-agent"
+      const result = isManagedSubagent
         ? await SessionPrompt.prompt(promptInput)
         : await AgentTaskConcurrency.run(taskLane, () => SessionPrompt.prompt(promptInput))
 
