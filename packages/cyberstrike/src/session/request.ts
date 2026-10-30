@@ -99,6 +99,7 @@ export namespace Request {
   }
 
   export function add(input: {
+    id?: string
     sessionID: string
     method: z.infer<typeof Method>
     normalizedPath: string
@@ -127,18 +128,17 @@ export namespace Request {
     opKeyHash?: string
     keyHash?: string
   }): Info | undefined {
-    const id = Identifier.ascending("request")
+    // Use the ID stamped at intake so asynchronous normalization cannot reverse
+    // FIFO recovery order after a restart.
+    const id = input.id ?? Identifier.ascending("request")
     const now = Date.now()
 
     const responseURL = requestResponseURL(input)
     const processed = input.response ? processResponse({ ...input.response, url: responseURL }) : undefined
 
-    // Atomic dedup guard (Faz 0): one row per (session, key_hash). If a concurrent
-    // ingest already inserted this key_hash, ON CONFLICT DO NOTHING drops the second
-    // write and `returning` comes back empty — we report the race-duplicate to the
-    // caller (returns undefined) so it skips the redundant LLM enqueue. key_hash NULL
-    // (legacy / non-HTTP) never conflicts (NULLs are distinct), so behavior is
-    // unchanged for those rows.
+    // Every captured HTTP transaction is an independent analysis item. key_hash
+    // remains a structural endpoint identity for observation grouping and correlation,
+    // not a request-level deduplication key.
     const inserted = Database.transaction((db) => {
       const created = db
         .insert(RequestTable)
@@ -178,17 +178,9 @@ export namespace Request {
           time_created: now,
           time_updated: now,
         })
-        .onConflictDoNothing({ target: [RequestTable.session_id, RequestTable.key_hash] })
         .returning({ id: RequestTable.id })
         .all()
-      // A duplicate request shape is not enqueued to the LLM twice, but a new
-      // JavaScript content version must still be preserved against the existing row.
-      const linkedRequestID = created[0]?.id ?? (input.keyHash
-        ? db.select({ id: RequestTable.id }).from(RequestTable).where(and(
-            eq(RequestTable.session_id, input.sessionID),
-            eq(RequestTable.key_hash, input.keyHash),
-          )).get()?.id
-        : undefined)
+      const linkedRequestID = created[0]?.id
       if (processed?.javascriptSource && linkedRequestID) {
         const sourceURL = canonicalSourceURL(responseURL)
         const contentHash = createHash("sha256").update(processed.javascriptSource).digest("hex")
@@ -359,9 +351,8 @@ export namespace Request {
   }
 
   /**
-   * Return only persisted requests whose analysis has not reached a terminal state.
-   * Filtering in SQLite avoids loading full request/response bodies for every historical
-   * request when a target has a large captured-traffic inventory.
+   * Return unfinished requests in their original intake order. Their IDs are stamped
+   * before asynchronous normalization so write/completion order cannot reorder recovery.
    */
   export function pending(): Info[] {
     const rows = Database.use((db) =>
@@ -369,7 +360,7 @@ export namespace Request {
         .select()
         .from(RequestTable)
         .where(or(eq(RequestTable.status, "queued"), eq(RequestTable.status, "processing")))
-        .orderBy(asc(RequestTable.time_created), asc(RequestTable.id))
+        .orderBy(asc(RequestTable.id))
         .all(),
     )
     return rows.map(rowToInfo)
