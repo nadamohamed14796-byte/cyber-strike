@@ -1,6 +1,7 @@
 ---
 name: wstg-auth-session
 description: WSTG identity, authentication, authorization, and session management testing
+category: authentication
 tags: [auth, session, idor, csrf, jwt, wstg]
 version: "1.0"
 ---
