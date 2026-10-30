@@ -1880,9 +1880,24 @@ export namespace JavaScriptCorrelation {
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     if (input.javascriptURL && !explicitJS) throw new Error("javascriptURL must be a valid HTTP(S) URL without embedded credentials.")
-    const workspace = await TargetMemory.get(input.targetURL)
+    const workspaceDecision = await TargetMemory.checkURLScope(input.targetURL)
+    // A concrete authorized subdomain resolves to the same canonical root used
+    // by ingestion. A root workspace may also be a policy container whose own
+    // URL is not included; permit only that exact root identity when no scope
+    // exclusion applies. Never fall back to an unconfigured child workspace.
+    const exactRootContainer = Boolean(
+      workspaceDecision.workspace &&
+      workspaceDecision.workspace.parentTargetID === null &&
+      workspaceDecision.workspace.targetKey === normalizedTarget.targetKey &&
+      workspaceDecision.excludeMatches.length === 0,
+    )
+    const workspace = workspaceDecision.allowed && workspaceDecision.workspace
+      ? workspaceDecision.workspace
+      : exactRootContainer
+        ? workspaceDecision.workspace
+        : null
     if (!workspace) {
-      throw new Error("No existing target workspace matches this target. Initialize it with target_workspace first.")
+      throw new Error("No authorized target workspace matches this target: " + workspaceDecision.reason)
     }
     const sessionAssociated = TargetMemory.isObservedOrAncestorInSession(rootSessionID, workspace.targetURL)
     if (!sessionAssociated && !input.localOnly) {
