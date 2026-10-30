@@ -20,7 +20,7 @@ import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
 import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
-  requestIDFromPromptText,
+  requestIDFromRecentPromptTexts,
   selectTaskRequestContext,
 } from "./task-resume"
 
@@ -34,23 +34,9 @@ import {
 // web_get_request_detail for the rare response that still exceeds this.
 const MAX_PREPEND_BYTES = 48 * 1024
 
-// Captured-request child sessions carry their canonical request ID in the
-// server-built initial prompt. Recover it from that session so parallel Extension
-// requests cannot accidentally inherit another in-flight request's context when
-// a model omits the optional Task.request_id argument.
-async function requestIDFromSession(sessionID: string): Promise<string | undefined> {
-  const messages = await Session.messages({ sessionID })
-  for (const message of messages) {
-    if (message.info.role !== "user") continue
-    const text = message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-    const requestID = requestIDFromPromptText(text)
-    if (requestID) return requestID
-  }
-  return undefined
-}
+// A persistent Proxy Agent broker handles many captured requests in one child
+// session. Resolve the latest trusted request identity in the current conversation,
+// rather than binding every future Task call to the first capture in session history.
 
 // Only real subagents may use the internal, background-only escalation path.
 // A primary/user-facing agent must still honor the normal task permission policy.
@@ -144,7 +130,18 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Ordinary primary-agent tasks have no session-bound captured request;
       // avoid scanning the main transcript unless a subagent is delegating.
-      const sessionRequestID = caller?.mode === "subagent" ? await requestIDFromSession(ctx.sessionID) : undefined
+      const sessionRequestID = caller?.mode === "subagent"
+        ? requestIDFromRecentPromptTexts(
+            ctx.messages
+              .filter((message) => message.info.role === "user")
+              .map((message) =>
+                message.parts
+                  .filter((part) => part.type === "text")
+                  .map((part) => part.text)
+                  .join("\n"),
+              ),
+          )
+        : undefined
       if (sessionRequestID && params.request_id && params.request_id !== sessionRequestID) {
         throw new Error(
           `Request context mismatch: this subagent session is bound to request ${sessionRequestID}, but task request_id ${params.request_id} was supplied. Use the current session's request ID to avoid cross-request context mixing.`,
