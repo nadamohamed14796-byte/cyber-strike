@@ -28,7 +28,7 @@ describe("Observation.operationTreeForRequest", () => {
             normalizedPath: path,
             origin,
             credentialID,
-            rawRequest: `POST ${path} HTTP/1.1\\r\\nHost: example.test\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\nformAction=${action}`,
+            rawRequest: `POST ${path} HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nformAction=${action}`,
             bodyHash: "body-" + action,
             keyHash,
           })
