@@ -2700,23 +2700,37 @@ export const SessionRoutes = lazy(() =>
         const body = c.req.valid("json")
         const targetSession = await Session.get(sessionID)
         const isProxyBroker = targetSession.title === PROXY_BROKER_TITLE && !!targetSession.parentID
-        if (isProxyBroker && (IngestQueue.pendingCount(targetSession.parentID!) > 0 || IngestQueue.isPaused(targetSession.parentID!))) {
-          return c.json(
-            { error: "Extension requests are queued or processing. Retry this Proxy Agent follow-up when the broker queue is idle." },
-            409,
-          )
-        }
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
-          const msg = await SessionPrompt.prompt({
+          const promptInput = {
             ...body,
             sessionID,
             ...(isProxyBroker ? { agent: "proxy-agent" } : {}),
-          }).catch((e) => {
-            if (e instanceof Error && e.message === "session prompt cancelled") return
-            throw e
-          })
+          }
+          const msg = isProxyBroker
+            ? await new Promise<MessageV2.WithParts | undefined>((resolve, reject) => {
+                IngestQueue.enqueue(
+                  targetSession.parentID!,
+                  async () => {
+                    try {
+                      resolve(
+                        await SessionPrompt.prompt(promptInput).catch((error) => {
+                          if (error instanceof Error && error.message === "session prompt cancelled") return undefined
+                          throw error
+                        }),
+                      )
+                    } catch (error) {
+                      reject(error)
+                    }
+                  },
+                  targetSession.parentID!,
+                )
+              })
+            : await SessionPrompt.prompt(promptInput).catch((error) => {
+                if (error instanceof Error && error.message === "session prompt cancelled") return undefined
+                throw error
+              })
           if (msg) stream.write(JSON.stringify(msg))
         })
       },
