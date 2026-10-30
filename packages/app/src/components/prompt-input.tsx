@@ -348,22 +348,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const agentList = createMemo(() =>
     sync.data.agent
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
-      .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
+      .map((agent): AtOption => ({ type: "agent", name: agent.id, display: agent.name })),
   )
-  const agentNames = createMemo(() => local.agent.all().map((agent) => agent.name))
+  const agentNames = createMemo(() => local.agent.all().map((agent) => agent.id))
 
   const currentAgentColor = createMemo(() => {
     const agent = local.agent.current()
     if (!agent) return undefined
     const primary = sync.data.agent.filter((a) => a.mode !== "subagent" && !a.hidden)
-    const idx = primary.findIndex((a) => a.name === agent.name)
+    const idx = primary.findIndex((a) => a.id === agent.id)
     return agentColor(agent.name, agent.color, idx >= 0 ? idx : undefined)
   })
 
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
     if (option.type === "agent") {
-      addPart({ type: "agent", name: option.name, content: "@" + option.name, start: 0, end: 0 })
+      addPart({ type: "agent", name: option.name, content: "@" + option.display, start: 0, end: 0 })
     } else {
       addPart({ type: "file", path: option.path, content: "@" + option.path, start: 0, end: 0 })
     }
