@@ -1110,15 +1110,9 @@ export namespace TargetMemory {
         const isDNSAncestor = candidate.hostname !== base.hostname &&
           candidate.hostname.endsWith("." + base.hostname) &&
           base.pathname === "/"
-        // A workspace below the candidate's own hostname is never its parent.
-        // For example, a legacy www.example.com ledger must not absorb the
-        // canonical example.com program root merely because it listed that apex.
-        const isReverseDNSDescendant = base.hostname !== candidate.hostname &&
-          base.hostname.endsWith("." + candidate.hostname)
         // Child workspaces remain tied to their DNS subtree. Only root program
         // workspaces may own explicitly listed unrelated domains.
-        return candidate.hostname !== base.hostname && !isReverseDNSDescendant &&
-          (isDNSAncestor || workspace.parentTargetID === null)
+        return candidate.hostname !== base.hostname && (isDNSAncestor || workspace.parentTargetID === null)
       })
       .sort((a, b) => {
         const aHost = new URL(a.targetURL).hostname
@@ -1135,13 +1129,25 @@ export namespace TargetMemory {
       // Unconfigured intermediate workspaces are not authorization boundaries.
       if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) continue
       const href = candidate.origin + "/"
+      const matchingIncludes = matchingScopeItems(href, scope.scopeItems)
+      const baseHostname = new URL(workspace.targetURL).hostname.toLowerCase().replace(/\.$/, "")
+      const isReverseDNSDescendant = baseHostname !== candidate.hostname &&
+        baseHostname.endsWith("." + candidate.hostname)
+      // A more-specific existing host (for example www.example.com) can own
+      // its apex only when its persisted policy explicitly grants the wildcard
+      // family. An exact apex entry alone must not turn a legacy host ledger into
+      // the parent of the canonical program root.
+      const reverseMatchHasWildcardGrant = matchingIncludes.some((item) =>
+        /^(?:wildcard[ \t]*:[ \t]*)?\*\./i.test(item.trim()),
+      )
+      if (isReverseDNSDescendant && !reverseMatchHasWildcardGrant) continue
       if (matchingScopeItems(href, scope.excludedItems).length) {
         // Never fall back to a broader root when the most-specific matching policy excludes it.
         const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
         if (isDNSAncestor) return null
         continue
       }
-      if (!matchingScopeItems(href, scope.scopeItems).length) {
+      if (!matchingIncludes.length) {
         // A configured DNS-ancestor policy is a delegation boundary: never fall
         // back to a wider root when that nearer policy does not include the asset.
         const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
@@ -1650,6 +1656,13 @@ export namespace TargetMemory {
       if (!currentRow) continue
       const matchingParent = await findAuthorizedParent(new URL(candidate.targetURL).origin)
       if (matchingParent) {
+        // Preserve an independently configured root as a legacy/evidence ledger.
+        // New policy roots may become canonical for permission checks, but must
+        // not silently reparent and reinterpret a workspace with its own scope.
+        if (currentRow.parent_target_id === null) {
+          const currentScope = await getScope(candidate.targetURL)
+          if (currentScope?.status === "configured") continue
+        }
         if (currentRow.parent_target_id !== matchingParent.id) {
           attached.push(await ensure(candidate.targetURL, {
             parentTargetURL: matchingParent.targetURL,
