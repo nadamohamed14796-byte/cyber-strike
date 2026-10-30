@@ -166,6 +166,8 @@ test("Impact Hunter is a terminal investigator with evidence tools but no defaul
       expect(agent).toBeDefined()
       expect(agent?.mode).toBe("subagent")
       expect(agent?.hidden).toBe(true)
+      expect(agent?.prompt).toContain("chain_link")
+      expect(agent?.prompt).toContain("validate_chain")
       expect(evalPerm(agent, "task")).toBe("deny")
       // Impact Hunter must be able to discover reference skills and read their
       // companion files; starting the subagent is not enough if either tool is denied.
