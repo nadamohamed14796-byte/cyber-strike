@@ -285,7 +285,12 @@ export namespace SkillIndex {
       // Multiword queries such as "JavaScript analysis" should match the
       // canonical slug "attack-javascript-analysis" and equivalent tags.
       const matchedTokens = queryTokens.filter((token) => fields.some((field) => field.includes(token)))
-      const tokenThreshold = queryTokens.length <= 1 ? 1 : Math.ceil(queryTokens.length * 0.67)
+      // Require at least two thirds of the distinct query terms. Multiplying
+      // by the rounded decimal 0.67 incorrectly turns a 2-of-3 match into 3-of-3
+      // because ceil(3 * 0.67) is 3. That hid valid skills for searches such as
+      // "javascript analysis security" when the skill metadata contains the first
+      // two concepts but not the generic word "security".
+      const tokenThreshold = queryTokens.length <= 1 ? 1 : Math.ceil((queryTokens.length * 2) / 3)
       if (matchedTokens.length >= tokenThreshold) {
         score += matchedTokens.length * 6
       } else if (score === 0) {
