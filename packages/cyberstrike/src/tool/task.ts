@@ -70,12 +70,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
   // Permission patterns and task arguments use stable registry keys, never
   // configurable display names. Keep the same key from discovery through Agent.get().
   const caller = ctx?.agent
-  const callerID =
-    registry.find((entry) => entry.info === caller)?.id ??
-    (() => {
-      const matches = registry.filter((entry) => entry.info.name === caller?.name)
-      return matches.length === 1 ? matches[0].id : undefined
-    })()
+  const callerID = await Agent.resolveID(caller)
   const accessibleAgents = caller
     ? agents.filter((entry) => entry.id === "impact-hunter" || PermissionNext.evaluate("task", entry.id, caller.permission).action !== "deny")
     : agents
