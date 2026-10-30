@@ -173,7 +173,7 @@ export function rankSkillsForPhase(
     let score = 0
     let matchedQuery = queries[0] ?? phaseId
 
-    // Prefer exact skill aliases and exact phase tags over broad prose matches.
+    // Prefer exact skill aliases and named signals (including legacy tag aliases) over broad prose matches.
     for (const query of queries) {
       const normalizedQuery = normalizeSkillText(query)
       let queryScore = 0
@@ -205,7 +205,7 @@ export function rankSkillsForPhase(
     // Token overlap alone is weak evidence: generic skills often share words like
     // "web", "testing", or "recon" without containing the actual procedure.
     // Keep broad token-only matches out of the shortlist unless several distinct
-    // tokens align; strong name/tag/category/technology matches still rank normally.
+    // tokens align; strong name/signal/category/technology matches still rank normally.
     const hasSubstantiveMatch = queries.some((query) => {
       const normalizedQuery = normalizeSkillText(query)
       return name === normalizedQuery || name.startsWith(normalizedQuery) || name.includes(normalizedQuery) ||
@@ -314,7 +314,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
         lines.push(`  Selection: matched ${match.query}; relevance ${match.score}. Load with skill(action="load", name="${match.name}") only when its procedure fits the current evidence gap.`)
       }
       lines.push(
-        "Use tags/category/CWE/technology to select the precise skill. Treat chains_with as conditional follow-up guidance: load a linked skill only when the observed evidence supports that next step; it is not an automatic severity increase or proof of a vulnerability.",
+        "Use signals/tags/category/CWE/technology to select the precise skill. Treat chains_with as conditional follow-up guidance: load a linked skill only when the observed evidence supports that next step; it is not an automatic severity increase or proof of a vulnerability.",
       )
 
     }
