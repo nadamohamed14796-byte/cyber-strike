@@ -1,6 +1,7 @@
 ---
 name: ad-security
 description: Active Directory security testing and attack techniques
+category: identity-security
 tags: [ad, windows, kerberos, ldap, internal-network]
 chains_with: [attack-security-headers, recon-email-security, attack-triage-validation]
 version: "1.0"
