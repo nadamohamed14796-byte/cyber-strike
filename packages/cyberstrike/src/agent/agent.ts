@@ -1065,8 +1065,16 @@ export namespace Agent {
   export async function get(agent: string) {
     const registry = await state()
     if (registry[agent]) return registry[agent]
-    const matches = Object.values(registry).filter((entry) => entry.name === agent)
-    return matches.length === 1 ? matches[0] : undefined
+    const matches = Object.entries(registry).filter(([, entry]) => entry.name === agent)
+    if (matches.length === 1) return matches[0]![1]
+    if (matches.length > 1) {
+      throw new Error(
+        `Agent display name "${agent}" is ambiguous. Use a stable registry ID: ${matches.map(([id]) => id).join(", ")}.`,
+      )
+    }
+    throw new Error(
+      `Unknown agent "${agent}". Use one of the stable registry IDs: ${Object.keys(registry).join(", ")}.`,
+    )
   }
 
   /**
