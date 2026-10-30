@@ -22,6 +22,7 @@ import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
   requestIDFromRecentPromptTexts,
+  requestIDsFromTaskPrompt,
   shouldInferSessionRequestID,
   selectTaskRequestContext,
   proxyTesterMethodologyPhase,
@@ -169,14 +170,38 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
               ),
           )
         : undefined
-      if (sessionRequestID && params.request_id && params.request_id !== sessionRequestID) {
+      // The primary orchestrator often writes the captured Request ID into the
+      // delegated prompt but omits the dedicated request_id argument. Recover the
+      // exact structured field for request-aware agents; never infer from arbitrary
+      // prose, and reject multiple/conflicting identities instead of cross-binding.
+      const promptRequestIDs = agent.prependRequestContext
+        ? [...new Set([
+            ...requestIDsFromTaskPrompt(params.prompt),
+            ...requestIDsFromTaskPrompt(params.request_context ?? ""),
+          ])]
+        : []
+      if (promptRequestIDs.length > 1) {
         throw new Error(
-          `Request context mismatch: this subagent session is bound to request ${sessionRequestID}, but task request_id ${params.request_id} was supplied. Use the current session's request ID to avoid cross-request context mixing.`,
+          "Task prompt contains multiple request IDs. Supply the single intended request_id explicitly to prevent cross-request context mixing.",
         )
       }
-      // Prefer the session-bound request ID automatically when the model omits
-      // the optional argument. An explicit conflicting ID is rejected above.
-      const requestID = params.request_id ?? sessionRequestID
+      const promptRequestID = promptRequestIDs[0]
+      const requestedIDs = new Set(
+        [params.request_id, promptRequestID, sessionRequestID].filter((value): value is string => Boolean(value)),
+      )
+      if (requestedIDs.size > 1) {
+        throw new Error(
+          "Request context mismatch: the supplied request_id, task prompt, and session-bound request identity do not agree. Use the exact current request ID.",
+        )
+      }
+      // Prefer the explicit tool argument, then the structured task prompt, and
+      // finally the persistent Proxy Agent transcript for follow-up delegation.
+      const requestID = params.request_id ?? promptRequestID ?? sessionRequestID
+      if (requestID && !Request.get(Session.root(ctx.sessionID)).some((request) => request.id === requestID)) {
+        throw new Error(
+          `Request context ${requestID} does not exist in the current root session. Refusing to start a subagent with unrelated or stale request evidence.`,
+        )
+      }
 
       const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
 
