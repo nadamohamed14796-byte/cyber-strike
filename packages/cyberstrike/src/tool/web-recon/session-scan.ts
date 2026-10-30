@@ -15,6 +15,21 @@ interface OriginBucket {
   pages: Set<string>
 }
 
+export function sessionScanProbeTargets(
+  origins: Map<string, { apis: Set<string>; pages: Set<string> }>,
+  rootAuthorizedOrigins: ReadonlySet<string>,
+): { corsTargets: string[]; methodRoots: string[] } {
+  const corsTargets: string[] = []
+  for (const [origin, bucket] of origins) {
+    if (bucket.apis.size > 0) corsTargets.push(...bucket.apis)
+    else if (rootAuthorizedOrigins.has(origin)) corsTargets.push(origin + "/")
+  }
+  return {
+    corsTargets,
+    methodRoots: [...rootAuthorizedOrigins].filter((origin) => origins.has(origin)).map((origin) => origin + "/"),
+  }
+}
+
 function isApiEndpoint(req: Request.Info, path: string): boolean {
   if (req.method !== "GET") return true
   if (/\/api\b|\/v\d+\/|\/graphql\b|\/rest\/|\/ws\//i.test(path)) return true
@@ -176,13 +191,10 @@ export async function sessionScan(
 
   // Phase 2: CORS on API endpoints (+ origin root fallback) + method_check on origin roots only
   if (!abort?.aborted) {
-    const corsTargets: string[] = []
-    for (const [origin, bucket] of originEntries) {
-      if (bucket.apis.size > 0) corsTargets.push(...bucket.apis)
-      else if (rootEntries.some(([root]) => root === origin)) corsTargets.push(origin + "/")
-    }
-
-    const methodRoots = [...new Set(rootEntries.map(([origin]) => origin + "/"))]
+    const { corsTargets, methodRoots } = sessionScanProbeTargets(
+      new Map(originEntries),
+      new Set(rootEntries.map(([origin]) => origin)),
+    )
     apiCheckCount = corsTargets.length + methodRoots.length
 
     if (apiCheckCount > 0) {
