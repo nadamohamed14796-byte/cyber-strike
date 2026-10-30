@@ -637,100 +637,20 @@ describe("SessionQueueStatus", () => {
 })
 
 
-describe("Extension ingest transcript visibility", () => {
-  test("suppresses routine queue/completion chatter but keeps actionable parse errors", async () => {
+describe("Extension ingest transcript isolation", () => {
+  test("never appends queue, completion, deduplication, or rejection chatter to the Main conversation", async () => {
     await withInstance(async () => {
-      const session = await Session.create({ title: "extension-ingest-visibility-test" })
+      const session = await Session.create({ title: "extension-ingest-transcript-isolation-test" })
+      const before = await Session.messages({ sessionID: session.id })
+
       await IngestSummary.notice(session.id, "Extension request queued for independent analysis: GET /profile")
       await IngestSummary.notice(session.id, "Extension request analysis completed: GET /profile")
-      await IngestSummary.notice(session.id, "Extension request already known (deduplicated): GET /profile — credential/cookie observation was retained; LLM work was not duplicated.")
-      await IngestSummary.notice(session.id, "Extension request received again: GET /profile — previous analysis had failed and was requeued.")
+      await IngestSummary.notice(session.id, "Extension request already known (deduplicated): GET /profile")
+      await IngestSummary.notice(session.id, "Extension request received again: GET /profile")
       await IngestSummary.notice(session.id, "Extension request rejected before analysis: invalid HTTP request format")
 
-      const messages = await Session.messages({ sessionID: session.id })
-      const text = messages.flatMap((message) => message.parts)
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-
-      expect(text).not.toContain("Extension request queued for independent analysis: GET /profile")
-      expect(text).not.toContain("Extension request analysis completed: GET /profile")
-      expect(text).not.toContain("Extension request already known (deduplicated): GET /profile")
-      expect(text).not.toContain("credential/cookie observation was retained")
-      expect(text).not.toContain("Extension request received again: GET /profile")
-      expect(text).toContain("Extension request rejected before analysis: invalid HTTP request format")
-      expect(messages.filter((message) => message.info.role === "user").every((message) => "excludeHistory" in message.info && message.info.excludeHistory)).toBe(true)
-      expect(MessageV2.filterExcluded(messages)).toHaveLength(0)
-      await Session.remove(session.id)
-    })
-  })
-})
-
-describe("Per-request live analysis transcript entries", () => {
-  test("keeps sequential request notices separate while sharing the broker session reference", async () => {
-    await withInstance(async () => {
-      const session = await Session.create({ title: "per-request-live-analysis-entry-test" })
-      const model = { providerID: "test-provider", modelID: "test-model" }
-      const brokerSessionID = "shared-proxy-broker-session"
-      const first = await IngestSummary.createLiveNotice({
-        sessionID: session.id,
-        agent: "proxy-agent",
-        model,
-        text: "## Captured request — ANALYZING\nRequest: GET /first",
-        requestAnalysis: {
-          requestID: "request-first",
-          analysisSessionID: brokerSessionID,
-          method: "GET",
-          url: "https://example.test/first",
-        },
-      })
-      const second = await IngestSummary.createLiveNotice({
-        sessionID: session.id,
-        agent: "proxy-agent",
-        model,
-        text: "## Captured request — ANALYZING\nRequest: GET /second",
-        requestAnalysis: {
-          requestID: "request-second",
-          analysisSessionID: brokerSessionID,
-          method: "GET",
-          url: "https://example.test/second",
-        },
-      })
-
-      expect(second.messageID).not.toBe(first.messageID)
-      expect(second.partID).not.toBe(first.partID)
-      expect(second.requestAnalysis.analysisSessionID).toBe(first.requestAnalysis.analysisSessionID)
-      const parentMessages = await Session.messages({ sessionID: session.id })
-      expect(parentMessages.filter((message) => message.info.role === "user").every((message) => "excludeHistory" in message.info && message.info.excludeHistory)).toBe(true)
-      expect(MessageV2.filterExcluded(parentMessages)).toHaveLength(0)
-
-      await IngestSummary.updateLiveNotice({
-        sessionID: session.id,
-        live: first,
-        text: "First request finished",
-        completed: true,
-        status: "processed",
-      })
-      // A late write for a completed request is ignored and cannot overwrite
-      // the separate live entry for the next request.
-      await IngestSummary.updateLiveNotice({
-        sessionID: session.id,
-        live: first,
-        text: "STALE first request output",
-      })
-      await IngestSummary.updateLiveNotice({
-        sessionID: session.id,
-        live: second,
-        text: "Second request remains live",
-      })
-
-      const messages = await Session.messages({ sessionID: session.id })
-      const parts = messages.flatMap((message) => message.parts)
-        .filter((part) => part.type === "text" && (part.metadata as { kind?: string } | undefined)?.kind === "ingest-summary")
-      expect(parts).toHaveLength(2)
-      const texts = parts.filter((part) => part.type === "text").map((part) => part.text)
-      expect(texts).toContain("First request finished")
-      expect(texts).toContain("Second request remains live")
-      expect(texts).not.toContain("STALE first request output")
+      const after = await Session.messages({ sessionID: session.id })
+      expect(after.map((message) => message.info.id)).toEqual(before.map((message) => message.info.id))
       await Session.remove(session.id)
     })
   })
