@@ -91,13 +91,14 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       }
       const accessibleSkills = accessibleCache.get(agentKey)!.skills
       const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
+      const contextScope: SkillContext.ContextScope = { sessionID: ctx.sessionID, agent: ctx.agent }
       const escapeXmlAttribute = (value: string) =>
         value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
       if (params.action === "list") {
         if (params.loaded) {
-          const active = SkillContext.active()
-          const tokens = SkillContext.tokenCount()
+          const active = SkillContext.active(contextScope)
+          const tokens = SkillContext.tokenCount(contextScope)
           if (active.length === 0)
             return {
               title: "No skills loaded",
@@ -146,11 +147,11 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       if (params.action === "unload") {
         if (!params.name) throw new Error("Skill name required for unload action")
         const canonicalName = accessibleSkills.find((entry) => entry.name.trim().toLocaleLowerCase("en-US") === params.name!.trim().toLocaleLowerCase("en-US"))?.name ?? SkillIndex.resolveReference(params.name) ?? params.name
-        const removed = SkillContext.unload(canonicalName)
+        const removed = SkillContext.unload(canonicalName, contextScope)
         return {
           title: removed ? `Unloaded: ${canonicalName}` : `Not loaded: ${canonicalName}`,
           output: removed
-            ? `Skill "${canonicalName}" removed from context. Active tokens: ${SkillContext.tokenCount()}`
+            ? `Skill "${canonicalName}" removed from context. Active tokens: ${SkillContext.tokenCount(contextScope)}`
             : `Skill "${canonicalName}" was not in context.`,
           metadata: {} as { name?: string; dir?: string },
         }
@@ -237,6 +238,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const suggestions = SkillContext.suggest(
           params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })),
           allowedSkills,
+          contextScope,
         )
         if (suggestions.length === 0)
           return {
@@ -347,7 +349,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         metadata: {} as { name?: string; dir?: string },
       })
 
-      const loadedContent = await SkillContext.load(canonicalName)
+      const loadedContent = await SkillContext.load(canonicalName, contextScope)
       if (loadedContent === undefined) {
         throw new Error(`Failed to load skill "${canonicalName}" into context.`)
       }
@@ -403,7 +405,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             omittedPrerequisiteCount++
             return []
           }
-          const loaded = SkillContext.isLoaded(resolved)
+          const loaded = SkillContext.isLoaded(resolved, contextScope)
           return [`  <prerequisite skill="${escapeXmlAttribute(resolved)}" status="${loaded ? "loaded" : "not-loaded"}" />`]
         }
         // Human-readable prerequisites are real-world conditions, not skill links.
