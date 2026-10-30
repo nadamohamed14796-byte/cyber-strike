@@ -6,6 +6,7 @@ import { RequestJavaScriptCaptureTable, RequestTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { createHash } from "crypto"
 import { processResponse, type ResponseInput } from "./response-processor"
+import { isConfirmedEmptyStaticHTML } from "./captured-request-triage"
 
 function requestResponseURL(input: {
   normalizedPath: string
@@ -490,6 +491,46 @@ export namespace Request {
   }
 
   /**
+   * Classify a request as a confirmed empty/static HTML response using the
+   * complete original body stored outside the model-facing response preview.
+   */
+  export function isConfirmedEmptyStatic(id: string): boolean {
+    const row = Database.use((db) =>
+      db.select({
+        method: RequestTable.method,
+        response_status: RequestTable.response_status,
+        response_content_type: RequestTable.response_content_type,
+        response_size: RequestTable.response_size,
+        html_source: RequestTable.html_source,
+        raw_request: RequestTable.raw_request,
+        body_hash: RequestTable.body_hash,
+        query_hash: RequestTable.query_hash,
+        protocol: RequestTable.protocol,
+        operation: RequestTable.operation,
+        trigger_element: RequestTable.trigger_element,
+        element_roles: RequestTable.element_roles,
+        ui_context: RequestTable.ui_context,
+      }).from(RequestTable).where(eq(RequestTable.id, id)).get(),
+    )
+    if (!row) return false
+    return isConfirmedEmptyStaticHTML({
+      method: row.method,
+      responseStatus: row.response_status ?? undefined,
+      responseContentType: row.response_content_type ?? undefined,
+      responseSize: row.response_size ?? undefined,
+      htmlSource: row.html_source ?? undefined,
+      rawRequest: row.raw_request ?? undefined,
+      bodyHash: row.body_hash ?? undefined,
+      queryHash: row.query_hash ?? undefined,
+      protocol: row.protocol ?? undefined,
+      operation: row.operation ?? undefined,
+      triggerElement: row.trigger_element ?? undefined,
+      elementRoles: (row.element_roles as string[] | null) ?? undefined,
+      uiContext: (row.ui_context as Record<string, unknown> | null) ?? undefined,
+    })
+  }
+
+  /**
    * Find a previously completed, byte-for-byte equivalent capture for the same
    * credential and UI/access context. Different credentials are never folded
    * together: they are essential cross-account and cross-tenant evidence.
@@ -508,7 +549,6 @@ export namespace Request {
     if (!current || current.response_status == null || current.response_size == null) return undefined
 
     // A truncated text preview is not enough to establish exact response equality.
-    const contentType = (current.response_content_type ?? "").toLowerCase()
     const hasCompleteSource =
       current.html_source != null ||
       current.javascript_source != null ||
@@ -548,7 +588,6 @@ export namespace Request {
     )
     if (!prior) return undefined
 
-    log.debug?.("equivalent processed captured request found", { requestID: request.id, priorRequestID: prior.id })
     return rowToInfo(prior)
   }
 
