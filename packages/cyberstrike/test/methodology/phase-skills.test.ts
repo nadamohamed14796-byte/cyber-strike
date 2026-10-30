@@ -24,6 +24,15 @@ describe("Recon prompt specialization", () => {
   })
 })
 
+describe("Dynamic specialist dispatch contract", () => {
+  test("the root prompt has no static phase-to-agent routing table", async () => {
+    const prompt = await Bun.file(path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")).text()
+    expect(prompt).toContain("There is deliberately no phase-to-agent assignment table")
+    expect(prompt).toContain("Methodology phases, parent-workflow position, and phase-specific skill recommendations are tracking/context only")
+    expect(prompt).not.toContain("Phase-to-Agent Decision Table")
+  })
+})
+
 describe("Provider prompt agent-roster alignment", () => {
   test("provider-specific prompts discover the live Task roster instead of freezing an agent list", async () => {
     const promptNames = ["codex_header.txt", "beast.txt", "gemini.txt", "trinity.txt", "qwen.txt", "anthropic.txt"]
