@@ -277,6 +277,10 @@ test("proxy vulnerability agents can retrieve shared global research and validat
         for (const tool of sharedContextTools) {
           expect(evalPerm(agent, tool), String(agent?.name) + " must be able to use " + tool).toBe("allow")
         }
+        expect(evalPerm(agent, "skill"), String(agent?.name) + " must be able to discover and load skills").toBe("allow")
+        expect(agent?.prompt, String(agent?.name) + " must receive shared runtime routing guidance").toContain(
+          "Runtime capability, skill, and signal routing",
+        )
       }
       expect(evalPerm(orchestrator, "target_workspace")).toBe("allow")
       expect(evalPerm(analyzer, "target_workspace")).toBe("deny")
@@ -357,8 +361,13 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(evalPerm(analyzer, "validate_finding")).toBe("deny")
       expect(evalPerm(analyzer, "triage_vulnerability")).toBe("deny")
 
-      for (const name of ["web-application", "mobile-application", "cloud-security", "internal-network", "general"]) {
-        expect(evalPerm(await Agent.get(name), "research_knowledge"), name).toBe("allow")
+      for (const name of ["cyberstrike", "web-application", "mobile-application", "cloud-security", "internal-network", "general"]) {
+        const agent = await Agent.get(name)
+        expect(evalPerm(agent, "research_knowledge"), name).toBe("allow")
+        expect(evalPerm(agent, "skill"), name).toBe("allow")
+        expect(agent?.prompt, name + " must receive shared runtime routing guidance").toContain(
+          "Runtime capability, skill, and signal routing",
+        )
       }
     },
   })
