@@ -62,6 +62,7 @@ function compileScopeItems(items: readonly string[]): CompiledScopeItems {
     if (/^(?:domain|wildcard|url|javascript(?:[ \t]+(?:file|url))?|js(?:[ \t]+(?:file|url))?|script[ \t]+file|source[ \t]+map|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:/i.test(item)) typedEntries.push(item)
     else if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
     else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
+    else if (item.includes("/")) urlPatterns.push(item)
     else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
     else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2).toLowerCase().replace(/\.$/, ""))
     else if (item.includes("*") || /\{[^{}]+\}/.test(item)) wildcardPatterns.push(item)
