@@ -356,6 +356,43 @@ describe("IngestQueue parent-child controls", () => {
     })
   })
 
+  test("Extension Proxy work persists notes visible to the root while the Main Agent is still running", async () => {
+    await withInstance(async () => {
+      const parent = "main-agent-shared-notes"
+      const proxy = "extension-proxy-shared-notes"
+      const targetURL = "https://shared-target.example.test"
+      const workspace = await TargetMemory.ensure(targetURL)
+      const mainStarted = defer()
+      const releaseMain = defer()
+      const proxySaved = defer()
+
+      IngestQueue.enqueue(parent, async () => {
+        mainStarted.resolve()
+        await releaseMain.promise
+      })
+      await mainStarted.promise
+
+      const reservation = IngestQueue.reserve(proxy, parent)
+      IngestQueue.enqueueReserved(reservation, async () => {
+        await TargetMemory.addNote(targetURL, {
+          kind: "observation",
+          title: "Extension capture evidence",
+          content: "The child Proxy session recorded this request observation.",
+          source: "extension-proxy-test",
+        })
+        proxySaved.resolve()
+      })
+
+      await proxySaved.promise
+      expect(IngestQueue.pendingCount(parent)).toBe(1)
+      expect(TargetMemory.allNotes(workspace.id).some((note) => note.content.includes("child Proxy session"))).toBe(true)
+
+      releaseMain.resolve()
+      await new Promise((r) => setTimeout(r, 15))
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+    })
+  })
+
   test("Extension Proxy child queue runs alongside Main Agent work", async () => {
     await withInstance(async () => {
       const parent = "main-agent-running"
