@@ -2955,14 +2955,21 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       omittedParentNoteCount + omittedParentJournalCount +
       omittedAncestorNoteCount + omittedAncestorJournalCount + omittedDatabaseNoteCount
 
-    // Walk the entire registered asset tree iteratively: no arbitrary asset-count or
-    // nesting-depth truncation, and the visited set makes malformed cycles harmless.
+    // The database and workspace registry retain every asset. This prompt-only
+    // preview is bounded so a large recon tree cannot allocate an unbounded array
+    // of Workspace objects or thousands of lines on every request.
+    const MAX_CONTEXT_ASSET_NODES = 500
     const hierarchyLines: string[] = []
     const treeVisited = new Set<string>()
     const pendingAssets: Array<{ workspace: Workspace; depth: number; root: boolean }> = [
       { workspace: programRoot, depth: 0, root: true },
     ]
+    let omittedAssetPreview = false
     while (pendingAssets.length) {
+      if (treeVisited.size >= MAX_CONTEXT_ASSET_NODES) {
+        omittedAssetPreview = true
+        break
+      }
       const current = pendingAssets.pop()!
       if (treeVisited.has(current.workspace.id)) continue
       treeVisited.add(current.workspace.id)
@@ -2974,7 +2981,16 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       }
       let items: Workspace[] = []
       try {
-        items = children(current.workspace.id)
+        const remaining = Math.max(1, MAX_CONTEXT_ASSET_NODES - treeVisited.size)
+        items = Database.use((db) => db.select().from(TargetWorkspaceTable).where(and(
+          eq(TargetWorkspaceTable.parent_target_id, current.workspace.id),
+          eq(TargetWorkspaceTable.project_id, projectID),
+          eq(TargetWorkspaceTable.owner_key, ownerKey),
+        )).orderBy(asc(TargetWorkspaceTable.time_created)).limit(remaining + 1).all().map((row) => mapWorkspace(row)))
+        if (items.length > remaining) {
+          omittedAssetPreview = true
+          items = items.slice(0, remaining)
+        }
       } catch {
         hierarchyLines.push("  ".repeat(current.depth + 1) + "[asset inventory unavailable for this node]")
         continue
@@ -2983,6 +2999,9 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       for (let index = items.length - 1; index >= 0; index--) {
         pendingAssets.push({ workspace: items[index]!, depth: current.depth + 1, root: false })
       }
+    }
+    if (omittedAssetPreview) {
+      hierarchyLines.push("[Asset preview limited to " + MAX_CONTEXT_ASSET_NODES + " workspaces; the complete registered inventory remains in the workspace database and assets/registry.json files.]")
     }
 
     // Bound the selected-note portion independently of maxNotes. Callers may request
