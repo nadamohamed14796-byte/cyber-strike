@@ -102,6 +102,13 @@ export function CapturedRequestAnalysisPanel() {
     return id ? (sync.data.message[id] ?? []) : []
   })
   const childUserMessages = createMemo(() => childMessages().filter((message) => message.role === "user"))
+  const replyModelMessage = createMemo(
+    () =>
+      childUserMessages().at(-1) ??
+      (sync.data.message[parentID()] ?? [])
+        .filter((message) => message.role === "user" && message.agent !== "proxy-agent")
+        .at(-1),
+  )
   const childBusy = createMemo(() => {
     const id = analysisSessionID()
     return !!id && (sync.data.session_status[id]?.type ?? "idle") !== "idle"
@@ -144,7 +151,7 @@ export function CapturedRequestAnalysisPanel() {
     })
   })
   const replyDisabled = createMemo(
-    () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || brokerQueueBusy() || replySending(),
+    () => !analysisSessionID() || !replyModelMessage() || childBusy() || brokerQueueBusy() || replySending(),
   )
   const requestParts = createMemo(() => parseRequest(request()?.raw_request))
   const queryParams = createMemo(() => {
@@ -244,7 +251,7 @@ export function CapturedRequestAnalysisPanel() {
     const text = replyDraft().trim()
     const sessionID = analysisSessionID()
     const requestID = selected()?.requestID
-    const lastUserMessage = childUserMessages().at(-1)
+    const lastUserMessage = replyModelMessage()
     if (!text || !sessionID || !requestID || !lastUserMessage || replySending() || childBusy() || brokerQueueBusy()) return
 
     const submittedDraft = replyDraft()
