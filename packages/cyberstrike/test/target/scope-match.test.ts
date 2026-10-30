@@ -38,6 +38,14 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://[2001:db8::2]/", "IP Address: 2001:db8::1").matches).toBe(false)
   })
 
+  test("JavaScript and JS typed scope entries authorize only the declared file path", () => {
+    expect(checkMatch("https://example.com/assets/app.js", "JavaScript: https://example.com/assets/app.js").matches).toBe(true)
+    expect(checkMatch("https://example.com/assets/app.js?v=2", "JS: https://example.com/assets/app.js").matches).toBe(true)
+    expect(checkMatch("https://example.com/assets/app.js.map", "JavaScript: https://example.com/assets/app.js").matches).toBe(false)
+    expect(checkMatch("https://example.com/assets/admin.js", "JavaScript: https://example.com/assets/app.js").matches).toBe(false)
+    expect(checkMatch("https://sub.example.com/assets/app.js", "JavaScript: https://example.com/assets/app.js").matches).toBe(false)
+  })
+
   test("scheme-less URL paths never broaden to the whole host", () => {
     expect(checkMatch("https://example.com/api", "example.com/api").matches).toBe(true)
     expect(checkMatch("https://example.com/api/users", "example.com/api").matches).toBe(true)
