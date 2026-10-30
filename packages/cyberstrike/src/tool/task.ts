@@ -67,7 +67,7 @@ type TaskToolMetadata = {
 
 export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task", async (ctx) => {
   const registry = await Agent.entries()
-  const agents = registry.filter((entry) => entry.info.mode !== "primary")
+  const agents = registry
 
   // Permission patterns and task arguments use stable registry keys, never
   // configurable display names. Keep the same key from discovery through Agent.get().
@@ -180,7 +180,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         )
       }
 
-      const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
+      const hasTaskPermission = PermissionNext.evaluate("task", "*", agent.permission).action !== "deny"
 
       const session = await iife(async () => {
         if (params.task_id) {
