@@ -384,6 +384,7 @@ describe("IngestQueue parent-child controls", () => {
       })
 
       await proxySaved.promise
+      await new Promise((r) => setTimeout(r, 10))
       expect(IngestQueue.pendingCount(parent)).toBe(1)
       expect(TargetMemory.allNotes(workspace.id).some((note) => note.content.includes("child Proxy session"))).toBe(true)
 
