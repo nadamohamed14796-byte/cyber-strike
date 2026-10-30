@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { isConfirmedEmptyStaticHTML } from "../../src/session/captured-request-triage"
+import { isConfirmedEmptyStaticHTML, type EmptyStaticResponseInput } from "../../src/session/captured-request-triage"
 
 const shell = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Blank</title></head><body>\n</body></html>"
 
-function input(overrides: Record<string, unknown> = {}) {
+function input(overrides: Partial<EmptyStaticResponseInput> = {}): EmptyStaticResponseInput {
   return {
     method: "GET",
     responseStatus: 200,
