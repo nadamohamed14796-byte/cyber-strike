@@ -675,7 +675,7 @@ describe("Per-request live analysis transcript entries", () => {
         sessionID: session.id,
         agent: "proxy-agent",
         model,
-        text: "## Captured request — ANALYZING\\nRequest: GET /first",
+        text: "## Captured request — ANALYZING\nRequest: GET /first",
         requestAnalysis: {
           requestID: "request-first",
           analysisSessionID: brokerSessionID,
@@ -687,7 +687,7 @@ describe("Per-request live analysis transcript entries", () => {
         sessionID: session.id,
         agent: "proxy-agent",
         model,
-        text: "## Captured request — ANALYZING\\nRequest: GET /second",
+        text: "## Captured request — ANALYZING\nRequest: GET /second",
         requestAnalysis: {
           requestID: "request-second",
           analysisSessionID: brokerSessionID,
@@ -832,7 +832,7 @@ describe("Request.isConfirmedEmptyStatic", () => {
           method: "GET",
           normalizedPath: path,
           origin: "https://example.test",
-          rawRequest: `GET ${path} HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\n`,
+          rawRequest: `GET ${path} HTTP/1.1\r\nHost: example.test\r\n\r\n`,
           response: {
             status: 200,
             headers: { "content-type": "text/html; charset=utf-8" },
@@ -857,7 +857,7 @@ describe("Request.findEquivalentProcessed", () => {
   test("reuses only an exact completed capture for the same credential and access context", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "request-equivalent-analysis-test" })
-      const rawRequest = "GET /api/profile HTTP/1.1\\r\\nHost: example.test\\r\\nAccept: application/json\\r\\n\\r\\n"
+      const rawRequest = "GET /api/profile HTTP/1.1\r\nHost: example.test\r\nAccept: application/json\r\n\r\n"
       const create = (credentialID: string, body: string, roles: string[] = ["member"]) => {
         const item = Request.add({
           sessionID: session.id,
@@ -957,7 +957,7 @@ describe("full JavaScript source persistence", () => {
   test("stores complete .js response while keeping the normal request preview capped", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "javascript-source-persistence-test" })
-      const source = 'fetch("/api/full-endpoint");\\n' + "x".repeat(110 * 1024)
+      const source = 'fetch("/api/full-endpoint");\n' + "x".repeat(110 * 1024)
       const request = Request.add({
         sessionID: session.id,
         method: "GET",
@@ -1202,7 +1202,7 @@ describe("captured request HTTP route scope gate", () => {
             body: JSON.stringify({
               sessionID: session.id,
               scheme: "https",
-              text: "GET /admin/profile HTTP/1.1\\r\\nHost: authorized-app.example.test\\r\\n\\r\\n",
+              text: "GET /admin/profile HTTP/1.1\r\nHost: authorized-app.example.test\r\n\r\n",
             }),
           },
         )
