@@ -59,6 +59,25 @@ function canonicalArtifactPath(area: (typeof AREAS)[number], filename: string): 
   return directory + "/" + canonicalFilename
 }
 
+const artifactWriteQueues = new Map<string, Promise<void>>()
+
+/** Prevent parallel first-writes to the same artifact path from silently replacing each other. */
+async function withArtifactWriteLock<T>(filePath: string, task: () => Promise<T>): Promise<T> {
+  const previous = artifactWriteQueues.get(filePath) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  artifactWriteQueues.set(filePath, current)
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (artifactWriteQueues.get(filePath) === current) artifactWriteQueues.delete(filePath)
+  }
+}
+
 type TargetArtifactMetadata = {
   saved: boolean
   reason?: string
@@ -213,29 +232,40 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     }
 
     const content = rawContent
-    await TargetMemory.writeWorkspaceFile(workspace, relativePath, content)
-    return {
-      title: "Target artifact saved",
-      output: [
-        "Target: " + workspace.targetURL,
-        "Workspace: " + workspace.workspacePath,
-        "Artifact: " + filePath,
-        "Bytes written: " + Buffer.byteLength(content, "utf-8"),
-        ...(params.source_path ? ["Source file: " + params.source_path, "Source SHA-256: " + sourceHash] : []),
-        "Evidence preservation: exact content stored in target-local workspace",
-      ].join("\n"),
-      metadata: {
-        saved: true,
-        target_id: workspace.id,
-        target_url: workspace.targetURL,
-        workspace: workspace.workspacePath,
-        area: params.area,
-        filename,
-        path: filePath,
-        bytes: Buffer.byteLength(content, "utf-8"),
-        source_path: params.source_path,
-        source_sha256: sourceHash,
-      } as TargetArtifactMetadata,
-    }
+    return await withArtifactWriteLock(filePath, async () => {
+      // The earlier existence check is a fast path only. Recheck inside the lock
+      // so simultaneous first-writers cannot both replace the same new artifact.
+      if (await Bun.file(filePath).exists() && !params.overwrite) {
+        return {
+          title: "Target artifact already exists",
+          output: "Existing artifact preserved: " + filePath + ". Set overwrite=true only if replacement is intentional.",
+          metadata: { saved: false, reason: "already_exists", target_id: workspace.id, path: filePath } as TargetArtifactMetadata,
+        }
+      }
+      await TargetMemory.writeWorkspaceFile(workspace, relativePath, content)
+      return {
+        title: "Target artifact saved",
+        output: [
+          "Target: " + workspace.targetURL,
+          "Workspace: " + workspace.workspacePath,
+          "Artifact: " + filePath,
+          "Bytes written: " + Buffer.byteLength(content, "utf-8"),
+          ...(params.source_path ? ["Source file: " + params.source_path, "Source SHA-256: " + sourceHash] : []),
+          "Evidence preservation: exact content stored in target-local workspace",
+        ].join("\n"),
+        metadata: {
+          saved: true,
+          target_id: workspace.id,
+          target_url: workspace.targetURL,
+          workspace: workspace.workspacePath,
+          area: params.area,
+          filename,
+          path: filePath,
+          bytes: Buffer.byteLength(content, "utf-8"),
+          source_path: params.source_path,
+          source_sha256: sourceHash,
+        } as TargetArtifactMetadata,
+      }
+    })
   },
 })
