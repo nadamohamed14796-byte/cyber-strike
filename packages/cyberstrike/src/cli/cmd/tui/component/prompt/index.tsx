@@ -593,9 +593,13 @@ export function Prompt(props: PromptProps) {
 
   async function submit() {
     if (props.disabled) return
+    const brokerParentSessionID = props.sessionID
+      ? sync.session.get(props.sessionID)?.parentID ?? props.sessionID
+      : undefined
     if (
       isProxyAgentSession() &&
-      (sync.data.session_queue_status?.[props.sessionID ?? ""]?.pending ?? 0) > 0
+      brokerParentSessionID &&
+      (sync.data.session_queue_status?.[brokerParentSessionID]?.pending ?? 0) > 0
     ) {
       toast.show({
         variant: "warning",
