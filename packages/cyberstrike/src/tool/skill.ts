@@ -33,6 +33,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     name: z.string().optional().describe("Exact skill name from search/list (preferred for load/outline/unload)"),
     query: z.string().optional().describe("Search by observed technology, behavior, skill name, or evidence gap"),
     tech: z.array(z.string()).optional().describe("Tech stack filter (for search action)"),
+    tag: z.string().optional().describe("Exact skill tag filter (for search action)"),
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
     loaded: z.boolean().optional().describe("For list action: only show currently loaded skills"),
@@ -166,6 +167,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           candidates = SkillIndex.byTechStack(params.tech, Infinity)
         } else if (params.category) {
           candidates = SkillIndex.byCategory(params.category, Infinity)
+        } else if (params.tag) {
+          candidates = SkillIndex.byTag(params.tag, Infinity)
         } else if (params.query) {
           candidates = SkillIndex.search(params.query, Infinity)
         } else {
