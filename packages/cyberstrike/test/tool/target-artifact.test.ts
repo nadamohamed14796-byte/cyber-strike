@@ -108,13 +108,13 @@ test("serializes concurrent first-writes to one artifact path without losing the
           metadata: () => undefined,
         } as never
         const attempts = await Promise.all([
-          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer A evidence.\\n" }, ctx),
-          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer B evidence.\\n" }, ctx),
+          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer A evidence.\n" }, ctx),
+          tool.execute({ target_url: target, area: "findings", filename: "shared-summary.md", content: "Writer B evidence.\n" }, ctx),
         ])
         expect(attempts.filter((result) => result.metadata.saved === true)).toHaveLength(1)
         expect(attempts.filter((result) => result.metadata.reason === "already_exists")).toHaveLength(1)
         const saved = await fs.readFile(path.join(workspace.workspacePath, "findings", "shared-summary.md"), "utf-8")
-        expect(["Writer A evidence.\\n", "Writer B evidence.\\n"]).toContain(saved)
+        expect(["Writer A evidence.\n", "Writer B evidence.\n"]).toContain(saved)
       } finally {
         await Instance.dispose()
       }
