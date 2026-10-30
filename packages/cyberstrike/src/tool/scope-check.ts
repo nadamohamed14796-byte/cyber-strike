@@ -62,10 +62,10 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     let scopeConfigured = false
     let authoritativeDecision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>> | undefined
     let candidateURL: URL | undefined
+    let workspace: Awaited<ReturnType<typeof TargetMemory.get>> = null
+    let persisted: Awaited<ReturnType<typeof TargetMemory.getScope>> = null
 
     if (params.target_url) {
-      let workspace
-      let persisted: Awaited<ReturnType<typeof TargetMemory.getScope>>
       try {
         // Resolve the supplied workspace URL through the same canonical selector
         // used by active tools. Exact lookup alone could read the legacy www root
@@ -73,7 +73,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
         // program root, producing a misleading source/manifest in the UI.
         const workspaceResolution = await TargetMemory.checkURLScope(params.target_url)
         workspace = workspaceResolution.workspace ?? await TargetMemory.get(params.target_url)
-        persisted = workspace ? await TargetMemory.getScope(workspace.targetURL) : undefined
+        persisted = workspace ? await TargetMemory.getScope(workspace.targetURL) : null
         // A child without its own scope inherits the saved parent scope. Its own
         // scope, when configured, is still intersected with the parent at decision time.
         if ((!persisted || persisted.status !== "configured" || persisted.scopeItems.length === 0) && workspace?.parentTargetID) {
