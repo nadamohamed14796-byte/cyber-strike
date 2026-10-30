@@ -392,6 +392,52 @@ describe("IngestQueue parent-child controls", () => {
     })
   })
 
+  test("Agent Proxy manual follow-ups stay behind captures but not Main work", async () => {
+    await withInstance(async () => {
+      const parent = "main-manual-followup-running"
+      const proxy = "proxy-manual-followup-running"
+      const mainStarted = defer()
+      const releaseMain = defer()
+      const captureStarted = defer()
+      const releaseCapture = defer()
+      const manualStarted = defer()
+      const order: string[] = []
+
+      IngestQueue.enqueue(parent, async () => {
+        mainStarted.resolve()
+        await releaseMain.promise
+      })
+      await mainStarted.promise
+
+      const capture = IngestQueue.reserve(proxy)
+      IngestQueue.enqueueReserved(capture, async () => {
+        order.push("capture-start")
+        captureStarted.resolve()
+        await releaseCapture.promise
+        order.push("capture-finish")
+      })
+      IngestQueue.enqueue(proxy, async () => {
+        order.push("manual-follow-up")
+        manualStarted.resolve()
+      })
+
+      await captureStarted.promise
+      await new Promise((r) => setTimeout(r, 10))
+      expect(order).toEqual(["capture-start"])
+
+      releaseCapture.resolve()
+      await manualStarted.promise
+      expect(order).toEqual(["capture-start", "capture-finish", "manual-follow-up"])
+      // Both Proxy turns finished while the Main Agent task was still running.
+      expect(IngestQueue.pendingCount(parent)).toBe(1)
+      expect(IngestQueue.pendingCount(proxy)).toBe(0)
+
+      releaseMain.resolve()
+      await new Promise((r) => setTimeout(r, 10))
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+    })
+  })
+
   test("parent pause does not gate an independent Extension Proxy queue", async () => {
     await withInstance(async () => {
       const parent = "paused-main-agent"
