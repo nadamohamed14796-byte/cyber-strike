@@ -111,7 +111,7 @@ export const SkillRoutes = lazy(() =>
       "/context",
       describeRoute({
         summary: "Get loaded skills",
-        description: "Get skills currently loaded in agent context.",
+        description: "Get loaded skills. Supply both session_id and agent to inspect one agent context; omit both to inspect the project-wide aggregate.",
         operationId: "skill.context",
         responses: {
           200: {
@@ -129,10 +129,23 @@ export const SkillRoutes = lazy(() =>
           },
         },
       }),
+      validator(
+        "query",
+        z.object({
+          session_id: z.string().min(1).optional(),
+          agent: z.string().min(1).optional(),
+        }).refine((value) => Boolean(value.session_id) === Boolean(value.agent), {
+          message: "session_id and agent must be supplied together.",
+        }),
+      ),
       async (c) => {
+        const query = c.req.valid("query")
+        const contextScope = query.session_id && query.agent
+          ? { sessionID: query.session_id, agent: query.agent }
+          : undefined
         return c.json({
-          active: SkillContext.active(),
-          tokens: SkillContext.tokenCount(),
+          active: SkillContext.active(contextScope),
+          tokens: SkillContext.tokenCount(contextScope),
         })
       },
     )
