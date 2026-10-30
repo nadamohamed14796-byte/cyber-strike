@@ -22,7 +22,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     "Simple workflow: search by evidence, technology, or skill name; load the exact returned name; read the returned content before applying it. All catalog skills are searchable and loadable, but load only relevant skills rather than the whole catalog.",
     "",
     "Actions: load full content; search metadata; outline a preview; list available/loaded skills; suggest or chain conditional next skills; unload a skill when no longer needed.",
-    "Search supports exact tag, tech-stack, CWE, category, or free-text routing filters. Search and list are paginated; continue with the returned next offset when needed. A search hit or outline is not loaded content. A skill never grants scope or testing permission."
+    "Search supports exact signal, tag, tech-stack, CWE, category, or free-text routing filters. Explicit signals and legacy tags share one searchable signal vocabulary. Search and list are paginated; continue with the returned next offset when needed. A search hit or outline is not loaded content. A skill never grants scope or testing permission."
   ].join("\n")
 
   const parameters = z.object({
@@ -34,6 +34,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     query: z.string().optional().describe("Search by observed technology, behavior, skill name, or evidence gap"),
     tech: z.array(z.string()).optional().describe("Tech stack filter (for search action)"),
     tag: z.string().optional().describe("Exact skill tag filter (for search action)"),
+    signal: z.string().optional().describe("Exact observed-behavior signal alias filter (explicit signals plus legacy tags)"),
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
     loaded: z.boolean().optional().describe("For list action: only show currently loaded skills"),
@@ -136,7 +137,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             ...page.map((s) =>
               "- **" + s.name + "** [" + (s.verified ?? "unverified") + "] — " + s.description +
               (s.category ? " (" + s.category + ")" : "") +
-              (s.tech_stack?.length ? " [" + s.tech_stack.join(", ") + "]" : ""),
+              (s.tech_stack?.length ? " [" + s.tech_stack.join(", ") + "]" : "") +
+              (s.signals?.length ? " {signals: " + s.signals.join(", ") + "}" : ""),
             ),
             ...(hasMore ? ["", "More skills remain. Repeat action=\"list\" with offset=" + nextOffset + " and limit=" + limit + ", or use action=\"search\" to narrow the catalog."] : []),
           ].join("\n"),
@@ -172,6 +174,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         if (params.tech?.length) filterSets.push(new Set(SkillIndex.byTechStack(params.tech, Infinity).map((entry) => entry.name)))
         if (params.category) filterSets.push(new Set(SkillIndex.byCategory(params.category, Infinity).map((entry) => entry.name)))
         if (params.tag) filterSets.push(new Set(SkillIndex.byTag(params.tag, Infinity).map((entry) => entry.name)))
+        if (params.signal) filterSets.push(new Set(SkillIndex.bySignal(params.signal, Infinity).map((entry) => entry.name)))
         const matched = candidates.filter((entry) => filterSets.every((set) => set.has(entry.name)))
         // Filter permissions before paginating so denied skills neither leak nor hide allowed results.
         const permitted = matched.filter((entry) => accessibleNames.has(entry.name))
@@ -209,6 +212,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 "- **" + r.name + "** [" + (r.verified ?? "unverified") + "] — " + r.description,
                 "  Routing: category=" + (r.category ?? "unspecified") +
                   "; tags=" + (r.tags.join(", ") || "none") +
+                  "; signals=" + (r.signals.join(", ") || "none") +
                   "; tech_stack=" + (r.tech_stack.join(", ") || "none") +
                   "; CWE=" + (r.cwe_ids.join(", ") || "none") +
                   "; OWASP=" + (r.owasp_id ?? "none"),
@@ -302,6 +306,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             `Verification: ${skill.verified ?? "unverified"}`,
             `Category: ${skill.category ?? "unspecified"}`,
             `Tags: ${skill.tags?.join(", ") || "none declared"}`,
+            `Signals: ${SkillIndex.get(skill.name)?.signals.join(", ") || skill.signals?.join(", ") || skill.tags?.join(", ") || "none declared"}`,
             `Technologies: ${skill.tech_stack?.join(", ") || "none declared"}`,
             `CWE IDs: ${skill.cwe_ids?.join(", ") || "none declared"}`,
             `OWASP ID: ${skill.owasp_id ?? "none"}`,
@@ -435,7 +440,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           `<skill_content name="${skill.name}" verified="${skill.verified ?? "unverified"}">`,
           `# Skill: ${skill.name}`,
           "",
-          `Routing metadata: category=${skill.category ?? "unspecified"}; tags=${skill.tags?.join(", ") || "none declared"}; tech_stack=${skill.tech_stack?.join(", ") || "none declared"}; CWE=${skill.cwe_ids?.join(", ") || "none"}; OWASP=${skill.owasp_id ?? "none"}`,
+          `Routing metadata: category=${skill.category ?? "unspecified"}; tags=${skill.tags?.join(", ") || "none declared"}; signals=${SkillIndex.get(skill.name)?.signals.join(", ") || skill.signals?.join(", ") || skill.tags?.join(", ") || "none declared"}; tech_stack=${skill.tech_stack?.join(", ") || "none declared"}; CWE=${skill.cwe_ids?.join(", ") || "none"}; OWASP=${skill.owasp_id ?? "none"}`,
           "",
           skill.content.trim(),
           "",
