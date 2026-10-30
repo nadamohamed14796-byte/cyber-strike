@@ -176,8 +176,8 @@ export const RequestTable = sqliteTable(
     processed_response: text(),
     // Complete JavaScript source for offline static analysis; kept separate from the capped LLM preview.
     javascript_source: text(),
-    // Complete HTML response for deterministic empty/static-page triage; never sent as the LLM preview.
-    html_source: text(),
+    // Deterministic preflight result; the original HTML is inspected in memory, not duplicated in storage.
+    empty_static_html: integer().notNull().default(0),
     ...Timestamps,
   },
   (table) => [
