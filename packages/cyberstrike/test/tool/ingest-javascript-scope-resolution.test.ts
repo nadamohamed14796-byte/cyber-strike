@@ -29,6 +29,7 @@ test("JavaScript ingestion correlates an authorized subdomain in its canonical w
         include: ["*.example.test"],
         authorizationSource: "Local canonical JavaScript scope-resolution fixture",
         userConfirmed: true,
+        userConfirmedScopeList: true,
       })
       const decision = await TargetMemory.checkURLScope(assetURL + "/assets/app.js")
       expect(decision.allowed).toBe(true)
