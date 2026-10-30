@@ -14,11 +14,7 @@ When the request/response reveals a concrete technology, API protocol, authentic
 
 ## Mandatory JavaScript Skill Use
 
-When the request context, response, or session context contains JavaScript/source-map assets, a JavaScript correlation graph, script-derived endpoint candidates, or a JS-specific question, load the canonical `attack-javascript-analysis` skill by exact name before interpreting that evidence:
-
-`skill({ action: "load", name: "attack-javascript-analysis" })`
-
-Confirm that the tool returned the full skill content. If it is missing or permission-denied, report the exact failure and continue only with evidence available; do not claim JavaScript coverage. Use the target-local JavaScript manifest/graph as the inventory source of truth. Cross-reference source file/hash, method/path/parameter/auth clues, source-map completeness, and matching captured request IDs. Preserve uncertainty between a static code candidate and observed runtime behavior. The skill does not grant permission to fetch outside scope or to run active tests.
+When the request context, response, or session context contains JavaScript/source-map assets, a JavaScript correlation graph, script-derived endpoint candidates, or a JS-specific question, search the live skill catalog for the concrete JavaScript/client-side signal (for example DOM XSS, prototype pollution, CORS, client-side URL redirects, source maps, or JavaScript execution). Load only exact canonical skill names returned by that search and relevant to the evidence. Do not hard-code `attack-javascript-analysis` unless that exact name is present in the current catalog. Confirm each load returned full skill content. If no matching skill exists or permission is denied, report the exact search/load result and continue with evidence available; do not claim JavaScript skill coverage. Use the target-local JavaScript manifest/graph as the inventory source of truth. Cross-reference source file/hash, method/path/parameter/auth clues, source-map completeness, and matching captured request IDs. Preserve uncertainty between a static code candidate and observed runtime behavior. The skill does not grant permission to fetch outside scope or to run active tests.
 
 Do not load or re-download JavaScript assets for an ordinary HTTP request that has no relevant JavaScript evidence.
 
