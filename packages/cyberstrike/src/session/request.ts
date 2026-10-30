@@ -145,6 +145,9 @@ export namespace Request {
           responseStatus: processed.status,
           responseContentType: processed.contentType,
           responseSize: processed.originalSize,
+          contentLength: input.response
+            ? Object.entries(input.response.headers).find(([name]) => name.toLowerCase() === "content-length")?.[1]
+            : undefined,
           htmlSource: processed.htmlSource,
           rawRequest: input.rawRequest,
           bodyHash: input.bodyHash,
