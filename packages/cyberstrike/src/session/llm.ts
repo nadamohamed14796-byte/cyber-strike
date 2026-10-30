@@ -189,17 +189,18 @@ export namespace LLM {
               .join(" ")
           : ""
     const actionableRequest =
-      /\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|search|fetch|download|deploy|start|continue|resume|complete)\b/i.test(
+      /\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|verify|validate|audit|confirm|ensure|diagnose|troubleshoot|search|fetch|download|deploy|start|continue|resume|complete)\b/i.test(
         latestUserText,
       ) ||
-      /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل)/u.test(
+      /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|اتأكد|اتاكد|تأكد|تاكد|تحقق|راجع|شيك|بص|شوف|دقق|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل)/u.test(
         latestUserText,
       )
     // Keep the stream's default in auto mode so the model can finish with text.
     // For an explicit action request, require a tool only on the first model step;
     // later steps return to auto and can produce the final response.
     const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
-    const requireInitialToolCall = !input.toolChoice && activeTools.length > 0 && actionableRequest
+    const requireInitialToolCall =
+      !input.toolChoice && input.model.capabilities.toolcall && activeTools.length > 0 && actionableRequest
     if (activeTools.length > 0) {
       const toolExecutionContract = [
         "## Tool Execution Contract",
