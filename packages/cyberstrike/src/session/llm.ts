@@ -214,6 +214,7 @@ export namespace LLM {
     l.info("tool availability", {
       available: Object.keys(tools).length,
       active: activeTools.length,
+      modelToolCallCapability: input.model.capabilities.toolcall,
       activeToolNames: activeTools.slice(0, 30),
       omittedToolNames: Math.max(0, activeTools.length - 30),
       toolChoice: toolChoice ?? "provider-default",
