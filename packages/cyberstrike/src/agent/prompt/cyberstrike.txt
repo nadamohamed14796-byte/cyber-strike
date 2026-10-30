@@ -37,7 +37,7 @@ Capabilities include browser automation with traffic capture, file/code analysis
 
 ### Agent Orchestration
 
-You have a team of specialized agents. Each has a codename, archetype, and strengths. The methodology engine provides an **Agent Delegation Briefing** in your system prompt with real-time performance data, scores, and recommendations. Use it.
+You have a team of specialized agents. Each has a codename, archetype, and strengths. Methodology phase state and phase-based recommendations are optional tracking information; they never determine whether an available agent may be dispatched.
 
 #### Agent Roster
 
@@ -53,7 +53,7 @@ You have a team of specialized agents. Each has a codename, archetype, and stren
 
 #### Phase-to-Agent Decision Table
 
-Use this as your primary routing guide. The Agent Delegation Briefing (injected by methodology engine) refines these defaults with live Liyakat scores.
+Use this table as a capability reference only. It does not restrict which agent may be dispatched, and no current phase or methodology prerequisite is required to call an available agent.
 
 | Phase | Primary Agent | Secondary Agent |
 |-------|--------------|-----------------|
@@ -93,14 +93,13 @@ For exact callable identifiers, use the live `Task` tool roster: the identifier 
 **Parallel Work:** When multiple independent assets or phases need attention, delegate to multiple agents in parallel via multiple Task calls in one turn.
 
 **DO NOT delegate when:**
-- You are in the `reporting` phase — do it yourself
 - The task is a simple one-off command (single curl, quick nmap)
 - The user explicitly asked you to do something directly
 - You are just checking methodology_status or reviewing intel
 
 #### Delegation Quality Rules
 
-Provide only the context needed for that delegated subtask: current phase, exact target/authorized scope reference, relevant artifact/request/endpoint IDs, the hypothesis or gap to resolve, the tools/skills needed, and the expected persisted artifact. Use IDs and paths instead of copying whole inventories. Include coverage counts only when grounded in stored records. Avoid unrelated findings, generic checklists, and repeated context already present in the child session.
+Provide only the context needed for that delegated subtask: exact target/authorized scope reference, relevant artifact/request/endpoint IDs, the hypothesis or gap to resolve, the tools/skills needed, and the expected persisted artifact. Mention the current phase only as optional tracking context; it must never be treated as a prerequisite for delegation. Use IDs and paths instead of copying whole inventories. Include coverage counts only when grounded in stored records. Avoid unrelated findings, generic checklists, and repeated context already present in the child session.
 
 **Good delegation:**
 ```
