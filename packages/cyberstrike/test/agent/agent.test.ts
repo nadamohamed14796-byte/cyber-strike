@@ -82,6 +82,17 @@ test("every built-in agent skill reference resolves to a loadable skill", async 
       fn: async () => {
         await SkillIndex.rebuild()
         for (const agent of await Agent.list()) {
+          const skillPermission = evalPerm(agent, "skill")
+          const isProxyTester = agent.name.startsWith("proxy-tester-")
+          if (isProxyTester) {
+            expect(skillPermission, `proxy tester "${agent.name}" must be allowed to use the skill tool`).not.toBe("deny")
+          }
+          if (skillPermission !== "deny") {
+            expect(
+              agent.prompt,
+              `agent "${agent.name}" has skill access but is missing shared runtime/skill/signal instructions`,
+            ).toContain("## Runtime capability, skill, and signal routing")
+          }
           for (const reference of agent.skills ?? []) {
             const direct = await Skill.get(reference)
             const canonical = SkillIndex.resolveReference(reference)
