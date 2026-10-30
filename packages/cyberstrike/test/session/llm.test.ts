@@ -335,6 +335,14 @@ describe("session.llm.stream", () => {
         expect(body.top_p).toBe(0.8)
         expect(body.stream).toBe(true)
         expect(body.tool_choice).toBe("auto")
+        expect(body.messages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: "system",
+              content: expect.stringContaining("## Tool Execution Contract"),
+            }),
+          ]),
+        )
         expect(body.tools).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
