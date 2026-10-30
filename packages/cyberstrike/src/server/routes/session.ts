@@ -413,6 +413,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
               let liveNotice: IngestSummary.LiveNotice | undefined
               let unsubscribeLive: (() => void) | undefined
               let latestAgentText = ""
+              let sharedEvidenceDelta: string | null = null
               const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
               try {
                 // Mark the dequeued request active immediately so queue waiters never open panels.
@@ -537,14 +538,16 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                       : "Agent reached its step cap before completing."
                   failureReason = failureReason.slice(0, 500)
                 }
-                await IngestSummary.write({
-                  // Keep completion chatter in the shared Proxy Agent broker session.
+                sharedEvidenceDelta = await IngestSummary.write({
+                  // The persistent broker must not receive a synthetic user turn
+                  // after each request; keep this summary with the request notice.
                   sessionID: analysisSessionID,
                   agent: agentName,
                   model,
                   source,
                   before,
                   after: IngestSummary.snapshot(sessionID),
+                  transcript: false,
                 })
 
                 // Keep one durable note per endpoint, not one JSON file and one growing note
@@ -700,7 +703,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                     live: liveNotice,
                     completed: true,
                     status: finalStatus,
-                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}${failureReason ? `\nFailure reason: ${failureReason}` : ""}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
+                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}${failureReason ? `\nFailure reason: ${failureReason}` : ""}${sharedEvidenceDelta ? `\n\n### Shared evidence delta\n${sharedEvidenceDelta}` : ""}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
                   }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
                 }
                 log.info("captured request broker turn finished", {
