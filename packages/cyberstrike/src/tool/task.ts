@@ -39,8 +39,8 @@ const MAX_PREPEND_BYTES = 48 * 1024
 // session. Resolve the latest trusted request identity in the current conversation,
 // rather than binding every future Task call to the first capture in session history.
 
-// Only real subagents may use the internal, background-only escalation path.
-// A primary/user-facing agent must still honor the normal task permission policy.
+// Impact Hunter is the single designated internal background escalation path;
+// unrelated task spawning still follows normal permission and dispatch guards.
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
   prompt: z.string().describe("The task for the agent to perform"),
@@ -232,7 +232,10 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Cross-cutting handoff contract: every subagent receives the same routing
       // rule, regardless of which specialized prompt it was loaded from.
       if (agent.name !== "impact-hunter") {
-        prompt = "## Mandatory Impact Hunter handoff (all non-Impact-Hunter subagents)\nWhen you discover or record a concrete vulnerability candidate, immediately delegate a separate deep investigation to `impact-hunter` with `background: true`; do not wait for that investigation and do not pause your own assigned work. Include the finding ID and exact claim; request ID(s); affected URL/method; the full original HTTP request and response (retrieve via `web_get_request_detail` if needed); relevant headers, cookies/auth credential ID and role context (never paste live secrets into free-form notes); payload and exact observed result; positive/negative controls; prior tests and outcomes; related endpoint/request IDs; JavaScript/source-map asset IDs, candidate call sites/endpoints and correlation findings; relevant skill/research references; and unresolved impact/chain hypotheses. The Impact Hunter can retrieve protected request details using IDs and the session context; do not truncate away evidence or invent missing values. Pass references/IDs rather than copying live secrets into unrelated artifacts.\nDo not delegate every normal request or a vague scanner label. Delegate each distinct evidence-backed candidate once; check existing target notes/findings for an active Impact Hunter task before starting another. Preserve the returned `task_id` in a target note linked to the finding so the investigation can be resumed; if no durable task tracking mechanism is available, report that limitation honestly. Continue your own work immediately. Never claim the finding is confirmed just because the Impact Hunter started. Impact Hunter must not delegate the same finding back to itself." + "\n\n" + prompt
+        prompt =
+          "## Automatic Impact Hunter dispatch\n" +
+          "Every successful report_vulnerability call automatically starts or resumes one dedicated background Impact Hunter task for that persisted finding. The report tool returns its task_id and status. Do NOT manually start a second Hunter task for the same finding. Continue your assigned work independently; a started Hunter task is not a confirmation verdict.\n\n" +
+          prompt
       }
       if (agent.prependRequestContext) {
         // Request records live on the root session; this also works when one
