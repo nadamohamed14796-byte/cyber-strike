@@ -10,6 +10,7 @@ import { Bus } from "../../bus"
 import { NamedError } from "@cyberstrike-io/util/error"
 import { MessageV2 } from "../../session/message-v2"
 import { SessionPrompt } from "../../session/prompt"
+import { capCapturedRequestField } from "../../session/captured-request-prompt"
 import { SessionCompaction } from "../../session/compaction"
 import { SessionRevert } from "../../session/revert"
 import { SessionStatus } from "@/session/status"
@@ -182,6 +183,7 @@ function buildPromptWithCredentialContext(
     lines.push("")
     lines.push("## Required Evidence-Driven Analysis and Memory")
     lines.push("This is one new captured-request turn inside the persistent Proxy Agent broker session. Analyze the exact request_id in this turn, reuse connected root-session and target evidence from earlier requests and sibling agents, and do not switch to another request or launch unrelated full-target recon.")
+    lines.push("Large raw request/response fields are bounded in this prompt to protect context. If a truncation marker appears, retrieve the complete capture with web_get_request_detail for this exact request_id before concluding; never treat omitted bytes as absent.")
     lines.push("Inspect existing target/session context and relevant endpoint/JavaScript evidence before selecting a test. Reuse prior results and do not repeat tests already resolved.")
     lines.push("Separate observed facts, hypotheses, and confirmed impact. A missing header, scanner signal, unusual status, endpoint existence, or static JavaScript sink is not by itself a confirmed vulnerability.")
     lines.push("For INFO/LOW hardening signals, preserve the observation and investigate whether a concrete, in-scope attack path crosses a real security boundary. Use baseline/negative controls and safe, hypothesis-driven variations; never invent a chain or inflate severity. Raise severity only after demonstrating realistic impact and reproducible evidence. If no impact is demonstrated, keep it INFO/LOW and state why.")
@@ -239,14 +241,14 @@ function buildPromptWithCredentialContext(
   lines.push("")
   lines.push("## Raw HTTP Request")
   lines.push("```")
-  lines.push(rawRequest)
+  lines.push(requestContext ? capCapturedRequestField({ value: rawRequest, label: "request", requestID: requestContext.requestID, maxBytes: 16 * 1024 }) : rawRequest)
   lines.push("```")
 
   if (processedResponse) {
     lines.push("")
     lines.push("## Response")
     lines.push("```")
-    lines.push(processedResponse)
+    lines.push(requestContext ? capCapturedRequestField({ value: processedResponse, label: "response", requestID: requestContext.requestID, maxBytes: 32 * 1024 }) : processedResponse)
     lines.push("```")
   }
 
