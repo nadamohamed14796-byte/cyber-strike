@@ -45,7 +45,7 @@ export namespace LLM {
 
   export function isActionableRequest(text: string): boolean {
     return (
-      /\\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|verify|validate|audit|confirm|ensure|diagnose|troubleshoot|search|fetch|download|deploy|start|continue|resume|complete|organize|reorganize|unify|tidy|clean)\\b/i.test(
+      /\b(fix|repair|implement|change|edit|write|create|build|run|execute|test|install|scan|recon|analy[sz]e|inspect|check|review|verify|validate|audit|confirm|ensure|diagnose|troubleshoot|search|fetch|download|deploy|start|continue|resume|complete|organize|reorganize|unify|tidy|clean)\b/i.test(
         text,
       ) ||
       /(?:صلح|إصلاح|ظبط|عدّل|عدل|نفذ|شغل|تشغيل|اختبر|افحص|اتأكد|اتاكد|تأكد|تاكد|تحقق|راجع|شيك|بص|شوف|دقق|حلل|حلّل|ابحث|اجمع|استخرج|ابني|أنشئ|ثبت|كمّل|كمل|تابع|ابدأ|استكمل|وحد|وحّد|نظم|نظّم|رتب|رتّب|نظف|نظّف|نسق|نسّق)/u.test(
