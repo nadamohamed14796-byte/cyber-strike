@@ -237,7 +237,7 @@ export namespace Methodology {
       if (phase.blockReason && phase.deliverableCount > 0) {
         violations.push({
           gate: "methodology_ordering",
-          severity: "blocking",
+          severity: "warning",
           message: `Phase "${phase.name}" has deliverables despite unmet prerequisites: ${phase.blockReason}`,
         })
       }
