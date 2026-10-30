@@ -1086,6 +1086,24 @@ export namespace Agent {
     return Object.entries(await state()).map(([id, info]) => ({ id, info }))
   }
 
+  /**
+   * Resolve the stable registry key for a tool/session agent identity.
+   * Prefer the registry key; accept a unique display name only for compatibility.
+   */
+  export async function resolveID(agent: string | Info | undefined): Promise<string | undefined> {
+    if (!agent) return undefined
+    const registry = await state()
+    if (typeof agent === "string") {
+      if (registry[agent]) return agent
+      const matches = Object.entries(registry).filter(([, info]) => info.name === agent)
+      return matches.length === 1 ? matches[0][0] : undefined
+    }
+    const direct = Object.entries(registry).find(([, info]) => info === agent)
+    if (direct) return direct[0]
+    const matches = Object.entries(registry).filter(([, info]) => info.name === agent.name)
+    return matches.length === 1 ? matches[0][0] : undefined
+  }
+
   export async function list() {
     const cfg = await Config.get()
     return pipe(
