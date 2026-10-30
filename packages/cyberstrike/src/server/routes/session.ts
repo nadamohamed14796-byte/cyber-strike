@@ -2762,7 +2762,9 @@ export const SessionRoutes = lazy(() =>
         const sessionID = c.req.valid("param").sessionID
         const body = c.req.valid("json")
         const targetSession = await Session.get(sessionID)
-        const isProxyBroker = targetSession.title === PROXY_BROKER_TITLE && !!targetSession.parentID
+        const isProxyBroker =
+          (targetSession.title === PROXY_BROKER_TITLE || targetSession.title === LEGACY_PROXY_BROKER_TITLE) &&
+          !!targetSession.parentID
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
@@ -2825,7 +2827,9 @@ export const SessionRoutes = lazy(() =>
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
           const targetSession = await Session.get(sessionID)
-          const isProxyBroker = targetSession.title === PROXY_BROKER_TITLE && !!targetSession.parentID
+          const isProxyBroker =
+          (targetSession.title === PROXY_BROKER_TITLE || targetSession.title === LEGACY_PROXY_BROKER_TITLE) &&
+          !!targetSession.parentID
           const runPrompt = async () => {
             try {
               await SessionPrompt.prompt({
