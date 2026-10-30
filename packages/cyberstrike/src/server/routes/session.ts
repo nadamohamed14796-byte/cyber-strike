@@ -362,7 +362,8 @@ type CapturedRequestAnalysisInput = {
  * Run persisted captured-request work through the same analysis path regardless
  * of whether the request arrived now or was restored after a process restart.
  */
-const PROXY_BROKER_TITLE = "Extension Proxy Broker (@proxy-agent subagent)"
+const PROXY_BROKER_TITLE = "Agent Proxy"
+const LEGACY_PROXY_BROKER_TITLE = "Extension Proxy Broker (@proxy-agent subagent)"
 const proxyBrokerCreation = new Map<string, Promise<Session.Info>>()
 
 /**
@@ -380,8 +381,13 @@ async function getOrCreateProxyBrokerSession(input: {
 
   const creation = (async () => {
     const children = await Session.children(input.parentSessionID)
-    const existing = children.find((child) => child.title === PROXY_BROKER_TITLE)
-    if (existing) return existing
+    const existing = children.find(
+      (child) => child.title === PROXY_BROKER_TITLE || child.title === LEGACY_PROXY_BROKER_TITLE,
+    )
+    if (existing) {
+      if (existing.title === PROXY_BROKER_TITLE) return existing
+      return Session.setTitle({ sessionID: existing.id, title: PROXY_BROKER_TITLE })
+    }
 
     return Session.create({
       parentID: input.parentSessionID,
