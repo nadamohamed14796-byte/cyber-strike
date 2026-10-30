@@ -1484,17 +1484,17 @@ export namespace TargetMemory {
           relativePath: path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/"),
         })),
       }
-      await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\\n")
+      await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\n")
       const notesPath = path.join(parent.workspacePath, "notes.md")
       const startMarker = "<!-- cyberstrike-assets:start -->"
       const endMarker = "<!-- cyberstrike-assets:end -->"
       const table = assets.length
         ? ["| Asset | Type | Workspace |", "|---|---|---|", ...assets.map((asset) =>
-            "| [" + asset.targetURL.replace(/\\|/g, "%7C") + "](" + asset.targetURL + ") | " +
+            "| [" + asset.targetURL.replace(/\|/g, "%7C") + "](" + asset.targetURL + ") | " +
             asset.assetType + " | " + path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/") + " |",
           )]
         : ["No in-scope child assets registered yet."]
-      const managed = [startMarker, "", "## Managed Asset Inventory", "", ...table, "", endMarker].join("\\n")
+      const managed = [startMarker, "", "## Managed Asset Inventory", "", ...table, "", endMarker].join("\n")
       await withNotesMarkdownLock(notesPath, async () => {
         await assertRegularFileOrMissing(notesPath)
         let current = ""
@@ -1506,7 +1506,7 @@ export namespace TargetMemory {
         const to = base.indexOf(endMarker, from + startMarker.length)
         const next = from >= 0 && to >= from
           ? base.slice(0, from) + managed + base.slice(to + endMarker.length)
-          : base.replace(/\\s*$/, "") + "\\n\\n" + managed + "\\n"
+          : base.replace(/\s*$/, "") + "\n\n" + managed + "\n"
         if (next !== current) await TargetMemory.writeWorkspaceFile(parent, "notes.md", next)
       })
     })
