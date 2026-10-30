@@ -196,7 +196,7 @@ function currentOwnerKey(): string {
 function isExactUserConfirmedScopeItem(input: string): boolean {
   const value = input.trim()
   if (!value || /[*{}\\]/.test(value)) return false
-  if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
+  if (/^(?:domain|wildcard|url|javascript|js|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
   if (/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return false
   if (!/^https?:\/\//i.test(value) && value.includes("/")) return false
   // normalizeScopeItem() validates the concrete host, scheme, port, path, and URL syntax before this check.
