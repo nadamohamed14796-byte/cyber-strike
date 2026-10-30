@@ -472,14 +472,9 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   },
                 })
 
-                // Respect ordered user permission overrides, but never fail silently.
-                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
-                if (taskPermission !== "allow") {
-                  throw new Error(
-                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
-                  )
-                }
-                const config = await Config.get()
+                // Create or reuse the persistent child before checking delegation permission.
+                // Even a permission-blocked capture must have an addressable child session so
+                // the Extension panel can open it and show the exact failure state.
                 const childSession = await getOrCreateProxyBrokerSession({
                   parentSessionID: sessionID,
                 })
@@ -491,15 +486,21 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   requestID: req.id,
                   agent: proxyAgent.name,
                 })
-                // Publish the child session ID immediately. If prompt construction or a
-                // later setup step fails, the analysis panel can still open the session and
-                // inspect its error state instead of losing the link to the created child.
                 liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
                 await IngestSummary.updateLiveNotice({
                   sessionID,
                   live: liveNotice,
                   text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
                 })
+
+                // Respect ordered user permission overrides, but never fail silently.
+                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
+                if (taskPermission !== "allow") {
+                  throw new Error(
+                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
+                  )
+                }
+                const config = await Config.get()
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
