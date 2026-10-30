@@ -854,6 +854,42 @@ describe("Request.isConfirmedEmptyStatic", () => {
 })
 
 describe("Request.findEquivalentProcessed", () => {
+  test("uses the full response digest when the HTML model preview is only a stub", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-html-response-digest-test" })
+      const rawRequest = "GET /app HTTP/1.1\\r\\nHost: example.test\\r\\n\\r\\n"
+      const create = (html: string) => {
+        const item = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/app",
+          origin: "https://example.test",
+          credentialID: "credential-html",
+          rawRequest,
+          keyHash: "same-html-route",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: html,
+          },
+        })
+        if (!item) throw new Error("HTML request fixture was not inserted")
+        return item
+      }
+
+      const first = create("<html><body>first</body></html>")
+      Request.updateStatus({ id: first.id, status: "processed" })
+      const exactRepeat = create("<html><body>first</body></html>")
+      const changedBody = create("<html><body>other</body></html>")
+
+      expect(first.processed_response).toBe(exactRepeat.processed_response)
+      expect(Request.findEquivalentProcessed(exactRepeat)?.id).toBe(first.id)
+      expect(Request.findEquivalentProcessed(changedBody)).toBeUndefined()
+      await Session.remove(session.id)
+      await Instance.dispose()
+    })
+  })
+
   test("reuses only an exact completed capture for the same credential and access context", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "request-equivalent-analysis-test" })
