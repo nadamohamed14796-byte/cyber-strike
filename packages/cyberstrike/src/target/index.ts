@@ -585,6 +585,25 @@ async function withNotesMarkdownLock<T>(notesPath: string, task: () => Promise<T
   }
 }
 
+const assetRegistryQueues = new Map<string, Promise<void>>()
+
+/** Serialize asset-registry snapshots so parallel workspace attachments cannot overwrite newer rows. */
+async function withAssetRegistryLock<T>(registryPath: string, task: () => Promise<T>): Promise<T> {
+  const previous = assetRegistryQueues.get(registryPath) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  assetRegistryQueues.set(registryPath, current)
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (assetRegistryQueues.get(registryPath) === current) assetRegistryQueues.delete(registryPath)
+  }
+}
+
 function defaultTargetNotes(workspace: Workspace): string {
   return [
     "# Target Notes",
@@ -1437,55 +1456,59 @@ export namespace TargetMemory {
   }
 
   async function syncAssetRegistry(parent: Workspace): Promise<void> {
-    const assets = children(parent.id)
     const registryPath = path.join(parent.workspacePath, "assets", "registry.json")
-    let previousRegistry: Record<string, unknown> = {}
-    try {
-      const info = await fs.lstat(registryPath)
-      if (!info.isFile() || info.isSymbolicLink()) {
-        throw new Error("Asset registry is not a regular file.")
-      }
-      const parsed: unknown = JSON.parse(await fs.readFile(registryPath, "utf-8"))
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        previousRegistry = parsed as Record<string, unknown>
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-    }
-    const registry = {
-      ...previousRegistry,
-      schemaVersion: 2, parentTargetID: parent.id, targetURL: parent.targetURL,
-      updatedAt: new Date().toISOString(),
-      assets: assets.map((asset) => ({
-        workspaceID: asset.id, targetURL: asset.targetURL, hostname: asset.hostname,
-        type: asset.assetType,
-        relativePath: path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/"),
-      })),
-    }
-    await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\n")
-    const notesPath = path.join(parent.workspacePath, "notes.md")
-    const startMarker = "<!-- cyberstrike-assets:start -->"
-    const endMarker = "<!-- cyberstrike-assets:end -->"
-    const table = assets.length
-      ? ["| Asset | Type | Workspace |", "|---|---|---|", ...assets.map((asset) =>
-          "| [" + asset.targetURL.replace(/\|/g, "%7C") + "](" + asset.targetURL + ") | " +
-          asset.assetType + " | " + path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/") + " |",
-        )]
-      : ["No in-scope child assets registered yet."]
-    const managed = [startMarker, "", "## Managed Asset Inventory", "", ...table, "", endMarker].join("\n")
-    await withNotesMarkdownLock(notesPath, async () => {
-      await assertRegularFileOrMissing(notesPath)
-      let current = ""
-      try { current = await fs.readFile(notesPath, "utf-8") } catch (error) {
+    await withAssetRegistryLock(registryPath, async () => {
+      // Read the child-workspace rows only after acquiring the file lock. A later
+      // attachment therefore always writes a snapshot at least as new as the prior one.
+      const assets = children(parent.id)
+      let previousRegistry: Record<string, unknown> = {}
+      try {
+        const info = await fs.lstat(registryPath)
+        if (!info.isFile() || info.isSymbolicLink()) {
+          throw new Error("Asset registry is not a regular file.")
+        }
+        const parsed: unknown = JSON.parse(await fs.readFile(registryPath, "utf-8"))
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          previousRegistry = parsed as Record<string, unknown>
+        }
+      } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
       }
-      const base = current || defaultTargetNotes(parent)
-      const from = base.indexOf(startMarker)
-      const to = base.indexOf(endMarker, from + startMarker.length)
-      const next = from >= 0 && to >= from
-        ? base.slice(0, from) + managed + base.slice(to + endMarker.length)
-        : base.replace(/\s*$/, "") + "\n\n" + managed + "\n"
-      if (next !== current) await TargetMemory.writeWorkspaceFile(parent, "notes.md", next)
+      const registry = {
+        ...previousRegistry,
+        schemaVersion: 2, parentTargetID: parent.id, targetURL: parent.targetURL,
+        updatedAt: new Date().toISOString(),
+        assets: assets.map((asset) => ({
+          workspaceID: asset.id, targetURL: asset.targetURL, hostname: asset.hostname,
+          type: asset.assetType,
+          relativePath: path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/"),
+        })),
+      }
+      await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\\n")
+      const notesPath = path.join(parent.workspacePath, "notes.md")
+      const startMarker = "<!-- cyberstrike-assets:start -->"
+      const endMarker = "<!-- cyberstrike-assets:end -->"
+      const table = assets.length
+        ? ["| Asset | Type | Workspace |", "|---|---|---|", ...assets.map((asset) =>
+            "| [" + asset.targetURL.replace(/\\|/g, "%7C") + "](" + asset.targetURL + ") | " +
+            asset.assetType + " | " + path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/") + " |",
+          )]
+        : ["No in-scope child assets registered yet."]
+      const managed = [startMarker, "", "## Managed Asset Inventory", "", ...table, "", endMarker].join("\\n")
+      await withNotesMarkdownLock(notesPath, async () => {
+        await assertRegularFileOrMissing(notesPath)
+        let current = ""
+        try { current = await fs.readFile(notesPath, "utf-8") } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        }
+        const base = current || defaultTargetNotes(parent)
+        const from = base.indexOf(startMarker)
+        const to = base.indexOf(endMarker, from + startMarker.length)
+        const next = from >= 0 && to >= from
+          ? base.slice(0, from) + managed + base.slice(to + endMarker.length)
+          : base.replace(/\\s*$/, "") + "\\n\\n" + managed + "\\n"
+        if (next !== current) await TargetMemory.writeWorkspaceFile(parent, "notes.md", next)
+      })
     })
   }
 
