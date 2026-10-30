@@ -1721,14 +1721,6 @@ export const SessionRoutes = lazy(() =>
       async (c) => {
         const body = c.req.valid("json")
         let sessionID = body.sessionID
-        if (sessionID) {
-          try {
-            await Session.get(sessionID)
-          } catch {
-            sessionID = undefined
-          }
-        }
-
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         // Malformed/truncated browser captures still carry metadata. Never let them
         // fall through into the active parent chat prompt as ordinary text.
@@ -1744,9 +1736,22 @@ export const SessionRoutes = lazy(() =>
             body.page_visited_by?.length,
         )
         const isHTTPRequest = looksLikeHTTPRequest(body.text, hasCaptureMetadata)
-        // Stamp arrival order before asynchronous authorization, session lookup,
-        // broker creation, and normalization. This ID orders restart recovery.
+        // Stamp the durable ID and intake-order barrier before any awaited work.
+        // A later capture cannot take a broker slot while an earlier capture is
+        // still resolving session/scope/normalization prerequisites.
         const capturedRequestID = isHTTPRequest ? Identifier.ascending("request") : undefined
+        const intakeOrder =
+          isHTTPRequest && sessionID ? IngestQueue.reserveOrder(sessionID) : undefined
+        let intakeOrderReleased = false
+
+        try {
+          if (sessionID) {
+            try {
+              await Session.get(sessionID)
+            } catch {
+              sessionID = undefined
+            }
+          }
 
         // Scope-check captured HTTP traffic BEFORE normalization: Normalize.run may
         // update endpoint templates and invoke the Tier-3 model. Out-of-scope input
@@ -1798,15 +1803,21 @@ export const SessionRoutes = lazy(() =>
         let captureReservation: IngestQueue.Reservation | undefined
         let reservationTransferred = false
         try {
-        if (isHTTPRequest && !ingestDryRun) {
-          const brokerSession = await getOrCreateProxyBrokerSession({
-            parentSessionID: activeSessionID,
-          })
-          // Reserve before normalization so concurrent captures preserve arrival order.
-          // This queue belongs only to Agent Proxy; do not register it on the Main queue.
-          captureReservation = IngestQueue.reserve(brokerSession.id)
-        }
-        const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
+          if (isHTTPRequest && !ingestDryRun) {
+            const brokerSession = await getOrCreateProxyBrokerSession({
+              parentSessionID: activeSessionID,
+            })
+            // Take the broker slot only after this capture reaches its intake turn.
+            // This prevents faster later scope/normalization work from occupying
+            // the persistent Proxy FIFO ahead of an earlier browser transaction.
+            if (intakeOrder) await intakeOrder.previous
+            captureReservation = IngestQueue.reserve(brokerSession.id)
+            if (intakeOrder) {
+              intakeOrder.release()
+              intakeOrderReleased = true
+            }
+          }
+          const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
 
         // Never route a malformed extension capture into the ordinary parent-chat
         // branch. That fallback writes into the active text window and can hijack
@@ -2007,6 +2018,11 @@ export const SessionRoutes = lazy(() =>
           if (captureReservation && !reservationTransferred) {
             IngestQueue.skipReserved(captureReservation)
           }
+        }
+        } finally {
+          // Rejected/out-of-scope, malformed, dry-run, and setup-error captures
+          // must release their intake barrier so later requests cannot deadlock.
+          if (intakeOrder && !intakeOrderReleased) intakeOrder.release()
         }
       },
     )
