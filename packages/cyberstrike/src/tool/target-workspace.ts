@@ -675,7 +675,8 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     // makes the common discovery call resilient and avoids a pointless tool error.
     if (params.action === "show" && params.target_url?.trim()) {
       const targetURL = required(params.target_url, "target_url")
-      const workspace = await TargetMemory.get(targetURL)
+      const resolution = await TargetMemory.checkURLScope(targetURL)
+      const workspace = resolution.workspace ?? await TargetMemory.get(targetURL)
       if (!workspace) {
         return {
           title: "Target workspace not found",
@@ -763,24 +764,61 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     }
 
     const targets = TargetMemory.list()
+    const legacyCanonical = new Map<string, (typeof targets)[number]>()
+    // Keep old duplicate root rows and their evidence intact, but make the
+    // canonical owner explicit so agents never choose a legacy ledger again.
+    for (const target of targets) {
+      if (target.parentTargetID !== null) continue
+      try {
+        if (new URL(target.targetURL).hostname.startsWith("*.")) continue
+      } catch {
+        continue
+      }
+      const resolution = await TargetMemory.checkURLScope(target.targetURL)
+      if (
+        resolution.workspace &&
+        resolution.workspace.id !== target.id &&
+        resolution.scope?.status === "configured"
+      ) {
+        legacyCanonical.set(target.id, resolution.workspace)
+      }
+    }
+    const canonicalCount = targets.filter((target) => !legacyCanonical.has(target.id)).length
     return {
-      title: "Target workspaces (" + targets.length + ")",
+      title: "Target workspaces (" + targets.length + "; " + canonicalCount + " canonical, " + legacyCanonical.size + " legacy overlaps)",
       output: targets.length
-        ? targets.map((target) => [
-          (target.parentTargetID ? "  ↳ " : "") + "[" + target.assetType + "] " + target.targetURL,
-          "    Workspace: " + target.workspacePath,
-          "    Parent ID: " + (target.parentTargetID ?? "(root)"),
-        ].join("\n")).join("\n")
+        ? targets.map((target) => {
+          const canonical = legacyCanonical.get(target.id)
+          return [
+            (target.parentTargetID ? "  ↳ " : "") +
+              (canonical ? "[LEGACY OVERLAP → " + canonical.targetURL + "] " : "[" + target.assetType + "] ") +
+              target.targetURL,
+            "    Workspace: " + target.workspacePath,
+            "    Parent ID: " + (target.parentTargetID ?? "(root)"),
+            ...(canonical ? [
+              "    Status: legacy duplicate retained for historical evidence; use canonical workspace above for all new work.",
+              "    Canonical workspace path: " + canonical.workspacePath,
+            ] : []),
+          ].join("\n")
+        }).join("\n")
         : "No target workspaces exist in this project. Initialize the program/root target before recon.",
       metadata: {
         count: targets.length,
-        targets: targets.map((target) => ({
-          id: target.id,
-          url: target.targetURL,
-          path: target.workspacePath,
-          parent_id: target.parentTargetID,
-          asset_type: target.assetType,
-        })),
+        canonical_count: canonicalCount,
+        legacy_overlap_count: legacyCanonical.size,
+        targets: targets.map((target) => {
+          const canonical = legacyCanonical.get(target.id)
+          return {
+            id: target.id,
+            url: target.targetURL,
+            path: target.workspacePath,
+            parent_id: target.parentTargetID,
+            asset_type: target.assetType,
+            legacy_duplicate: Boolean(canonical),
+            canonical_target_id: canonical?.id,
+            canonical_target_url: canonical?.targetURL,
+          }
+        }),
       } as TargetWorkspaceMetadata,
     }
   },
