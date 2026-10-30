@@ -80,6 +80,87 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
     })
   })
 
+  test("merges an explicitly confirmed wildcard on the existing root without creating a new workspace", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const root = await TargetMemory.configureScope("https://example.test", {
+            include: ["example.test"],
+            authorizationSource: "Operator-confirmed initial root scope",
+            authorizationReference: "https://example.test/policy",
+          })
+          const info = await TargetWorkspaceTool.init()
+          const result = await info.execute({
+            action: "configure_scope",
+            target_url: root.workspace.targetURL,
+            include: ["*.example.test"],
+            merge_existing: true,
+            user_confirmed_scope_list: true,
+          }, {
+            sessionID: "ses_confirmed_wildcard_merge_test",
+            messageID: "msg_confirmed_wildcard_merge_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          } as never)
+
+          expect(result.metadata.saved).toBe(true)
+          expect((await TargetMemory.getScope(root.workspace.targetURL))?.scopeItems)
+            .toEqual(["example.test", "*.example.test"])
+          const decision = await TargetMemory.checkURLScope("https://app.example.test/static/app.js")
+          expect(decision.allowed).toBe(true)
+          expect(decision.workspace?.id).toBe(root.workspace.id)
+          expect(TargetMemory.list()).toHaveLength(1)
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
+
+  test("adds an exact JavaScript asset to the existing root without granting its directory", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        try {
+          const root = await TargetMemory.configureScope("https://example.test", {
+            include: ["example.test"],
+            authorizationSource: "Operator-confirmed initial root scope",
+            authorizationReference: "https://example.test/policy",
+          })
+          const info = await TargetWorkspaceTool.init()
+          const result = await info.execute({
+            action: "configure_scope",
+            target_url: root.workspace.targetURL,
+            include: ["https://cdn.example.test/assets/app.js?v=1"],
+            merge_existing: true,
+          }, {
+            sessionID: "ses_js_scope_merge_test",
+            messageID: "msg_js_scope_merge_test",
+            agent: "cyberstrike",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => undefined,
+            ask: async () => undefined,
+          } as never)
+          expect(result.metadata.saved).toBe(true)
+          expect((await TargetMemory.getScope(root.workspace.targetURL))?.scopeItems)
+            .toContain("JavaScript: https://cdn.example.test/assets/app.js")
+          expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/app.js")).allowed).toBe(true)
+          expect((await TargetMemory.checkURLScope("https://cdn.example.test/assets/other.js")).allowed).toBe(false)
+          expect(TargetMemory.list()).toHaveLength(1)
+        } finally {
+          await Instance.dispose()
+        }
+      },
+    })
+  })
+
   test("rejects a wildcard configure_scope target instead of creating a second workspace", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
