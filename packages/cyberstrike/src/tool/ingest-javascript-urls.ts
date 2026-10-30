@@ -324,14 +324,31 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     // exact host-key lookup (which incorrectly demanded one workspace per
     // subdomain and split a single program into duplicate ledgers).
     const resolution = await TargetMemory.checkURLScope(params.target_url)
-    if (!resolution.allowed || !resolution.workspace) {
+    // Prefer the scope resolver's canonical owner for authorized subdomains and
+    // overlapping legacy roots. A concrete existing root may itself be outside
+    // its include list because it is only a policy container; permit that exact
+    // workspace identity only when no matching exclusion or competing workspace
+    // decision exists. Every fetched URL and redirect is still checked separately.
+    const exactWorkspace = await TargetMemory.get(params.target_url)
+    const exactTargetKey = TargetMemory.normalize(params.target_url).targetKey
+    const exactRootContainer = Boolean(
+      exactWorkspace &&
+      exactWorkspace.targetKey === exactTargetKey &&
+      resolution.excludeMatches.length === 0 &&
+      (!resolution.workspace || resolution.workspace.id === exactWorkspace.id),
+    )
+    const workspace = resolution.allowed && resolution.workspace
+      ? resolution.workspace
+      : exactRootContainer
+        ? exactWorkspace
+        : undefined
+    if (!workspace) {
       return {
         title: "JavaScript URL ingestion stopped",
         output: "No JavaScript URLs were fetched. The supplied target_url could not be resolved to one authorized canonical workspace: " + resolution.reason + ". Pass the existing root workspace URL shown by target_workspace(action=\"list\"); do not create a per-host child workspace to work around this result.",
-        metadata: { error: "workspace_scope_resolution_failed", reason: resolution.reason, target_url: params.target_url } ,
+        metadata: { error: "workspace_scope_resolution_failed", reason: resolution.reason, target_url: params.target_url },
       }
     }
-    const workspace = resolution.workspace
     const scope = resolution.scope ?? await TargetMemory.getScope(workspace.targetURL)
     if (!scope || scope.status !== "configured") {
       return { title: "JavaScript URL ingestion stopped", output: "The resolved canonical target workspace has no valid configured scope. No URLs were fetched.", metadata: { error: "scope_unconfigured", target_url: workspace.targetURL } }
