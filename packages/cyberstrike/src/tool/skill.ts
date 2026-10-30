@@ -72,7 +72,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       }
 
       const agentID = await Agent.resolveID(ctx.agent)
-      const agentKey = `${Instance.directory}\\0${agentID ?? ctx.agent ?? ""}`
+      if (ctx.agent && !agentID) throw new Error(`Unable to resolve skill caller agent "${ctx.agent}"; refusing to bypass skill permissions.`)
+      const agentKey = `${Instance.directory}\\0${agentID ?? ""}`
       const agentInfo = agentID ? await Agent.get(agentID) : undefined
       const permissionFingerprint = JSON.stringify(agentInfo?.permission ?? null)
       const cached = accessibleCache.get(agentKey)
