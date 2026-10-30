@@ -64,18 +64,19 @@ type TaskToolMetadata = {
 }
 
 export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task", async (ctx) => {
-  const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+  const agents = await Agent.entries().then((x) => x.filter((entry) => entry.info.mode !== "primary"))
 
-  // Filter agents by permissions if agent provided
+  // Permission patterns and task arguments use stable registry keys, never
+  // configurable display names. Keep the same key from discovery through Agent.get().
   const caller = ctx?.agent
   const accessibleAgents = caller
-    ? agents.filter((a) => a.name === "impact-hunter" || PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
+    ? agents.filter((entry) => entry.id === "impact-hunter" || PermissionNext.evaluate("task", entry.id, caller.permission).action !== "deny")
     : agents
 
   const description = DESCRIPTION.replace(
     "{agents}",
     accessibleAgents
-      .map((a) => `- ${a.name}: ${a.description ?? "This subagent should only be called manually by the user."}`)
+      .map((entry) => `- ${entry.id}: ${entry.info.description ?? "This subagent should only be called manually by the user."}`)
       .join("\n"),
   )
   return {
