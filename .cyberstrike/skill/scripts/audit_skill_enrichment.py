@@ -41,7 +41,7 @@ def inspect(path:Path,root:Path)->dict:
     marker_count=sum(content.count(marker) for marker in TOOL_MARKERS)
     has_ref=bool(URL.search(section)) or bool(re.search(r"^#{1,4}\s+.*\b(references?|resources?)\b",section,re.I|re.M))
     has_cli=bool(CLI.search(section)) or bool(re.search(r"\b(subfinder|dnsx|httpx|katana|ffuf|nuclei|sqlmap|gitleaks|trivy|jq|python3)\b",section))
-    has_install=bool(INSTALL.search(section))
+    has_install=bool(INSTALL.search(section)) or shared_catalog_ref
     ui=sorted(set(UI_FIRST.findall(section)))
     missing=[]
     if start<0 and not shared_catalog_ref: missing.append("agent_tooling_section")
