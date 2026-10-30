@@ -114,6 +114,26 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+describe("session.llm.isActionableRequest", () => {
+  test("recognizes English and Arabic requests to inspect, organize, and continue work", () => {
+    for (const request of [
+      "Check the repository",
+      "Tidy and organize the files",
+      "اتاكد ان كل حاجة تمام",
+      "وحد التعليمات والملفات",
+      "نظم الدنيا",
+      "كمل",
+    ]) {
+      expect(LLM.isActionableRequest(request), request).toBe(true)
+    }
+  })
+
+  test("does not force a tool call for ordinary conversational text", () => {
+    expect(LLM.isActionableRequest("Thanks, that makes sense.")).toBe(false)
+    expect(LLM.isActionableRequest("تمام، شكراً")).toBe(false)
+  })
+})
+
 describe("session.llm.shouldPrimeToolCall", () => {
   const bash = { description: "shell" } as never
   const probe = { description: "probe" } as never
