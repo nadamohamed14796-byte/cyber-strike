@@ -133,7 +133,10 @@ export function Session() {
   // sessions remain read-only in the TUI. The initial captured-request message
   // records its agent, so this identity survives navigation and process restarts.
   const proxyAgentSession = createMemo(
-    () => !!session()?.parentID && messages().some((message) => message.role === "user" && message.agent === "proxy-agent"),
+    () =>
+      !!session()?.parentID &&
+      (session()?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
+        messages().some((message) => message.role === "user" && message.agent === "proxy-agent")),
   )
   const permissions = createMemo(() => {
     if (proxyAgentSession()) return sync.data.permission[route.sessionID] ?? []
