@@ -438,12 +438,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
-              let liveNotice: IngestSummary.LiveNotice | undefined
-              let unsubscribeLive: (() => void) | undefined
-              let latestAgentText = ""
-              let sharedEvidenceDelta: string | null = null
-              const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
-              try {
+                            try {
                 // Mark the dequeued request active immediately so queue waiters never open panels.
                 Request.updateStatus({ id: req.id, status: "processing" })
                 // Preserve the normal model preference order while opening the panel before
@@ -456,23 +451,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
                   : undefined
                 const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
-
-                // Create the visible per-request status before checking delegation permissions.
-                // A blocked analyzer must still show up in the parent's live analysis panel,
-                // with the exact permission reason recorded as a failed request.
-                liveNotice = await IngestSummary.createLiveNotice({
-                  sessionID,
-                  agent: (await Agent.resolveID(proxyAgent)) ?? agentName,
-                  model,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the shared Proxy Agent broker session…\n`,
-                  requestAnalysis: {
-                    requestID: req.id,
-                    method: normalized.method,
-                    url: normalized.origin
-                      ? new URL(normalized.normalizedPath, normalized.origin).href
-                      : normalized.normalizedPath,
-                  },
-                })
 
                 // Create or reuse the persistent child before checking delegation permission.
                 // Even a permission-blocked capture must have an addressable child session so
@@ -488,13 +466,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   requestID: req.id,
                   agent: proxyAgent.name,
                 })
-                liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
-                await IngestSummary.updateLiveNotice({
-                  sessionID,
-                  live: liveNotice,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
-                })
-
                 // Deterministic runtime preflight: keep every captured request row and
                 // its observations, but do not spend a model turn on a proven empty
                 // document or a byte-for-byte repeat already completed for this same
@@ -509,8 +480,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                     : undefined
 
                 if (skipReason) {
-                  latestAgentText = "Runtime preflight completed without an LLM/Subagent dispatch. " + skipReason
-                  sharedEvidenceDelta = "Preflight skip: " + skipReason
                   finalStatus = "processed"
                   log.info("captured request skipped deep analysis after deterministic preflight", {
                     sessionID,
@@ -539,34 +508,6 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   responseBytes: Buffer.byteLength(req.processed_response ?? "", "utf8"),
                   rawRequestCapped: Buffer.byteLength(req.raw_request ?? "", "utf8") > 16 * 1024,
                   responseCapped: Buffer.byteLength(req.processed_response ?? "", "utf8") > 32 * 1024,
-                })
-                // Mirror only the subagent's visible text output into this stable parent
-                // transcript entry. Tool internals and hidden reasoning are not copied.
-                // This lets the user watch the request being analyzed without opening a
-                // separate chat window or creating one parent message per token.
-                unsubscribeLive = Bus.subscribe(MessageV2.Event.PartUpdated, async (event) => {
-                  const part = event.properties.part
-                  if (part.sessionID !== analysisSessionID || part.type !== "text" || part.synthetic) return
-                  try {
-                    const message = await MessageV2.get({
-                      sessionID: analysisSessionID,
-                      messageID: part.messageID,
-                    })
-                    if (message.info.role !== "assistant") return
-                    latestAgentText = part.text.slice(-6000)
-                    await IngestSummary.updateLiveNotice({
-                      sessionID,
-                      live: liveNotice!,
-                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\n\n### Latest agent output\n${latestAgentText || "(agent is working; no text emitted yet)"}`,
-                    })
-                  } catch (error) {
-                    log.debug("live ingest transcript update failed", {
-                      sessionID,
-                      analysisSessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
                 })
                 const agentResult = await SessionPrompt.prompt({
                   sessionID: analysisSessionID,
@@ -600,9 +541,9 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                       : "Agent reached its step cap before completing."
                   failureReason = failureReason.slice(0, 500)
                 }
-                sharedEvidenceDelta = await IngestSummary.write({
+                await IngestSummary.write({
                   // The persistent broker must not receive a synthetic user turn
-                  // after each request; keep this summary with the request notice.
+                  // after each request; keep the evidence delta out of chat transcripts.
                   sessionID: analysisSessionID,
                   agent: agentName,
                   model,
@@ -730,45 +671,9 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 }
               } catch (error) {
                 failureReason = (error instanceof Error ? error.message : String(error)).slice(0, 500)
-                // If agent lookup itself fails, still create the same request panel when
-                // a parent/request model is available so the final failed state is visible.
-                if (!liveNotice) {
-                  try {
-                    const fallbackModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
-                    liveNotice = await IngestSummary.createLiveNotice({
-                      sessionID,
-                      agent: agentName,
-                      model: fallbackModel,
-                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the shared Proxy Agent broker session…\n`,
-                      requestAnalysis: {
-                        requestID: req.id,
-                        method: normalized.method,
-                        url: normalized.origin
-                          ? new URL(normalized.normalizedPath, normalized.origin).href
-                          : normalized.normalizedPath,
-                      },
-                    })
-                  } catch (noticeError) {
-                    log.warn("captured request startup notice failed", {
-                      sessionID,
-                      requestID: req.id,
-                      error: noticeError instanceof Error ? noticeError.message : String(noticeError),
-                    })
-                  }
-                }
                 throw error
               } finally {
-                unsubscribeLive?.()
                 Request.updateStatus({ id: req.id, status: finalStatus })
-                if (liveNotice) {
-                  await IngestSummary.updateLiveNotice({
-                    sessionID,
-                    live: liveNotice,
-                    completed: true,
-                    status: finalStatus,
-                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}${failureReason ? `\nFailure reason: ${failureReason}` : ""}${sharedEvidenceDelta ? `\n\n### Shared evidence delta\n${sharedEvidenceDelta}` : ""}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
-                  }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
-                }
                 log.info("captured request broker turn finished", {
                   sessionID,
                   brokerSessionID: childSessionID,
