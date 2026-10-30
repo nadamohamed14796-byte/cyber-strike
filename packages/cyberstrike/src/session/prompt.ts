@@ -794,11 +794,15 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
-      // Inject methodology context if the session has intel data. Scope it to the
-      // running agent's lane when it's a proxy-tester (Phase 2.3) — orchestrator
-      // (non-tester) gets the full routing view.
-      const methodologyCtx = await MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
-      if (methodologyCtx) system.push(methodologyCtx)
+      // The Proxy Agent is an independent request-analysis service, not a
+      // methodology phase worker. Do not inject phase state, phase directives,
+      // coverage gates, or phase-specific skill routing into its prompt. Captured
+      // requests must be triaged immediately even when Main Recon has not started.
+      // Other agents retain the normal lane-scoped methodology context.
+      if (lastUser.agent !== "proxy-agent") {
+        const methodologyCtx = await MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
+        if (methodologyCtx) system.push(methodologyCtx)
+      }
 
       // Inject only project-local target memory matching observed hosts/endpoints in this session.
       const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
