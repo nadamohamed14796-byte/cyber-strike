@@ -8,6 +8,27 @@ import { Instance } from "../../src/project/instance"
 const projectRoot = path.join(__dirname, "../..")
 Log.init({ print: false })
 
+describe("session tree root resolution", () => {
+  test("resolves the Main Agent root through arbitrarily nested subagents", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const main = await Session.create({ title: "deep-session-tree-main" })
+        let parent = main
+        for (let depth = 0; depth < 14; depth++) {
+          parent = await Session.create({
+            parentID: parent.id,
+            title: "nested-subagent-" + (depth + 1),
+          })
+        }
+
+        expect(Session.root(parent.id)).toBe(main.id)
+        await Session.remove(main.id)
+      },
+    })
+  })
+})
+
 describe("session.started event", () => {
   test("should emit session.started event when session is created", async () => {
     await Instance.provide({
