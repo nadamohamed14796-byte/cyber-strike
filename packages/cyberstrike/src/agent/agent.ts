@@ -282,6 +282,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
             grep: "allow",
             glob: "allow",
             list: "allow",
@@ -313,6 +314,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
           }),
           user,
         ),
@@ -329,6 +331,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
           }),
           user,
         ),
@@ -345,6 +348,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
           }),
           user,
         ),
@@ -360,6 +364,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
           }),
           user,
         ),
@@ -572,6 +577,7 @@ export namespace Agent {
             // the model attempts calls that permission enforcement rejects.
             // `task` MUST be allowed explicitly or delegation breaks.
             "*": "deny",
+            task: "allow",
             // The orchestrator reads skill companion files and the canonical
             // workspace manifest/notes before routing captured requests.
             task: "allow",
@@ -615,6 +621,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
             // Skill payloads can point to local playbook entries; expose the
             // guarded read tool and read-only target-note lookup to the analyzer.
             read: "allow",
@@ -657,6 +664,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
             question: "allow",
             skill: "allow",
             bash: "allow",
@@ -750,6 +758,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             "*": "deny",
+            task: "allow",
             // Skill companion files are read through ReadTool, which still enforces
             // project/external-directory boundaries and per-file permission checks.
             read: "allow",
