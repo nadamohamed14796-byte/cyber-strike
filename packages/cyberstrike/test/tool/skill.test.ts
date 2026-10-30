@@ -91,13 +91,13 @@ describe("tool.skill", () => {
           const parentCtx: Tool.Context = {
             ...baseCtx,
             sessionID: "parent-session",
-            agent: "parent-agent",
+            agent: "build",
             ask: async () => {},
           }
           const childCtx: Tool.Context = {
             ...baseCtx,
             sessionID: "child-session",
-            agent: "child-agent",
+            agent: "general",
             ask: async () => {},
           }
           const parentScope = { sessionID: parentCtx.sessionID, agent: parentCtx.agent }
