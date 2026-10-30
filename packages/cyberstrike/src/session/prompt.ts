@@ -2271,7 +2271,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     }
     const agent = await Agent.get(agentName)
     if (!agent) {
-      const available = await Agent.list().then((agents) => agents.filter((a) => !a.hidden).map((a) => a.name))
+      // Error hints must use stable registry keys so a renamed or duplicated
+      // display label never points the caller at an unresolvable agent.
+      const available = await Agent.entries().then((agents) => agents.filter((entry) => !entry.info.hidden).map((entry) => entry.id))
       const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
       const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
       Bus.publish(Session.Event.Error, {
