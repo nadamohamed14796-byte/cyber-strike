@@ -130,6 +130,58 @@ describe("IngestQueue.enqueue", () => {
   })
 })
 
+describe("IngestQueue.reserve", () => {
+  test("keeps arrival order when a later capture becomes ready first", async () => {
+    await withInstance(async () => {
+      const sid = "reserved-arrival-order"
+      const first = IngestQueue.reserve(sid, sid)
+      const second = IngestQueue.reserve(sid, sid)
+      const firstStarted = defer()
+      const releaseFirst = defer()
+      const order: string[] = []
+
+      // Simulate request 2 finishing normalization before request 1.
+      IngestQueue.enqueueReserved(second, async () => {
+        order.push("second")
+      })
+      await new Promise((r) => setTimeout(r, 10))
+      expect(order).toEqual([])
+      expect(IngestQueue.pendingCount(sid)).toBe(2)
+
+      IngestQueue.enqueueReserved(first, async () => {
+        order.push("first")
+        firstStarted.resolve()
+        await releaseFirst.promise
+      })
+      await firstStarted.promise
+      expect(order).toEqual(["first"])
+      releaseFirst.resolve()
+      await new Promise((r) => setTimeout(r, 15))
+
+      expect(order).toEqual(["first", "second"])
+      expect(IngestQueue.pendingCount(sid)).toBe(0)
+    })
+  })
+
+  test("skipping a deduplicated capture releases its FIFO slot", async () => {
+    await withInstance(async () => {
+      const sid = "reserved-skip-order"
+      const first = IngestQueue.reserve(sid, sid)
+      const second = IngestQueue.reserve(sid, sid)
+      const order: string[] = []
+
+      IngestQueue.enqueueReserved(second, async () => {
+        order.push("second")
+      })
+      IngestQueue.skipReserved(first)
+      await new Promise((r) => setTimeout(r, 15))
+
+      expect(order).toEqual(["second"])
+      expect(IngestQueue.pendingCount(sid)).toBe(0)
+    })
+  })
+})
+
 describe("IngestQueue.pause / resume", () => {
   test("pause defers the next task until resume", async () => {
     await withInstance(async () => {
@@ -228,7 +280,7 @@ describe("IngestQueue.pause / resume", () => {
 })
 
 describe("IngestQueue parent-child controls", () => {
-  test("captured request child analyses run concurrently and share only parent queue controls", async () => {
+  test("explicitly independent child sessions can run concurrently and share parent queue controls", async () => {
     await withInstance(async () => {
       const parent = "parent-parallel-ingest"
       const childA = "child-parallel-ingest-a"
