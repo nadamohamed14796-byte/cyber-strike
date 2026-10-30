@@ -363,33 +363,49 @@ type CapturedRequestAnalysisInput = {
  * of whether the request arrived now or was restored after a process restart.
  */
 const PROXY_BROKER_TITLE = "Extension Proxy Broker (@proxy-agent subagent)"
+const proxyBrokerCreation = new Map<string, Promise<Session.Info>>()
 
 /**
  * Reuse one persistent Proxy Agent child under the active main session.
- * Every captured request becomes a new turn in this broker session; specialist
- * Task sessions are then nested beneath it by the existing Task tool.
+ * Concurrent Extension captures must share this same child before reserving
+ * their FIFO slots; otherwise the first two captures could create two brokers
+ * and split one Extension stream across independent histories.
  */
 async function getOrCreateProxyBrokerSession(input: {
   parentSessionID: string
   config: Awaited<ReturnType<typeof Config.get>>
 }): Promise<Session.Info> {
-  const children = await Session.children(input.parentSessionID)
-  const existing = children.find((child) => child.title === PROXY_BROKER_TITLE)
-  if (existing) return existing
+  const pending = proxyBrokerCreation.get(input.parentSessionID)
+  if (pending) return pending
 
-  return Session.create({
-    parentID: input.parentSessionID,
-    title: PROXY_BROKER_TITLE,
-    permission: [
-      { permission: "todowrite", pattern: "*", action: "deny" },
-      { permission: "todoread", pattern: "*", action: "deny" },
-      ...(input.config.experimental?.primary_tools?.map((tool) => ({
-        pattern: "*",
-        action: "allow" as const,
-        permission: tool,
-      })) ?? []),
-    ],
-  })
+  const creation = (async () => {
+    const children = await Session.children(input.parentSessionID)
+    const existing = children.find((child) => child.title === PROXY_BROKER_TITLE)
+    if (existing) return existing
+
+    return Session.create({
+      parentID: input.parentSessionID,
+      title: PROXY_BROKER_TITLE,
+      permission: [
+        { permission: "todowrite", pattern: "*", action: "deny" },
+        { permission: "todoread", pattern: "*", action: "deny" },
+        ...(input.config.experimental?.primary_tools?.map((tool) => ({
+          pattern: "*",
+          action: "allow" as const,
+          permission: tool,
+        })) ?? []),
+      ],
+    })
+  })()
+
+  proxyBrokerCreation.set(input.parentSessionID, creation)
+  try {
+    return await creation
+  } finally {
+    if (proxyBrokerCreation.get(input.parentSessionID) === creation) {
+      proxyBrokerCreation.delete(input.parentSessionID)
+    }
+  }
 }
 
 async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Promise<void> {
@@ -759,7 +775,7 @@ const requestRecoveryState = Instance.state(() => ({
  * terminal, while processing rows are treated as interrupted work after restart.
  * The state is scoped to the current project Instance.
  */
-export function recoverPendingRequests(): void {
+export async function recoverPendingRequests(): Promise<void> {
   const state = requestRecoveryState()
   if (state.started) return
   state.started = true
@@ -775,17 +791,39 @@ export function recoverPendingRequests(): void {
     return
   }
 
+  if (pending.length === 0) return
+
+  let config: Awaited<ReturnType<typeof Config.get>>
+  try {
+    config = await Config.get()
+  } catch (error) {
+    state.started = false
+    log.error("captured request recovery could not load configuration", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
+
   let scheduled = 0
   let failures = 0
+  const brokers = new Map<string, Session.Info>()
   for (const request of pending) {
     if (state.scheduled.has(request.id)) continue
     try {
       if (request.status === "processing") {
         Request.updateStatus({ id: request.id, status: "queued" })
       }
+      let brokerSession = brokers.get(request.session_id)
+      if (!brokerSession) {
+        brokerSession = await getOrCreateProxyBrokerSession({
+          parentSessionID: request.session_id,
+          config,
+        })
+        brokers.set(request.session_id, brokerSession)
+      }
       const resumable = { ...request, status: "queued" as const }
       IngestQueue.enqueue(
-        request.session_id,
+        brokerSession.id,
         () =>
           analyzeCapturedRequest({
             sessionID: request.session_id,
@@ -793,6 +831,8 @@ export function recoverPendingRequests(): void {
             buildPrompt: () => buildPersistedRequestPrompt(request.session_id, resumable),
           }),
         request.session_id,
+        false,
+        { independentFromParent: true },
       )
       state.scheduled.add(request.id)
       scheduled++
@@ -1259,6 +1299,10 @@ export const SessionRoutes = lazy(() =>
           return c.json({ error: `Only failed requests can be retried; current status is ${existing.status}` })
         }
 
+        const brokerSession = await getOrCreateProxyBrokerSession({
+          parentSessionID: sessionID,
+          config: await Config.get(),
+        })
         const req = Request.retryFailed(sessionID, requestID)
         if (!req) {
           c.status(409)
@@ -1266,7 +1310,7 @@ export const SessionRoutes = lazy(() =>
         }
 
         IngestQueue.enqueue(
-          sessionID,
+          brokerSession.id,
           () =>
             analyzeCapturedRequest({
               sessionID,
@@ -1274,6 +1318,8 @@ export const SessionRoutes = lazy(() =>
               buildPrompt: () => buildPersistedRequestPrompt(sessionID, req),
             }),
           sessionID,
+          false,
+          { independentFromParent: true },
         )
 
         c.status(202)
@@ -1756,12 +1802,21 @@ export const SessionRoutes = lazy(() =>
           sessionID = session.id
         }
         const activeSessionID = sessionID
-        // Reserve this capture's FIFO position before asynchronous normalization.
-        // A later request may normalize faster, but it cannot overtake this slot.
-        const captureReservation =
-          isHTTPRequest && !ingestDryRun ? IngestQueue.reserve(activeSessionID, activeSessionID) : undefined
+        let captureReservation: IngestQueue.Reservation | undefined
         let reservationTransferred = false
         try {
+        if (isHTTPRequest && !ingestDryRun) {
+          const brokerSession = await getOrCreateProxyBrokerSession({
+            parentSessionID: activeSessionID,
+            config: await Config.get(),
+          })
+          // Reserve before normalization so concurrent captures preserve arrival order.
+          // The broker session owns this queue; the Main Agent session is tracked for
+          // UI visibility only and cannot serialize or pause Proxy execution.
+          captureReservation = IngestQueue.reserve(brokerSession.id, activeSessionID, {
+            independentFromParent: true,
+          })
+        }
         const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
 
         // Never route a malformed extension capture into the ordinary parent-chat
@@ -2076,7 +2131,17 @@ export const SessionRoutes = lazy(() =>
               IngestQueue.enqueueReserved(captureReservation, requestTask)
               reservationTransferred = true
             } else {
-              IngestQueue.enqueue(sessionID, requestTask, sessionID)
+              const brokerSession = await getOrCreateProxyBrokerSession({
+                parentSessionID: activeSessionID,
+                config: await Config.get(),
+              })
+              IngestQueue.enqueue(
+                brokerSession.id,
+                requestTask,
+                activeSessionID,
+                false,
+                { independentFromParent: true },
+              )
             }
           }
         } else {
@@ -2711,7 +2776,7 @@ export const SessionRoutes = lazy(() =>
           const msg = isProxyBroker
             ? await new Promise<MessageV2.WithParts | undefined>((resolve, reject) => {
                 IngestQueue.enqueue(
-                  targetSession.parentID!,
+                  targetSession.id,
                   async () => {
                     try {
                       resolve(
@@ -2725,6 +2790,8 @@ export const SessionRoutes = lazy(() =>
                     }
                   },
                   targetSession.parentID!,
+                  false,
+                  { independentFromParent: true },
                 )
               })
             : await SessionPrompt.prompt(promptInput).catch((error) => {
@@ -2789,7 +2856,13 @@ export const SessionRoutes = lazy(() =>
           if (isProxyBroker) {
             // Manual broker follow-ups share the same FIFO as Extension captures.
             // This closes the UI polling race and keeps every turn on proxy-agent.
-            IngestQueue.enqueue(targetSession.parentID!, runPrompt, targetSession.parentID!)
+            IngestQueue.enqueue(
+              targetSession.id,
+              runPrompt,
+              targetSession.parentID!,
+              false,
+              { independentFromParent: true },
+            )
             return
           }
           void runPrompt()
