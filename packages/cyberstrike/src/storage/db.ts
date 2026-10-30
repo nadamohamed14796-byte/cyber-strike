@@ -128,12 +128,20 @@ export namespace Database {
       }
 
       if (entry.name === "20261030210000_request-html-source" && tableExists(sqlite, "request")) {
-        if (tableColumns(sqlite, "request").has("empty_static_html")) {
+        const columns = tableColumns(sqlite, "request")
+        if (columns.has("empty_static_html")) {
           const addEmptyStaticHTML = /ALTER TABLE request ADD COLUMN empty_static_html INTEGER NOT NULL DEFAULT 0;/i
           if (!addEmptyStaticHTML.test(sql)) {
             throw new Error("The request empty-HTML triage migration no longer matches its compatibility guard.")
           }
           sql = sql.replace(addEmptyStaticHTML, "SELECT 1;")
+        }
+        if (columns.has("response_body_hash")) {
+          const addResponseBodyHash = /ALTER TABLE request ADD COLUMN response_body_hash TEXT;/i
+          if (!addResponseBodyHash.test(sql)) {
+            throw new Error("The request response-hash migration no longer matches its compatibility guard.")
+          }
+          sql = sql.replace(addResponseBodyHash, "SELECT 1;")
         }
       }
 
