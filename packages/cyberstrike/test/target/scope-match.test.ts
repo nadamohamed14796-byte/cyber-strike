@@ -106,6 +106,9 @@ describe("HackerOne typed scope assets", () => {
 describe("JavaScript file scope assets", () => {
   test("matches an exact script or source-map path and ignores cache query strings", () => {
     expect(checkMatch("https://cdn.example.com/app.js?v=2", "JavaScript: https://cdn.example.com/app.js?v=1").matches).toBe(true)
+    expect(checkMatch("https://cdn.example.com/app.js?v=2", "JavaScript File: https://cdn.example.com/app.js?v=1").matches).toBe(true)
+    expect(checkMatch("https://cdn.example.com/app.js", "JS URL: https://cdn.example.com/app.js").matches).toBe(true)
+    expect(checkMatch("https://cdn.example.com/app.js.map", "JavaScript: https://cdn.example.com/app.js.map").matches).toBe(true)
     expect(checkMatch("https://cdn.example.com/app.mjs", "JS: https://cdn.example.com/app.mjs").matches).toBe(true)
     expect(checkMatch("https://cdn.example.com/app.js.map", "Source Map: https://cdn.example.com/app.js.map").matches).toBe(true)
   })
