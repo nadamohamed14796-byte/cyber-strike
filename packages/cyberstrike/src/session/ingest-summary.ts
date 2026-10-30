@@ -75,6 +75,8 @@ export namespace IngestSummary {
       time: { created: Date.now() },
       agent: "proxy-agent",
       model,
+      // Parent-visible Extension notices are UI status, never Main Agent input.
+      excludeHistory: true,
     })
     await Session.updatePart({
       id: Identifier.ascending("part"),
@@ -149,6 +151,8 @@ export namespace IngestSummary {
         time: { created: startedAt },
         agent: input.agent,
         model: input.model,
+        // The panel reads this metadata, but it must not enter Main Agent history.
+        excludeHistory: true,
       })
       await Session.updatePart({
         id: partID,
