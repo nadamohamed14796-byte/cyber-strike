@@ -434,7 +434,7 @@ describe("Extension ingest transcript visibility", () => {
       expect(text).not.toContain("credential/cookie observation was retained")
       expect(text).not.toContain("Extension request received again: GET /profile")
       expect(text).toContain("Extension request rejected before analysis: invalid HTTP request format")
-      expect(messages.filter((message) => message.info.role === "user").every((message) => message.info.excludeHistory)).toBe(true)
+      expect(messages.filter((message) => message.info.role === "user").every((message) => "excludeHistory" in message.info && message.info.excludeHistory)).toBe(true)
       expect(MessageV2.filterExcluded(messages)).toHaveLength(0)
       await Session.remove(session.id)
     })
@@ -476,7 +476,7 @@ describe("Per-request live analysis transcript entries", () => {
       expect(second.partID).not.toBe(first.partID)
       expect(second.requestAnalysis.analysisSessionID).toBe(first.requestAnalysis.analysisSessionID)
       const parentMessages = await Session.messages({ sessionID: session.id })
-      expect(parentMessages.filter((message) => message.info.role === "user").every((message) => message.info.excludeHistory)).toBe(true)
+      expect(parentMessages.filter((message) => message.info.role === "user").every((message) => "excludeHistory" in message.info && message.info.excludeHistory)).toBe(true)
       expect(MessageV2.filterExcluded(parentMessages)).toHaveLength(0)
 
       await IngestSummary.updateLiveNotice({
