@@ -73,5 +73,14 @@ export function isConfirmedEmptyStaticHTML(input: EmptyStaticResponseInput): boo
     .replace(/<meta\b[^>]*\/?>/gi, "")
     .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "")
 
+  // Empty structural containers (for example, an unused SPA root div) do not
+  // create an attack surface by themselves. Remove nested empty containers until
+  // stable, while leaving text and every interactive/external element untouched.
+  const emptyContainer = /<(div|span|main|section|article|header|footer|nav|aside|p|ul|ol|li|h[1-6]|strong|em|small|label|dl|dt|dd|table|thead|tbody|tfoot|tr|td|th|caption)\b[^>]*>\s*<\/\1\s*>/gi
+  let previous = ""
+  while (remaining !== previous) {
+    previous = remaining
+    remaining = remaining.replace(emptyContainer, "")
+  }
   return remaining.trim().length === 0
 }
