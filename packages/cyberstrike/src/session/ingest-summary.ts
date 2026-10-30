@@ -53,6 +53,8 @@ export namespace IngestSummary {
     source: string
     before: Snapshot
     after: Snapshot
+    /** Return the summary without appending a synthetic user turn to a persistent agent conversation. */
+    transcript?: boolean
   }
 
   /** Add a non-agent notification to the parent transcript. This makes extension
@@ -204,9 +206,11 @@ export namespace IngestSummary {
     })
   }
 
-  export async function write(input: WriteInput): Promise<void> {
+  export async function write(input: WriteInput): Promise<string | null> {
     const delta = formatDelta(input.before, input.after)
-    if (!delta) return
+    if (!delta) return null
+    const summary = `Ingest processed: ${input.source} — ${delta}`
+    if (input.transcript === false) return summary
 
     const messageID = Identifier.ascending("message")
     await Session.updateMessage({
@@ -222,9 +226,10 @@ export namespace IngestSummary {
       messageID,
       sessionID: input.sessionID,
       type: "text",
-      text: `Ingest processed: ${input.source} — ${delta}`,
+      text: summary,
       time: { start: Date.now(), end: Date.now() },
       metadata: { kind: KIND },
     })
+    return summary
   }
 }
