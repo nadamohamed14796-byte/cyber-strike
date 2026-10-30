@@ -490,6 +490,7 @@ export namespace SessionPrompt {
         )
         let executionError: Error | undefined
         const taskAgent = await Agent.get(task.agent)
+        if (!taskAgent) throw new Error(`Task agent "${task.agent}" is not registered.`)
         const taskCtx: Tool.Context = {
           agent: task.agent,
           messageID: assistantMessage.id,
