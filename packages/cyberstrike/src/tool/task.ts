@@ -257,17 +257,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       using _ = defer(() => ctx.abort.removeEventListener("abort", cancel))
 
       let prompt = params.prompt
-      if (passiveTriageBlock) {
-        prompt =
-          [
-            "## PASSIVE-ONLY TRIAGE — ACTIVE TESTING IS BLOCKED",
-            "Methodology phase: " + passiveTriageBlock.phase,
-            "Exact blocker: " + passiveTriageBlock.reason,
-            "Inspect only the already captured request/response, saved session context, local source/evidence, and existing target notes. Do not send or replay HTTP requests, inject probes, launch scanners/crawlers, run network-capable shell commands, mutate application state, or report a vulnerability.",
-            "Return the concrete evidence, the best-supported hypothesis, what is still unknown, and the exact prerequisites that must be completed before an active test can run. This task is passive triage only.",
-            "",
-          ].join("\n") + "\n" + prompt
-      }
       // Cross-cutting handoff contract: every subagent receives the same routing
       // rule, regardless of which specialized prompt it was loaded from.
       if (params.subagent_type !== "impact-hunter") {
