@@ -96,7 +96,7 @@ export function requestIDFromRecentPromptTexts(texts: readonly string[]): string
  */
 export function requestIDsFromTaskPrompt(text: string): string[] {
   const matches = text.matchAll(
-    /^\\s*(?:[-*]\\s*)?(?:\\*\\*)?(?:Request ID|request_id)(?:\\*\\*)?\\s*:\\s*(req[-_][A-Za-z0-9_-]+)\\s*$/gim,
+    /^\s*(?:[-*]\s*)?(?:\*\*)?(?:Request ID|request_id)(?:\*\*)?\s*:\s*(req[-_][A-Za-z0-9_-]+)\s*$/gim,
   )
   return [...new Set(Array.from(matches, (match) => match[1]!).filter(Boolean))]
 }
