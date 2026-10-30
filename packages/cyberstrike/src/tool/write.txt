@@ -2,7 +2,7 @@ Writes a file to the local filesystem.
 
 Target-workflow restriction:
 - Use this tool only for ordinary project/source files. Do not use it to save target-specific scope lists, recon output, requests/responses, evidence, scan logs, reports, or run manifests.
-- Target artifacts must be saved through target_artifact into the canonical target workspace, and durable run summaries through target_workspace(action="record_summary"). Initialize/show the target workspace first; never invent /root/targets or another target directory.
+- Target artifacts must be saved through target_artifact into the canonical target workspace, and durable run summaries through target_workspace(action="record_summary"). The designated root workspace owner initializes/shows the canonical workspace first. A delegated agent reuses the exact target_url/workspace identity supplied by its caller; it must not initialize another workspace or invent /root/targets or any alternate directory.
 
 Usage:
 - This tool will overwrite the existing file if there is one at the provided path.
