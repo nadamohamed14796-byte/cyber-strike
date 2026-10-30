@@ -34,7 +34,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   })
   const isExtensionTreeSession = createMemo(() => {
     const all = sync.data.session ?? []
-    let cursor = session()
+    let cursor: (typeof all)[number] | undefined = session()
     const visited = new Set<string>()
     while (cursor?.parentID && !visited.has(cursor.id)) {
       visited.add(cursor.id)
