@@ -359,6 +359,10 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
 
         expect(SkillIndex.search("JavaScript analysis", Infinity).map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
+        // Two of three meaningful terms must be enough; 0.67 rounding used
+        // to turn ceil(3 * 0.67) into 3 and incorrectly hide this exact skill.
+        expect(SkillIndex.search("javascript analysis security", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
         expect(SkillIndex.resolveReference("source maps")).toBe("attack-javascript-analysis")
         expect(SkillIndex.search("source maps", Infinity).map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
