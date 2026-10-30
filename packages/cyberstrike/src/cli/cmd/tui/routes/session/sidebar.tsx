@@ -261,10 +261,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     )}
                   </For>
                   <box
-                    onMouseOver={() => setHover("next")}
-                    onMouseOut={() => setHover(null)}
                     onMouseUp={enterProxyBroker}
-                    backgroundColor={hover() === "next" ? theme.backgroundPanel : theme.backgroundElement}
+                    backgroundColor={theme.backgroundElement}
                     paddingLeft={1}
                     paddingRight={1}
                   >
