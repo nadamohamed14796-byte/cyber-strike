@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import path from "path"
-import type { ModelMessage } from "ai"
+import { jsonSchema, tool, type ModelMessage } from "ai"
 import { LLM } from "../../src/session/llm"
 import { Global } from "../../src/global"
 import { Instance } from "../../src/project/instance"
@@ -308,7 +308,13 @@ describe("session.llm.stream", () => {
           system: ["You are a helpful assistant."],
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
-          tools: {},
+          tools: {
+            probe: tool({
+              description: "A test tool used to verify tool calling is enabled",
+              inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }),
+              execute: async () => ({ output: "ok", title: "probe", metadata: {} }),
+            }),
+          },
         })
 
         for await (const _ of stream.fullStream) {
@@ -328,6 +334,15 @@ describe("session.llm.stream", () => {
         expect(body.temperature).toBe(0.4)
         expect(body.top_p).toBe(0.8)
         expect(body.stream).toBe(true)
+        expect(body.tool_choice).toBe("auto")
+        expect(body.tools).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: "function",
+              function: expect.objectContaining({ name: "probe" }),
+            }),
+          ]),
+        )
 
         const maxTokens = (body.max_tokens as number | undefined) ?? (body.max_output_tokens as number | undefined)
         const expectedMaxTokens = ProviderTransform.maxOutputTokens(resolved)
