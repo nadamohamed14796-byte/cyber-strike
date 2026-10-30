@@ -802,7 +802,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         },
       })
       try {
-        const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: params.target_url, localOnly: true })
+        // Use the resolved canonical root, not an authorized subdomain supplied as an asset selector.
+        // JavaScriptCorrelation resolves workspace identity by exact canonical target URL.
+        const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: workspace.targetURL, localOnly: true })
         analyzedSourceRecords = result.graph.sourceFiles.length
         analysisCoverageGaps =
           result.graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")).length +
