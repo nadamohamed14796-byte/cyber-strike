@@ -114,6 +114,30 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+describe("session.llm.shouldPrimeToolCall", () => {
+  const bash = { description: "shell" } as never
+  const probe = { description: "probe" } as never
+
+  test("primes only when the registered bash tool is available", () => {
+    expect(LLM.shouldPrimeToolCall("custom", false, { bash }, [])).toBe(true)
+    expect(LLM.shouldPrimeToolCall("custom", false, { probe }, [])).toBe(false)
+    expect(LLM.shouldPrimeToolCall("custom", false, {}, [])).toBe(false)
+  })
+
+  test("does not prime cloud providers, small calls, or conversations with tool history", () => {
+    expect(LLM.shouldPrimeToolCall("anthropic", false, { bash }, [])).toBe(false)
+    expect(LLM.shouldPrimeToolCall("openai-compatible", true, { bash }, [])).toBe(false)
+    expect(
+      LLM.shouldPrimeToolCall(
+        "custom",
+        false,
+        { bash },
+        [{ role: "assistant", content: [{ type: "tool-call", toolCallId: "prior", toolName: "bash" }] }] as ModelMessage[],
+      ),
+    ).toBe(false)
+  })
+})
+
 type Capture = {
   url: URL
   headers: Headers
