@@ -3,6 +3,7 @@ import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
   requestIDFromPromptText,
+  requestIDFromRecentPromptTexts,
   selectTaskRequestContext,
 } from "../../src/tool/task-resume"
 
@@ -71,4 +72,15 @@ test("request identity parser reads only known identity sections", () => {
 
   expect(requestIDFromPromptText("Request ID: not-in-a-known-section")).toBeUndefined()
   expect(requestIDFromPromptText("## Request Task Identity\n- Method: GET")).toBeUndefined()
+})
+
+test("persistent broker request identity follows the latest captured turn", () => {
+  const first = "## Request Task Identity\\n- Request ID: req-first\\n- Method: GET"
+  const second = "## Request Task Identity\\n- Request ID: req-second\\n- Method: POST"
+  const followUp = "Please explain the previous result without starting a new capture."
+
+  expect(requestIDFromRecentPromptTexts([first, second])).toBe("req-second")
+  // A follow-up with no identity block continues the most recent capture.
+  expect(requestIDFromRecentPromptTexts([first, second, followUp])).toBe("req-second")
+  expect(requestIDFromRecentPromptTexts([followUp])).toBeUndefined()
 })
