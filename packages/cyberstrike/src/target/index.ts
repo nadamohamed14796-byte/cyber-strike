@@ -3392,9 +3392,15 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
           sourceFiles: incoming.sourceFiles ?? [],
           requestIDs: incoming.requestIDs ?? [],
         }
+        const declaredSources = unique(incoming.methodEvidenceSources ?? [])
+        if (declaredSources.length > 1 && !incoming.evidence?.length) {
+          throw new Error(
+            "Canonical endpoint operations with multiple evidence sources require explicit per-source evidence entries.",
+          )
+        }
         const evidenceInputs = incoming.evidence ?? (() => {
-          const sources = incoming.methodEvidenceSources?.length
-            ? incoming.methodEvidenceSources
+          const sources = declaredSources.length
+            ? declaredSources
             : [operation.observedInTraffic ? "traffic" as const : "other" as const]
           if (sources.includes("javascript") && sources.includes("traffic")) {
             return [
