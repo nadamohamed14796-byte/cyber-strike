@@ -3560,95 +3560,29 @@ export namespace JavaScriptCorrelation {
       JSON.stringify(testerSurvey, null, 2) + "\n",
     )
 
-    // Create one stable, readable note per endpoint candidate so future request
-    // ingestion can update/reuse the same evidence record instead of rediscovering it.
-    for (const endpoint of graph.endpointCandidates) {
-      const relatedRequests = graph.requests.filter((request) => endpoint.observedRequestIDs.includes(request.id))
-      const requestLines = relatedRequests.length
-        ? relatedRequests.map((request) => "- " + request.id + ": " + request.method + " " + (request.url ?? request.normalizedPath) + " — status " + (request.responseStatus ?? "unknown"))
-        : ["- No matching captured request yet."]
-      const endpointOrigin = endpoint.origin?.toLowerCase() ?? "*"
-      const relatedCandidates = graph.javascriptAnalysis.requestCandidates.filter((candidate) => {
-        const candidateURL = safeURL(candidate.urlTemplate)
-        const candidateOrigin = (candidate.origin ?? candidateURL?.origin ?? null)?.toLowerCase() ?? "*"
-        return candidateOrigin === endpointOrigin &&
-          normalizedTemplateShape(candidate.path) === normalizedTemplateShape(endpoint.path) &&
-          (endpoint.method ? candidate.method?.toUpperCase() === endpoint.method : !candidate.method)
-      })
-      const parameterLines = [
-        "- Path parameters: " + ((endpoint.pathParameters ?? []).join(", ") || "none statically identified"),
-        "- Query parameters: " + ((endpoint.queryParameters ?? []).join(", ") || "none statically identified"),
-        "- Body parameters: " + ((endpoint.bodyParameters ?? []).join(", ") || "none statically identified"),
-        "- Header names: " + ((endpoint.headerNames ?? []).join(", ") || "none statically identified"),
-        "- Authentication signals: " + ((endpoint.authSignals ?? []).join(", ") || "none statically identified"),
-        "- Cookie/session signals: " + ((endpoint.cookieSignals ?? []).join(", ") || "none statically identified"),
-      ]
-      const sourceCallLines = relatedCandidates.length
-        ? relatedCandidates.map((candidate) => {
-            const parameterEvidence = [
-              ...candidate.pathParameters.map((name) => name + " [path; type unknown unless independently inferred]"),
-              ...candidate.queryParameters.map((name) => name + " [query; type unknown unless independently inferred]"),
-              ...candidate.bodyParameters.map((name) => name + " [body; type unknown unless independently inferred]"),
-              ...candidate.headerNames.map((name) => name + " [header; value/type not captured by this static hint]"),
-            ]
-            const sourceRecord = graph.sourceFiles.find((file) => file.relativePath === candidate.sourceFile)
-            const sourceRequestIDs = sourceRecord?.sourceRequestIDs ?? (sourceRecord?.sourceRequestID ? [sourceRecord.sourceRequestID] : [])
-            const sourceCaptureIDs = sourceRecord?.sourceCaptureIDs ?? (sourceRecord?.sourceCaptureID ? [sourceRecord.sourceCaptureID] : [])
-            const sourceReference = sourceRequestIDs.length
-              ? "captured JS response " + (sourceRecord?.sourceURL ?? "(URL unavailable)") +
-                (sourceCaptureIDs.length ? " (source capture version IDs: " + sourceCaptureIDs.join(", ") + ")" : "") +
-                " via request IDs " + sourceRequestIDs.join(", ") + " (full body remains in request storage, not in the graph file)"
-              : "workspace file " + candidate.sourceFile
-            return "- " + (candidate.method ?? "UNKNOWN") + " " + candidate.urlTemplate +
-              " — source: " + sourceReference + ":" + candidate.sourceLine +
-              (candidate.sourceFunction ? " in " + candidate.sourceFunction : "") +
-              " — parameters: [" + (parameterEvidence.join(", ") || "none statically identified") + "]" +
-              " — confidence: " + candidate.confidence +
-              " — auth assessment: " + candidate.authAssessment +
-              " — auth signals: [" + candidate.authSignals.join(", ") + "]" +
-              " — cookie/session signals: [" + candidate.cookieSignals.join(", ") + "]" +
-              " — captured request IDs: [" + (candidate.observedRequestIDs.join(", ") || "none") + "]"
-          })
-        : ["- No structured request-call candidate associated with this method-specific route."]
-      const endpointNoteContent = [
-        "# Endpoint Evidence",
-        "",
-        "- Candidate ID: " + endpoint.id,
-        "- Target: " + workspace.targetURL,
-        "- Origin: " + (endpoint.origin ?? "(relative or same-origin route)"),
-        "- Host: " + (endpoint.host ?? "(relative or same-origin route)"),
-        "- Method: " + (endpoint.method ?? "not statically known"),
-        "- Path/template: " + endpoint.path,
-        "- Observation status: " + (endpoint.observedInTraffic ? "path overlap observed in captured traffic" : "static JavaScript candidate; not yet observed in captured traffic"),
-        "- Confidence: " + endpoint.confidence,
-        "- Source JavaScript files: " + (endpoint.sourceFiles.length ? endpoint.sourceFiles.join(", ") : "none recorded"),
-        "- Related captured request IDs: " + (endpoint.observedRequestIDs.length ? endpoint.observedRequestIDs.join(", ") : "none"),
-        "",
-        "## Merged parameter inventory (kept separate by location)",
-        ...parameterLines,
-        "",
-        "## Request-call provenance",
-        ...sourceCallLines,
-        "",
-        "## Related captured request evidence",
-        ...requestLines,
-        "",
-        "## Artifact links",
-        "- JavaScript correlation graph: " + path.relative(workspace.workspacePath, graphPath).split(path.sep).join("/"),
-        "- Endpoint inventory: " + path.relative(workspace.workspacePath, endpointPath).split(path.sep).join("/"),
-        "",
-        "## Interpretation",
-        "This is an endpoint candidate, not a vulnerability finding. Path overlap does not prove the listed JavaScript file executed the request. Verify the exact origin, method, authentication/role context, parameter locations, response behavior, and authorization before testing.",
-      ].join("\n")
-      await TargetMemory.addNote(workspace.targetURL, {
-        kind: "endpoint",
-        title: ("Endpoint " + (endpoint.method ? endpoint.method + " " : "") + (endpoint.host ?? "relative") + endpoint.path).slice(0, 180),
-        content: endpointNoteContent,
-        source: "javascript-correlation:" + endpoint.id,
-        sourceURL: endpoint.origin ? endpoint.origin + endpoint.path : undefined,
-        status: endpoint.observedInTraffic ? "observed" : "unverified",
-        tags: ["endpoint", "javascript", endpoint.observedInTraffic ? "traffic-observed" : "static-candidate"],
-        upsertByIdentity: true,
+    // One canonical note per origin + route template. HTTP methods are nested
+    // operations; method-specific fields never leak into sibling operations.
+    for (const endpoint of groupCanonicalJavaScriptEndpoints([graph])) {
+      await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL: workspace.targetURL,
+        origin: endpoint.origin,
+        path: endpoint.path,
+        sourceFiles: endpoint.sourceFiles,
+        operations: endpoint.operations.map((operation) => ({
+          method: operation.method ?? "UNKNOWN",
+          methodEvidenceSources: operation.methodEvidenceSources ?? [],
+          pathParameters: operation.pathParameters ?? [],
+          queryParameters: operation.queryParameters ?? [],
+          bodyParameters: operation.bodyParameters ?? [],
+          headerNames: operation.headerNames ?? [],
+          authSignals: operation.authSignals ?? [],
+          cookieSignals: operation.cookieSignals ?? [],
+          sourceFiles: operation.sourceFiles ?? [],
+          requestIDs: operation.observedRequestIDs ?? [],
+          observedInTraffic: operation.observedInTraffic,
+          confidence: operation.confidence,
+        })),
+        unattributed: endpoint.unattributed,
       })
     }
     const canonicalArtifacts = await serializeCanonicalArtifacts(
