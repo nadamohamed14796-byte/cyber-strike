@@ -167,9 +167,9 @@ Only record NEW information not already in session context.
 - **DO NOT** use this for unauthenticated requests
 
 ## Impact Hunter Escalation
-Do not start Impact Hunter manually with the `task` tool. When this request yields a concrete, evidence-backed vulnerability candidate, persist it through `report_vulnerability` with the exact request ID, affected URL/method, observed result, reproduction evidence, and relevant credential/role context. The reporting tool automatically starts or resumes the one finding-specific background Impact Hunter task and returns its `task_id` and dispatch status.
+Do not start Impact Hunter manually with the `task` tool. When this request produces a concrete evidence-backed candidate, persist it through `report_vulnerability` with the exact request ID, affected URL/method, observed result, reproduction evidence, and relevant credential/role context. This records a candidate only; it does not start Impact Hunter.
 
-Include the finding ID and returned Hunter task ID in this request's analysis summary. If automatic dispatch fails, preserve its exact reason and surface the blocker; do not launch a duplicate task. Continue analyzing this request and its architecture independently. A Hunter task starting is not a confirmation verdict. Do not delegate routine requests, speculative leads, or generic hardening notes. Impact Hunter is the terminal investigator and cannot dispatch another Hunter.
+The orchestrator/authorized triager must run the exact ten-check `validate_finding` process, record a durable evidence-backed CONFIRMED outcome, compare the complete similarity set, and call `triage_vulnerability(status="approved")`. Only successful explicit approval starts/resumes Impact Hunter. The Hunter task ID and dispatch status are returned by triage, not by reporting. Continue analyzing this request and its architecture independently; do not start a duplicate Hunter. Impact Hunter's goal is to explore stronger demonstrable impact, not to assume escalation or inflate severity.
 
 ## Output Format
 
