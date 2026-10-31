@@ -797,6 +797,7 @@ export interface JavaScriptEndpointCandidate {
   queryParameters?: string[]
   bodyParameters?: string[]
   headerNames?: string[]
+  contentTypes?: string[]
   authSignals?: string[]
   cookieSignals?: string[]
   sourceFiles: string[]
@@ -850,6 +851,7 @@ export function mergeStructuredJavaScriptEndpoints(
     target.queryParameters = unique([...(target.queryParameters ?? []), ...(source.queryParameters ?? [])])
     target.bodyParameters = unique([...(target.bodyParameters ?? []), ...(source.bodyParameters ?? [])])
     target.headerNames = unique([...(target.headerNames ?? []), ...(source.headerNames ?? [])])
+    target.contentTypes = unique([...(target.contentTypes ?? []), ...(source.contentTypes ?? [])])
     target.authSignals = unique([...(target.authSignals ?? []), ...(source.authSignals ?? [])])
     target.cookieSignals = unique([...(target.cookieSignals ?? []), ...(source.cookieSignals ?? [])])
     target.observedRequestIDs = unique([...target.observedRequestIDs, ...source.observedRequestIDs])
@@ -878,6 +880,7 @@ export function mergeStructuredJavaScriptEndpoints(
         queryParameters: [],
         bodyParameters: [],
         headerNames: [],
+        contentTypes: [],
         authSignals: [],
         cookieSignals: [],
         methodEvidenceSources: [],
@@ -916,6 +919,7 @@ export function mergeStructuredJavaScriptEndpoints(
       queryParameters: [...request.queryParameters],
       bodyParameters: [...request.bodyParameters],
       headerNames: [...request.headerNames],
+      contentTypes: [...(request.contentTypes ?? [])],
       authSignals: [...request.authSignals],
       cookieSignals: [...request.cookieSignals],
       observedInTraffic: request.observedRequestIDs.length > 0,
@@ -1379,6 +1383,7 @@ export function groupCanonicalJavaScriptEndpoints(
           queryParameters: [],
           bodyParameters: [],
           headerNames: [],
+          contentTypes: [],
           authSignals: [],
           cookieSignals: [],
           observedRequestIDs: [],
@@ -1403,6 +1408,7 @@ export function groupCanonicalJavaScriptEndpoints(
         queryParameters: [],
         bodyParameters: [],
         headerNames: [],
+        contentTypes: [],
         authSignals: [],
         cookieSignals: [],
         methodEvidenceSources: [],
@@ -2024,6 +2030,7 @@ function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelation
             " — query_params=[" + (operation.queryParameters ?? []).map(inline).join(", ") + "]" +
             " — body_params=[" + (operation.bodyParameters ?? []).map(inline).join(", ") + "]",
           "    headers=[" + (operation.headerNames ?? []).map(inline).join(", ") + "]" +
+            " — content_types=[" + (operation.contentTypes ?? []).map(inline).join(", ") + "]" +
             " — auth=[" + (operation.authSignals ?? []).map(inline).join(", ") + "]" +
             " — cookies=[" + (operation.cookieSignals ?? []).map(inline).join(", ") + "]",
           "    sources=[" + operation.sourceFiles.map(inline).join(", ") + "]" +
@@ -3601,6 +3608,7 @@ export namespace JavaScriptCorrelation {
               queryParameters: operation.queryParameters ?? [],
               bodyParameters: operation.bodyParameters ?? [],
               headerNames: operation.headerNames ?? [],
+              contentTypes: operation.contentTypes ?? [],
               authSignals: operation.authSignals ?? [],
               cookieSignals: operation.cookieSignals ?? [],
               sourceFiles: operation.sourceFiles ?? [],
