@@ -127,11 +127,25 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
       "Durable evidence references: " + params.evidence_refs.join(", "),
       "The updated severity is based only on the additional impact validated in the latest ten-check assessment.",
     ].join("\n")
+    // FindingValidation.record replaces the trailing [Latest finding validation]
+    // block on the next validation run. Keep all Impact Hunter history BEFORE that
+    // replaceable tail so subsequent ten-check validations cannot erase escalation
+    // evidence or earlier severity transitions.
+    const validationMarker = "\\n\\n[Latest finding validation]"
+    const validationIndex = finding.description.lastIndexOf(validationMarker)
+    const descriptionCore = validationIndex >= 0
+      ? finding.description.slice(0, validationIndex)
+      : finding.description
+    const validationTail = validationIndex >= 0
+      ? finding.description.slice(validationIndex)
+      : ""
+    const updatedDescription = descriptionCore + evidenceBlock + validationTail
+
     const updated = Vulnerability.update({
       sessionID,
       id: finding.id,
       severity: params.severity,
-      description: finding.description + evidenceBlock,
+      description: updatedDescription,
       expectedStatus: "approved",
     })
     if (!updated) {
