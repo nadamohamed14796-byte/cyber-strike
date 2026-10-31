@@ -15,9 +15,7 @@ import { Request } from "../session/request"
 import { CoverageNote } from "../session/coverage-note"
 import { WebCredential } from "../session/web/web-credential"
 import { Observation } from "../session/observation"
-import { Vulnerability } from "../session/vulnerability"
-import { FindingValidation, hasCompleteConfirmedValidation } from "../methodology/finding-validation"
-import { VerificationLedger } from "../session/verification-ledger"
+import { evaluateImpactHunterGate, type ImpactHunterMode } from "../methodology/impact-hunter-gate"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
@@ -105,37 +103,47 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         callerMode: caller?.mode,
       })
 
-      // Every Impact Hunter launch is evidence-gated, including an explicit
-      // @-invocation/foreground task that bypasses ordinary task permissions.
-      // Never let the task permission bypass skip finding approval/validation.
+      // Every Impact Hunter launch is evidence-gated, including explicit
+      // @-invocations that bypass ordinary task permissions.
       if (params.subagent_type === "impact-hunter") {
-        const findingID = /^finding_id:\s*([^\s]+)\s*$/m.exec(params.prompt)?.[1]
+        const findingID = /^finding_id:\\s*([^\\s]+)\\s*$/m.exec(params.prompt)?.[1]
         if (!findingID) {
-          throw new Error("Impact Hunter dispatch requires an exact finding_id in the internal handoff prompt.")
+          throw new Error("Impact Hunter dispatch requires an exact finding_id in the task prompt.")
         }
+        const modeValue = /^handoff_mode:\\s*(proof_gap|approved_impact)\\s*$/m.exec(params.prompt)?.[1]
+        if (!modeValue) {
+          throw new Error("Impact Hunter dispatch requires handoff_mode=proof_gap or handoff_mode=approved_impact.")
+        }
+        const mode = modeValue as ImpactHunterMode
         const rootSessionID = Session.root(ctx.sessionID)
-        const finding = Vulnerability.get(rootSessionID).find((item) => item.id === findingID)
-        if (!finding || finding.status !== "approved") {
-          throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " is not explicitly triage-approved in the current session.")
+        const finding = (await import("../session/vulnerability")).Vulnerability.get(rootSessionID)
+          .find((item) => item.id === findingID)
+        if (!finding) {
+          throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " was not found in the current session.")
         }
-        const latestValidation = FindingValidation.history({
+
+        const requestIDsInPrompt = [...params.prompt.matchAll(/^supporting_request_ids:\\s*(.+)\\s*$/gim)]
+          .flatMap((match) => (match[1] ?? "").split(",").map((item) => item.trim()))
+          .filter((item) => item && item.toLowerCase() !== "none")
+        const preferredRequestIDs = [...new Set([
+          ...(params.request_id ? [params.request_id] : []),
+          ...requestIDsInPrompt,
+        ])]
+        const gate = evaluateImpactHunterGate({
+          finding,
           sessionID: rootSessionID,
-          vulnerabilityID: findingID,
-          limit: 1,
-        })[0]
-        if (!hasCompleteConfirmedValidation(latestValidation)) {
-          throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " does not have a latest confirmed ten-check validation.")
+          mode,
+          preferredRequestIDs,
+        })
+        if (!gate.allowed) {
+          throw new Error("Impact Hunter dispatch is blocked (" + mode + "): " + (gate.reason ?? "evidence gate did not pass") + ".")
         }
-        const durableConfirmed = VerificationLedger.list({
-          sessionID: rootSessionID,
-          hypothesisKey: "finding:" + findingID,
-        }).some((attempt) =>
-          attempt.outcome === "confirmed" &&
-          attempt.validConditions &&
-          Boolean(attempt.evidenceRef?.trim()),
-        )
-        if (!durableConfirmed) {
-          throw new Error("Impact Hunter dispatch is blocked: the durable verification ledger has no evidence-backed CONFIRMED outcome for finding:" + findingID + ".")
+
+        if (mode === "approved_impact") {
+          const baselineValidationID = /^baseline_validation_id:\\s*([^\\s]+)\\s*$/m.exec(params.prompt)?.[1]
+          if (!baselineValidationID || baselineValidationID !== gate.baselineValidationID) {
+            throw new Error("Impact Hunter dispatch is blocked: the prompt baseline_validation_id does not match the latest confirmed ten-check validation.")
+          }
         }
       }
 
