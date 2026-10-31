@@ -970,7 +970,7 @@ test("migrates legacy flattened endpoint evidence without inventing per-source o
 
       const endpoint = TargetMemory.allNotes(first.workspace.id).find((note) => note.id === first.note.id)!
       const marker = endpoint.content.match(
-        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\n([\s\S]*?)\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
       )
       expect(marker).not.toBeNull()
       const legacy = JSON.parse(marker![1]!)
@@ -979,7 +979,7 @@ test("migrates legacy flattened endpoint evidence without inventing per-source o
         "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->",
         JSON.stringify(legacy, null, 2),
         "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->",
-      ].join("\\n"))
+      ].join("\n"))
       Database.use((db) => db.update(TargetNoteTable)
         .set({ content: legacyContent })
         .where(eq(TargetNoteTable.id, endpoint.id))
@@ -1000,7 +1000,7 @@ test("migrates legacy flattened endpoint evidence without inventing per-source o
 
       const migratedNote = TargetMemory.allNotes(first.workspace.id).find((note) => note.id === endpoint.id)!
       const migratedMarker = migratedNote.content.match(
-        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\n([\s\S]*?)\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
       )
       expect(migratedMarker).not.toBeNull()
       const migrated = JSON.parse(migratedMarker![1]!)
