@@ -4,6 +4,7 @@ import { TaskTool } from "../tool/task"
 import type { Tool } from "../tool/tool"
 import { requestIDFromRecentPromptTexts } from "../tool/task-resume"
 import { Vulnerability } from "../session/vulnerability"
+import { FindingValidation } from "./finding-validation"
 import { redactTargetNoteSecrets } from "../target/redact"
 
 export interface ImpactHunterHandoffResult {
@@ -33,6 +34,15 @@ async function dispatch(
     const reporter = await Agent.get(ctx.agent)
     if (!reporter) return { started: false, reason: `reporting agent "${ctx.agent}" is not registered` }
 
+    const baselineValidation = FindingValidation.history({
+      sessionID: Session.root(ctx.sessionID),
+      vulnerabilityID: finding.id!,
+      limit: 1,
+    })[0]
+    if (!baselineValidation || baselineValidation.verdict !== "confirmed") {
+      return { started: false, reason: "latest ten-check validation is not confirmed; Impact Hunter dispatch is blocked" }
+    }
+
     const description = `Impact Hunter finding ${finding.id}`
     const childTitle = description + " (@impact-hunter subagent)"
     const existing = (await Session.children(ctx.sessionID)).find((child) => child.title === childTitle)
@@ -60,12 +70,14 @@ async function dispatch(
           `endpoint: ${finding.endpoint ?? "not recorded"}`,
           `status: ${finding.status}`,
           `request_id: ${requestID ?? "not bound to a single captured request"}`,
+          `baseline_validation_id: ${baselineValidation.id}`,
+          `baseline_validation_time: ${new Date(baselineValidation.time_created).toISOString()}`,
           "",
-          "Load this exact finding and inspect its latest confirmed validation, durable verification attempts, complete request/response evidence, role/account context, and linked artifacts. Use the already-proven weakness as the starting point.",
+          "Load this exact finding and inspect its latest confirmed validation, durable verification attempts, complete request/response evidence, role/account context, and linked artifacts. Use the already-proven weakness as the starting point. The original hypothesis key finding:<finding_id> is already terminal CONFIRMED; do not try to append more attempts to it.",
           "Your objective is to test evidence-supported adjacent impact and chains: identify the next meaningful boundary, prerequisite, reachable operation, controlled fixture, expected secure behavior, vulnerable signal, and disconfirming control. Explore the strongest safe hypothesis first; do not try unrelated classes or arbitrary payloads.",
           "Use only authorized scope, tester-owned accounts, synthetic records, reversible actions, and minimum-impact proof. Never access real users' private data, extract secrets, perform destructive actions, trigger real payments/messages, or cross into a third-party/out-of-scope service.",
           "A low, informational, or medium rating is a reason to assess realistic impact paths, not a promise that escalation exists. Do not chase the highest numeric severity. Raise severity only when additional confidentiality, integrity, availability, privilege, or business impact is independently demonstrated and reproducible; otherwise preserve the current rating.",
-          "For any changed impact claim, record new durable verification_attempt evidence against the exact hypothesis key finding:<finding_id>, then run validate_finding with all ten checks. Use the dedicated update_finding_impact tool only after the latest validation is confirmed; include the exact evidence references and a rationale tied to the demonstrated consequence. Update the same finding, never create a second row for the same root cause.",
+          "For each new impact-escalation hypothesis, record durable verification_attempt evidence under a distinct stable key shaped like finding:<finding_id>:impact:<short-hypothesis-slug>; the original finding:<finding_id> key is terminal and must not be reused. After an impact hypothesis is confirmed, run validate_finding again with all ten checks using the new evidence. Use update_finding_impact only after that newer validation is confirmed; provide baseline_validation_id from this task handoff, the exact impact hypothesis key, exact evidence references, and a rationale tied to the demonstrated consequence. Update the same finding, never create a second row for the same root cause.",
           "If a meaningful escalation path is disproven, record which check/test and observed evidence disproved it. If it is blocked or untested, record the missing prerequisite and why. Keep the original finding valid and its existing severity when no stronger impact is proven.",
           "Finish with the strongest demonstrated impact, tests/controls and evidence references, any verified chain hops, final severity rationale, and exact unresolved blockers. Do not report speculative downstream impact as fact.",
         ].join("\n"),
