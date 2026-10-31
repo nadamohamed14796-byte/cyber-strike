@@ -131,7 +131,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
       sessionID,
       id: finding.id,
       severity: params.severity,
-      description: finding.description.replace(/\n\n\[Impact Hunter — evidence-backed impact escalation\][\s\S]*$/, "") + evidenceBlock,
+      description: finding.description + evidenceBlock,
       expectedStatus: "approved",
     })
     if (!updated) {
