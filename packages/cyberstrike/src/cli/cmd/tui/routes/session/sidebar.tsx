@@ -32,6 +32,14 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
         (item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
     )
   })
+  // Automatic Impact Hunter runs are direct children of the root session.
+  // Keep them visible here with an explicit Open action; opening one navigates
+  // the UI only and does not pause or cancel the root session.
+  const impactHunterSessions = createMemo(() =>
+    sync.data.session
+      .filter((item) => item.parentID === props.sessionID && item.title.startsWith("Impact Hunter finding "))
+      .sort((left, right) => right.time.updated - left.time.updated),
+  )
   const isExtensionTreeSession = createMemo(() => {
     const all = sync.data.session ?? []
     let cursor: (typeof all)[number] | undefined = session()
@@ -266,6 +274,37 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     </text>
                   </box>
                 </box>
+              </box>
+            </Show>
+            <Show when={!session()?.parentID && impactHunterSessions().length > 0}>
+              <box flexDirection="column" gap={1}>
+                <text fg={theme.text}>
+                  <b>Impact Hunter</b>
+                </text>
+                <For each={impactHunterSessions()}>
+                  {(hunter) => {
+                    const status = () => sync.data.session_status?.[hunter.id]
+                    const title = hunter.title.replace(" (@impact-hunter subagent)", "")
+                    return (
+                      <box flexDirection="column" gap={1} padding={1} backgroundColor={theme.backgroundElement}>
+                        <text fg={theme.text} wrapMode="word">{title}</text>
+                        <box flexDirection="row" alignItems="center" gap={1}>
+                          <text fg={status()?.type === "busy" ? theme.success : theme.textMuted}>
+                            {status()?.type === "busy" ? "● Investigating" : "○ Paused / finished"}
+                          </text>
+                          <box
+                            onMouseUp={() => navigate({ type: "session", sessionID: hunter.id })}
+                            backgroundColor={theme.background}
+                            paddingLeft={1}
+                            paddingRight={1}
+                          >
+                            <text fg={theme.accent}><b>Open</b></text>
+                          </box>
+                        </box>
+                      </box>
+                    )
+                  }}
+                </For>
               </box>
             </Show>
             <Show when={hackbrowserStatus()}>
