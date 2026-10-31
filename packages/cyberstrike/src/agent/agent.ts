@@ -649,9 +649,11 @@ export namespace Agent {
       "impact-hunter": {
         name: "impact-hunter",
         description: DESC_IMPACT_HUNTER.split("\n")[0].trim(),
-        mode: "subagent",
+        // "all" keeps the Hunter callable as a delegated specialist while also
+        // exposing it in the user's Tab / agent picker for a standalone session.
+        mode: "all",
         native: true,
-        hidden: true,
+        hidden: false,
         color: "red",
         prompt: `${PROMPT_METHODOLOGY_CONTINUATION}\n\n---\n\n${PROMPT_IMPACT_HUNTER}`,
         prependRequestContext: true,
