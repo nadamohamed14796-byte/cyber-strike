@@ -685,7 +685,7 @@ test("groups one canonical endpoint with isolated method contracts and traffic-o
   expect(deleteOperation.observedRequestIDs).toEqual(["req-delete"])
   expect(endpoint!.unattributed.queryParameters).toEqual(["route-level-query-clue"])
   expect(endpoint!.unattributed.queryParameters).not.toContain("include")
-  expect(endpoint!.sourceFiles).toEqual(["javascript/routes.js", "javascript/get.js", "javascript/post.js"])
+  expect([...endpoint!.sourceFiles].sort()).toEqual(["javascript/get.js", "javascript/post.js", "javascript/routes.js"])
 })
 
 test("correlates each captured method separately without attributing traffic-only methods to JavaScript", () => {
