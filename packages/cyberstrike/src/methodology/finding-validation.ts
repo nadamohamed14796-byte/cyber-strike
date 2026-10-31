@@ -394,7 +394,15 @@ export namespace FindingValidation {
     }
 
     const validationID = Identifier.ascending("finding_validation")
-    const now = Date.now()
+    // Date.now() can return the same millisecond for a baseline and an immediate
+    // follow-up validation. Preserve a strict per-finding validation order so
+    // downstream evidence gates can distinguish post-handoff validation reliably.
+    const previousValidation = history({
+      sessionID: rootSessionID,
+      vulnerabilityID: input.vulnerabilityID,
+      limit: 1,
+    })[0]
+    const now = Math.max(Date.now(), (previousValidation?.time_created ?? 0) + 1)
     Database.transaction((db) =>
       db
         .insert(FindingValidationTable)
