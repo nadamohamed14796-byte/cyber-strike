@@ -32,6 +32,35 @@ export const FINDING_VALIDATION_CHECKS = [
 
 export type FindingValidationCheckID = (typeof FINDING_VALIDATION_CHECKS)[number]["id"]
 
+/**
+ * Reusable final gate for every code path that consumes a "confirmed" validation.
+ * A stored verdict string alone is not enough: the exact ten checks must exist,
+ * required checks must be PASS with evidence, and only identity_context may be
+ * NOT_APPLICABLE (with an explicit reason).
+ */
+export function hasCompleteConfirmedValidation(
+  validation: {
+    verdict: FindingValidationVerdict
+    checks: FindingValidationCheckRecord[]
+  } | null | undefined,
+): boolean {
+  if (!validation || validation.verdict !== "confirmed" || validation.checks.length !== FINDING_VALIDATION_CHECKS.length) {
+    return false
+  }
+
+  const byID = new Map(validation.checks.map((check) => [check.id, check]))
+  if (byID.size !== FINDING_VALIDATION_CHECKS.length) return false
+
+  return FINDING_VALIDATION_CHECKS.every((definition) => {
+    const check = byID.get(definition.id)
+    if (!check) return false
+    if (definition.id === "identity_context" && check.status === "not_applicable") {
+      return Boolean(check.reason?.trim())
+    }
+    return check.status === "pass" && Boolean(check.evidence?.trim())
+  })
+}
+
 export interface FindingValidationAttemptInput extends FindingValidationAttemptRecord {}
 
 
