@@ -16,6 +16,21 @@ test("flags sensitive data fields and embedded email literals without retaining 
   expect(serialized).not.toContain("1990-01-01")
 })
 
+test("attributes application and authorization hints to their containing functions", () => {
+  const source = [
+    'function exportReport() {',
+    '  const action = "export";',
+    '  return fetch("/api/reports/export");',
+    '}',
+    'function adminDashboard() {',
+    '  if (isAdmin) return fetch("/api/admin/dashboard");',
+    '}',
+  ].join("\\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.applicationHints?.find((item) => item.kind === "business-workflow" && item.value === "export")?.functionName).toBe("exportReport")
+  expect(result.roleHints.find((item) => item.kind === "admin-role-hint")?.functionName).toBe("adminDashboard")
+})
+
 test("extracts named functions and parameters", () => {
   const source = [
     "async function getInvoice(invoiceId, includeItems = false) {",
