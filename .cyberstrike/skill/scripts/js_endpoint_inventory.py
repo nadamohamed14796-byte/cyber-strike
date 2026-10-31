@@ -25,9 +25,14 @@ def safe_candidate(value: str) -> str | None:
         parts = urlsplit(value)
     except ValueError:
         return None
-    if not parts.scheme or not parts.hostname:
+    if not parts.scheme or not parts.hostname or parts.username or parts.password:
         return None
-    return f"{parts.scheme.lower()}://{parts.hostname.lower()}{parts.path or '/'}"
+    host = parts.hostname.lower()
+    if host in {"post", "get", "put", "delete", "patch", "localhost", "example.com", "www.w3.org"}:
+        return None
+    if host.endswith(".w3.org") or re.search(r"(?i)\\.(?:svg|png|jpe?g|gif|webp|ico|css|woff2?|ttf|eot|map)$", parts.path):
+        return None
+    return f"{parts.scheme.lower()}://{host}{parts.path or '/'}"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
