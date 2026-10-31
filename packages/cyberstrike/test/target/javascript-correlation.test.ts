@@ -131,7 +131,7 @@ test("parses HTTP call arguments across nested objects and strings containing de
   const source = [
     'client.open("POST", "/api/records", { note: "a ) and , stay inside this string", nested: { ids: [1, 2] } })',
     'fetch("/api/search?filter=a,b", { headers: { "X-Filter": "a,b)", "X-Trace": "one,two" }, body: JSON.stringify({ nested: [1, 2] }) })',
-  ].join("\\n")
+  ].join("\n")
   const endpoints = extractStaticJavaScriptEndpoints(source)
   expect(endpoints).toContain("/api/records")
   expect(endpoints).toContain("/api/search")
@@ -146,7 +146,7 @@ test("does not promote arbitrary links, namespaces, or static assets to API endp
     'const docs = "https://reactjs.org/docs/error-decoder.html";',
     'fetch("https://api.example.com/v1/users");',
     'axios.post("/auth/logout", payload);',
-  ].join("\\n")
+  ].join("\n")
   const endpoints = extractStaticJavaScriptEndpoints(source)
   expect(endpoints).toContain("https://api.example.com/v1/users")
   expect(endpoints).toContain("/auth/logout")
