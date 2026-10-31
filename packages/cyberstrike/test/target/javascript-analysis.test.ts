@@ -307,6 +307,7 @@ test("extracts fetch body keys without misclassifying request options", () => {
   expect(request.bodyParameters).not.toContain("headers")
   expect(request.bodyParameters).not.toContain("body")
   expect(request.bodyParameters).not.toContain("Content-Type")
+  expect(request.contentTypes).toEqual(["application/json"])
 })
 
 test("flags browser token storage, cookie writes, and wildcard postMessage as candidates", () => {
