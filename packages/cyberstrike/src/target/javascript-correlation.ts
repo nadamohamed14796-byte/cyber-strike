@@ -1794,6 +1794,7 @@ function renderCanonicalJavaScriptAnalysis(
   graphCount = 1,
 ): string {
   const manifestAssets = (manifest?.assets ?? []).filter((item) => typeof item.url === "string")
+  const endpointRecords = groupCanonicalJavaScriptEndpoints([graph])
   const manifestByURL = new Map(manifestAssets.map((asset) => [asset.url, asset]))
   const assets = new Map<string, JavaScriptCorrelationGraph["javascriptAssets"][number]>()
   for (const asset of graph.javascriptAssets) assets.set(asset.url, asset)
@@ -3515,8 +3516,15 @@ export namespace JavaScriptCorrelation {
         ? (graph.sourceMapReferences ?? []).map((item) => "- " + item.url + " — " + item.status + " — source: " + item.sourceFiles.join(", ") + " — " + item.note)
         : ["No external sourceMappingURL references were extracted from the analyzed JavaScript."]),
       "",
-      "## Static endpoint candidates",
-      ...(graph.endpointCandidates.length ? graph.endpointCandidates.map((endpoint) => "- " + (endpoint.host ? endpoint.host : "(relative)") + endpoint.path + " — " + (endpoint.observedInTraffic ? "path overlap observed" : "not yet observed in captured traffic") + " — source: " + endpoint.sourceFiles.join(", ") + (endpoint.observedRequestIDs.length ? " — requests: " + endpoint.observedRequestIDs.join(", ") : "")) : ["No static endpoint literals extracted."]),
+      "## Canonical endpoint candidates",
+      ...(endpointRecords.length ? endpointRecords.map((endpoint) =>
+        "- " + (endpoint.host ?? "(relative)") + endpoint.path +
+        " — operations=[" + endpoint.operations.map((operation) =>
+          (operation.method ?? "UNKNOWN") + ":" + ((operation.methodEvidenceSources ?? []).join("+") || "unspecified"),
+        ).join(", ") + "]" +
+        " — traffic_operations=[" + endpoint.operations.filter((operation) => operation.observedInTraffic).map((operation) => operation.method).join(", ") + "]" +
+        " — source_files=[" + endpoint.sourceFiles.join(", ") + "]",
+      ) : ["No static endpoint literals extracted."]),
       "",
       "## Notes about relationship confidence",
       ...graph.notes.map((note) => "- " + note),
@@ -3550,8 +3558,8 @@ export namespace JavaScriptCorrelation {
         generatedAt: graph.createdAt,
         targetURL: graph.targetURL,
         sessionID: graph.sessionID,
-        note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
-        endpoints: graph.endpointCandidates,
+        note: "Canonical endpoint records group HTTP methods as independent operations. Static candidates are leads, not proof of reachability or vulnerability; traffic-only methods remain labeled as traffic evidence.",
+        endpoints: groupCanonicalJavaScriptEndpoints([graph]),
         additionalScenarios: graph.additionalScenarios ?? [],
         javascriptAnalysis: graph.javascriptAnalysis,
         sourceMapReferences: graph.sourceMapReferences ?? [],
