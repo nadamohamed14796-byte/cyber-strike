@@ -177,8 +177,10 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
     fn: async () => {
       const agent = await Agent.get("impact-hunter")
       expect(agent).toBeDefined()
-      expect(agent?.mode).toBe("subagent")
-      expect(agent?.hidden).toBe(true)
+      // The Hunter is both a selectable user-facing agent and a delegatable specialist.
+      expect(agent?.mode).toBe("all")
+      expect(agent?.hidden).toBe(false)
+      expect((await Agent.list()).some((entry) => entry.name === "impact-hunter" && !entry.hidden)).toBe(true)
       expect(agent?.prompt).toContain("chain_link")
       expect(agent?.prompt).toContain("validate_chain")
       expect(agent?.prompt).toContain("Impact escalation objective — inspect the strongest realistic path")
