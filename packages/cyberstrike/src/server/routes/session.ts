@@ -555,32 +555,17 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
         const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
         if (scopeDecision.allowed && scopeDecision.workspace) {
           const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
-          const endpointIdentityHash = createHash("sha256")
-            .update([observedURL.origin, normalized.method.toUpperCase(), endpointPath].join("\\0"))
-            .digest("hex")
-            .slice(0, 32)
-          const endpointIdentity = "extension-endpoint:" + endpointIdentityHash
-          const requestNoteContent = [
-            "# Captured Endpoint Observation",
-            "",
-            "- Method: " + normalized.method,
-            "- Origin: " + observedURL.origin,
-            "- Normalized path: " + endpointPath,
-            "- Evidence source: the session's canonical captured-request store; use the Request ID from the request inventory/detail tools to inspect the individual observation.",
-            "",
-            "Interpretation: this is observed traffic, not a vulnerability finding. A route, parameter, status code, or client-side string alone does not establish unexpected behavior or security impact.",
-            "Next analysis: correlate this method/path with the target's canonical endpoint inventory and JavaScript source candidates; inspect authentication/role context and concrete request/response evidence from the request store; compare an authorized baseline/control when appropriate. Preserve meaningful negative results and do not duplicate raw headers, cookies, tokens, or bodies into notes.",
-          ].join("\n")
-          await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
-            kind: "evidence",
-            title: ("Captured endpoint " + normalized.method + " " + endpointPath).slice(0, 180),
-            content: requestNoteContent,
-            source: endpointIdentity,
-            sourceURL: observedURL.origin + endpointPath,
-            identityKey: endpointIdentity,
-            status: "observed",
-            tags: ["extension-request", "endpoint-observation", normalized.method.toLowerCase()],
-            upsertByIdentity: true,
+          await TargetMemory.mergeCanonicalEndpointRecord({
+            targetURL: scopeDecision.workspace.targetURL,
+            origin: observedURL.origin,
+            path: endpointPath,
+            operations: [{
+              method: normalized.method,
+              methodEvidenceSources: ["traffic"],
+              requestIDs: [req.id],
+              observedInTraffic: true,
+              confidence: "observed",
+            }],
           })
         } else {
           log.info("request evidence note skipped by persisted scope", {
