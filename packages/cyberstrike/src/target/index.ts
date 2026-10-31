@@ -3280,6 +3280,64 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         operation.contentTypes ??= []
         operation.sourceFiles ??= []
         operation.requestIDs ??= []
+        if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
+          operation.methodEvidenceSources.push("traffic")
+        }
+
+        // Legacy V1 endpoint notes stored one flattened operation. Preserve
+        // ambiguous fields without falsely assigning them to JavaScript or traffic.
+        if (operation.evidence.length === 0) {
+          const legacyFields = {
+            pathParameters: operation.pathParameters,
+            queryParameters: operation.queryParameters,
+            bodyParameters: operation.bodyParameters,
+            headerNames: operation.headerNames,
+            authSignals: operation.authSignals,
+            cookieSignals: operation.cookieSignals,
+            contentTypes: operation.contentTypes,
+            sourceFiles: operation.sourceFiles,
+          }
+          const hasLegacyFields = Object.values(legacyFields).some((values) => values.length > 0)
+          const sources = unique(operation.methodEvidenceSources)
+          const confidence = operation.confidence ?? "candidate"
+          const addLegacyEvidence = (
+            source: EndpointEvidenceSource,
+            fields: typeof legacyFields,
+            requestIDs: string[] = [],
+            evidenceConfidence = confidence,
+          ) => {
+            operation.evidence.push({
+              source,
+              ...fields,
+              requestIDs: unique(requestIDs),
+              confidence: evidenceConfidence,
+            })
+          }
+
+          if (sources.length === 1) {
+            addLegacyEvidence(sources[0]!, legacyFields, operation.requestIDs)
+          } else if (sources.length > 1) {
+            if (hasLegacyFields) {
+              addLegacyEvidence("other", legacyFields)
+              if (!operation.methodEvidenceSources.includes("other")) operation.methodEvidenceSources.push("other")
+            }
+            if (sources.includes("traffic")) {
+              addLegacyEvidence("traffic", emptyFields(), operation.requestIDs, "observed")
+            } else if (operation.requestIDs.length > 0) {
+              addLegacyEvidence("other", emptyFields(), operation.requestIDs)
+            }
+          } else if (operation.observedInTraffic || operation.requestIDs.length > 0) {
+            if (hasLegacyFields) {
+              addLegacyEvidence("other", legacyFields)
+              if (!operation.methodEvidenceSources.includes("other")) operation.methodEvidenceSources.push("other")
+            }
+            addLegacyEvidence("traffic", emptyFields(), operation.requestIDs, "observed")
+            if (!operation.methodEvidenceSources.includes("traffic")) operation.methodEvidenceSources.push("traffic")
+          } else if (hasLegacyFields || operation.requestIDs.length > 0) {
+            addLegacyEvidence("other", legacyFields, operation.requestIDs)
+            if (!operation.methodEvidenceSources.includes("other")) operation.methodEvidenceSources.push("other")
+          }
+        }
       }
 
       const confidenceRank: Record<NonNullable<EndpointOperationInput["confidence"]>, number> = {

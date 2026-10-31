@@ -943,6 +943,89 @@ test("user-confirmed scope without a policy URL must be exactly one asset, not a
 })
 
 
+
+test("migrates legacy flattened endpoint evidence without inventing per-source ownership", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://legacy-endpoint-notes.example.test"
+      const first = await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/legacy/{id}",
+        operations: [{
+          method: "POST",
+          methodEvidenceSources: ["javascript", "traffic"],
+          pathParameters: ["id"],
+          bodyParameters: ["role"],
+          headerNames: ["authorization"],
+          authSignals: ["bearer-token"],
+          sourceFiles: ["javascript/legacy.js"],
+          requestIDs: ["req-legacy-post"],
+          observedInTraffic: true,
+          confidence: "observed",
+        }],
+      })
+
+      const endpoint = TargetMemory.allNotes(first.workspace.id).find((note) => note.id === first.note.id)!
+      const marker = endpoint.content.match(
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+      )
+      expect(marker).not.toBeNull()
+      const legacy = JSON.parse(marker![1]!)
+      delete legacy.operations[0].evidence
+      const legacyContent = endpoint.content.replace(marker![0], [
+        "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->",
+        JSON.stringify(legacy, null, 2),
+        "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->",
+      ].join("\\n"))
+      Database.use((db) => db.update(TargetNoteTable)
+        .set({ content: legacyContent })
+        .where(eq(TargetNoteTable.id, endpoint.id))
+        .run())
+
+      await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/legacy/{userId}",
+        operations: [{
+          method: "POST",
+          methodEvidenceSources: ["javascript"],
+          sourceFiles: ["javascript/new-callsite.js"],
+          bodyParameters: ["displayName"],
+          confidence: "candidate",
+        }],
+      })
+
+      const migratedNote = TargetMemory.allNotes(first.workspace.id).find((note) => note.id === endpoint.id)!
+      const migratedMarker = migratedNote.content.match(
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+      )
+      expect(migratedMarker).not.toBeNull()
+      const migrated = JSON.parse(migratedMarker![1]!)
+      const operation = migrated.operations.find((item: { method: string }) => item.method === "POST")
+      const uncertain = operation.evidence.find((item: { source: string }) => item.source === "other")
+      const traffic = operation.evidence.find((item: { source: string }) => item.source === "traffic")
+      const javascript = operation.evidence.find((item: { source: string }) => item.source === "javascript")
+
+      expect(uncertain.pathParameters).toEqual(["id"])
+      expect(uncertain.bodyParameters).toEqual(["role"])
+      expect(uncertain.headerNames).toEqual(["authorization"])
+      expect(uncertain.authSignals).toEqual(["bearer-token"])
+      expect(uncertain.sourceFiles).toEqual(["javascript/legacy.js"])
+      expect(uncertain.requestIDs).toEqual([])
+      expect(traffic.requestIDs).toEqual(["req-legacy-post"])
+      expect(traffic.bodyParameters).toEqual([])
+      expect(traffic.headerNames).toEqual([])
+      expect(javascript.sourceFiles).toEqual(["javascript/new-callsite.js"])
+      expect(javascript.bodyParameters).toEqual(["displayName"])
+      expect(operation.bodyParameters).toEqual(["role", "displayName"])
+      expect(operation.requestIDs).toEqual(["req-legacy-post"])
+    },
+  })
+})
+
 test("merges JavaScript and captured methods into one canonical endpoint note without mixing contracts", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
