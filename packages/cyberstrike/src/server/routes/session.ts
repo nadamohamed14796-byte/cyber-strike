@@ -555,6 +555,21 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
         const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
         if (scopeDecision.allowed && scopeDecision.workspace) {
           const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
+          const headerNames = new Set<string>()
+          const contentTypes = new Set<string>()
+          const authSignals = new Set<string>()
+          const cookieSignals = new Set<string>()
+          const requestHeaderBlock = (req.raw_request ?? "").split(/\r?\n\r?\n/, 1)[0] ?? ""
+          for (const headerLine of requestHeaderBlock.split(/\r?\n/).slice(1)) {
+            const separator = headerLine.indexOf(":")
+            if (separator <= 0) continue
+            const name = headerLine.slice(0, separator).trim().toLowerCase()
+            const value = headerLine.slice(separator + 1).trim()
+            if (!name) continue
+            headerNames.add(name)
+            if (name === "content-type") {
+              const mediaType = value.split(";", 1)[0]?.trim().toLowerCase() ?? ""
+              if (/^[a-z0-9!#          const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
           await TargetMemory.mergeCanonicalEndpointRecord({
             targetURL: scopeDecision.workspace.targetURL,
             origin: observedURL.origin,
@@ -562,6 +577,55 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
             operations: [{
               method: normalized.method,
               methodEvidenceSources: ["traffic"],
+              requestIDs: [req.id],
+              observedInTraffic: true,
+              confidence: "observed",
+            }],
+          })^_.+-]+\/[a-z0-9!#          const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
+          await TargetMemory.mergeCanonicalEndpointRecord({
+            targetURL: scopeDecision.workspace.targetURL,
+            origin: observedURL.origin,
+            path: endpointPath,
+            operations: [{
+              method: normalized.method,
+              methodEvidenceSources: ["traffic"],
+              requestIDs: [req.id],
+              observedInTraffic: true,
+              confidence: "observed",
+            }],
+          })^_.+-]+$/.test(mediaType)) contentTypes.add(mediaType)
+            }
+            if (name === "authorization" || name === "proxy-authorization") {
+              authSignals.add(name + "-present")
+              const [scheme, remainder] = value.split(/\s+/, 2)
+              if (remainder && /^[a-z][a-z0-9+.-]*$/i.test(scheme ?? "")) {
+                authSignals.add(name + "-scheme:" + scheme!.toLowerCase())
+              }
+            }
+            if (name === "cookie") cookieSignals.add("cookie-header-present")
+            if (name === "x-api-key" || name === "api-key") authSignals.add("api-key-header-present")
+            if (name === "x-csrf-token" || name === "csrf-token" || name === "x-xsrf-token") {
+              authSignals.add("csrf-token-header-present")
+            }
+          }
+          const observedSlots = normalized.observedParams ?? []
+          const namesAt = (location: "path" | "query" | "body") => [...new Set(
+            observedSlots.filter((slot) => slot.loc === location).map((slot) => slot.name),
+          )]
+          await TargetMemory.mergeCanonicalEndpointRecord({
+            targetURL: scopeDecision.workspace.targetURL,
+            origin: observedURL.origin,
+            path: endpointPath,
+            operations: [{
+              method: normalized.method,
+              methodEvidenceSources: ["traffic"],
+              pathParameters: namesAt("path"),
+              queryParameters: namesAt("query"),
+              bodyParameters: namesAt("body"),
+              headerNames: [...headerNames],
+              contentTypes: [...contentTypes],
+              authSignals: [...authSignals],
+              cookieSignals: [...cookieSignals],
               requestIDs: [req.id],
               observedInTraffic: true,
               confidence: "observed",
