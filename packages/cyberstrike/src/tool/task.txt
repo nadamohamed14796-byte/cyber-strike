@@ -73,6 +73,7 @@ Background execution:
 
 
 Finding escalation contract:
-- Do not use this task tool to launch Impact Hunter. A successful `report_vulnerability` call persists the finding and automatically starts or resumes its one finding-specific Impact Hunter task.
+- Do not use this task tool to launch Impact Hunter. `report_vulnerability` only records a candidate and never dispatches the Hunter.
+- Impact Hunter starts or resumes only after the exact finding passes all ten evidence-based validation checks, has an evidence-backed CONFIRMED outcome in the durable verification ledger, and is explicitly approved through `triage_vulnerability`. The successful triage result returns the Hunter `task_id` and dispatch status.
 - Use this task tool for the foreground specialist work assigned to you. Keep request-specific `request_id` values exact and do not dispatch a second Hunter for the same finding.
-- The report tool returns the Hunter `task_id` and dispatch status. Started means running, not completed; carry the task ID with the finding and do not treat it as a verdict.
+- Started means running, not completed; carry the task ID with the finding and do not treat it as a verdict.
