@@ -25,6 +25,13 @@ export namespace SessionProcessor {
   export type Info = Awaited<ReturnType<typeof create>>
   export type Result = Awaited<ReturnType<Info["process"]>>
 
+  /** Only completed tool-call events or non-empty text count as model output. */
+  export function hasProducedOutput(parts: MessageV2.Part[], observedToolCalls: number): boolean {
+    return observedToolCalls > 0 || parts.some(
+      (part) => part.type === "text" && part.text.trim().length > 0,
+    )
+  }
+
   export function create(input: {
     assistantMessage: MessageV2.Assistant
     sessionID: string
@@ -394,11 +401,7 @@ export namespace SessionProcessor {
             // a failed turn instead of marking the session complete with no reply.
             if (!needsCompaction && !input.assistantMessage.error) {
               const completedParts = await MessageV2.parts(input.assistantMessage.id)
-              const producedOutput = completedParts.some(
-                (part) =>
-                  part.type === "tool" ||
-                  (part.type === "text" && part.text.trim().length > 0),
-              )
+              const producedOutput = hasProducedOutput(completedParts, observedToolCalls)
               if (!producedOutput) {
                 throw new Error("The model returned an empty response (no text or tool calls).")
               }
