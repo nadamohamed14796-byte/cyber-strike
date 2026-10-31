@@ -43,8 +43,8 @@ test("manual Impact Hunter task dispatch is blocked for an untriaged finding can
           description: "Impact Hunter",
           subagent_type: "impact-hunter",
           background: true,
-          prompt: "Investigate this finding.\nfinding_id: " + finding.id,
-        } as any, manualCtx)).rejects.toThrow("not explicitly triage-approved")
+          prompt: "Investigate this finding.\nhandoff_mode: proof_gap\nfinding_id: " + finding.id,
+        } as any, manualCtx)).rejects.toThrow("not linked to an existing target workspace")
         expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
       } finally {
         await Session.remove(session.id)
@@ -82,8 +82,8 @@ test("manual Impact Hunter dispatch is blocked even when a finding is approved w
           description: "Impact Hunter",
           subagent_type: "impact-hunter",
           background: true,
-          prompt: "Investigate this finding.\nfinding_id: " + finding.id,
-        } as any, manualCtx)).rejects.toThrow("does not have a latest confirmed ten-check validation")
+          prompt: "Investigate this finding.\nhandoff_mode: approved_impact\nfinding_id: " + finding.id,
+        } as any, manualCtx)).rejects.toThrow("latest validation does not contain ten complete evidence-backed checks")
       } finally {
         await Session.remove(session.id)
       }
