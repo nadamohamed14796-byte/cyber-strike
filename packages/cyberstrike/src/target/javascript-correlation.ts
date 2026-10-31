@@ -342,14 +342,14 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
   // being lost when a complex/minified call expression defeats the balanced
   // argument scanner. Only recognized request-call first arguments qualify;
   // arbitrary absolute links are still excluded.
-  const absoluteRequestCalls = /\\b(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\\w$]*\\.(?:get|post|put|patch|delete|head|options|request))\\s*\\(\\s*(["'\\x60])(https?:\\/\\/[^"'\\x60\\s<>]+)\\1/gi
+  const absoluteRequestCalls = /\b(?:fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request))\s*\(\s*(["'\x60])(https?:\/\/[^"'\x60\s<>]+)\1/gi
   for (const match of content.matchAll(absoluteRequestCalls)) {
     const normalized = normalizeEndpointLiteral(match[2]!)
     if (normalized) found.add(normalized)
   }
 
   // XHR's open(method, url) keeps the URL in its second argument.
-  const absoluteXHROpenCalls = /\\b[A-Za-z_$][\\w$]*\\.open\\s*\\(\\s*["'](?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']\\s*,\\s*(["'])(https?:\\/\\/[^"'\\s<>]+)\\1/gi
+  const absoluteXHROpenCalls = /\b[A-Za-z_$][\w$]*\.open\s*\(\s*["'](?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']\s*,\s*(["'])(https?:\/\/[^"'\s<>]+)\1/gi
   for (const match of content.matchAll(absoluteXHROpenCalls)) {
     const normalized = normalizeEndpointLiteral(match[2]!)
     if (normalized) found.add(normalized)
