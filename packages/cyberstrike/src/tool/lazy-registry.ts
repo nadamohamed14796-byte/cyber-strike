@@ -219,7 +219,10 @@ export namespace LazyToolRegistry {
     const estimatedTokens = (currentCount + newCount) * AVG_TOKENS_PER_TOOL
 
     if (estimatedTokens > TOOL_CONTEXT_BUDGET) {
-      log.warn("tool context budget exceeded, unloading least used tools", {
+      // Loading is intentionally lossless: never silently discard a tool the
+      // agent explicitly selected. The budget is advisory, and the caller can
+      // inspect/unload tools deliberately after the current evidence task.
+      log.warn("tool context budget exceeded; keeping explicitly requested tools loaded", {
         current: currentCount,
         new: newCount,
         estimated: estimatedTokens,
