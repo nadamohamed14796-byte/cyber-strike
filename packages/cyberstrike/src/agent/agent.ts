@@ -674,6 +674,7 @@ export namespace Agent {
             web_get_vulnerabilities: "allow",
             web_get_vuln_detail: "allow",
             correlate_javascript: "allow",
+            ingest_javascript_urls: "allow",
             web_write_role: "allow",
             web_write_object: "allow",
             web_write_object_value: "allow",
