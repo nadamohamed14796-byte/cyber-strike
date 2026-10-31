@@ -201,6 +201,66 @@ function configObjectFields(text: string, property: string, source: string, befo
   return [...fields]
 }
 
+type JavaScriptRequestCallExpression = {
+  start: number
+  end: number
+  callee: string
+  args: string[]
+}
+
+/**
+ * Use the TypeScript parser to identify actual request-shaped call expressions.
+ * This ignores comments, quoted examples, and template-string text. Malformed
+ * source falls back to the legacy scanner so partial bundles remain useful.
+ */
+function requestCallExpressions(source: string): JavaScriptRequestCallExpression[] {
+  const legacyPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
+  const sourceFile = ts.createSourceFile(
+    "javascript-request-analysis.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  )
+  if (sourceFile.parseDiagnostics.length > 0) {
+    return [...source.matchAll(legacyPattern)].flatMap((match) => {
+      const start = match.index ?? 0
+      const open = start + match[0].lastIndexOf("(")
+      const close = findCallEnd(source, open)
+      if (close < 0) return []
+      return [{
+        start,
+        end: close + 1,
+        callee: match[1] ?? "",
+        args: splitTopLevelArguments(source.slice(open + 1, close)),
+      }]
+    })
+  }
+
+  const supportedMethods = new Set(["fetch", "get", "post", "put", "patch", "delete", "head", "options", "request", "open"])
+  const calls: JavaScriptRequestCallExpression[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression
+      const isIdentifier = ts.isIdentifier(expression)
+      const isPropertyAccess = ts.isPropertyAccessExpression(expression)
+      const callee = isIdentifier || isPropertyAccess ? expression.getText(sourceFile) : ""
+      const method = callee.split(".").at(-1)?.toLowerCase() ?? ""
+      if (supportedMethods.has(method) && (isIdentifier || isPropertyAccess)) {
+        calls.push({
+          start: expression.getStart(sourceFile),
+          end: node.end,
+          callee,
+          args: node.arguments.map((argument) => argument.getText(sourceFile)),
+        })
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return calls.sort((a, b) => a.start - b.start || a.end - b.end)
+}
+
 function urlSearchParamsVariables(text: string): string[] {
   const names = new Set<string>()
   for (const match of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+URLSearchParams\b/g)) {
@@ -570,19 +630,20 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   }
 
   const requests: JavaScriptRequestCandidate[] = []
-  const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
-  const requestCallSpans = [...source.matchAll(callPattern)].map((call) => {
-    const start = call.index ?? 0
-    const open = start + call[0].lastIndexOf("(")
-    const end = findCallEnd(source, open)
-    return { start, end: end >= 0 ? end + 1 : start + call[0].length }
-  }).sort((a, b) => a.start - b.start)
-  for (const match of source.matchAll(callPattern)) {
-    const index = match.index ?? 0, callee = (match[1] ?? "").toLowerCase()
-    const open = index + match[0].lastIndexOf("(")
-    const close = findCallEnd(source, open)
-    if (close < 0) continue
-    const args = splitTopLevelArguments(source.slice(open + 1, close))
+  const requestCalls = requestCallExpressions(source)
+  const requestCallSpans = requestCalls.map((call) => ({ start: call.start, end: call.end }))
+  const requestCallSpansByEnd = [...requestCallSpans].sort((a, b) => a.end - b.end || a.start - b.start)
+  let completedSpanIndex = 0
+  let latestCompletedSpan: { start: number; end: number } | undefined
+  for (let callIndex = 0; callIndex < requestCalls.length; callIndex++) {
+    const match = requestCalls[callIndex]!
+    const index = match.start, callee = match.callee.toLowerCase()
+    const close = match.end - 1
+    const args = match.args
+    while (completedSpanIndex < requestCallSpansByEnd.length && requestCallSpansByEnd[completedSpanIndex]!.end <= index) {
+      const completed = requestCallSpansByEnd[completedSpanIndex++]!
+      if (!latestCompletedSpan || completed.start > latestCompletedSpan.start) latestCompletedSpan = completed
+    }
     const isXHR = callee.endsWith(".open")
     const methodSuffix = /\.(get|post|put|patch|delete|head|options)$/i.exec(callee)?.[1]?.toUpperCase() ?? null
     const axiosMethod = methodSuffix
@@ -596,17 +657,16 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (!normalizedEndpoint) continue
     const endpoint = requestConfig ? normalizedEndpoint : addConcatenatedPathParameters(normalizedEndpoint, urlExpression)
     const currentFunctionRange = functionRanges.filter((range) => range.start <= index && index <= range.end)
-      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
-    const previousSpan = [...requestCallSpans].reverse().find((span) => span.end <= index)
-    const nextSpan = requestCallSpans.find((span) => span.start > index)
-    const lowerBound = Math.max(currentFunctionRange?.start ?? 0, previousSpan?.end ?? 0)
+      .sort((a, b) => (a.end - a.start) - (b.end - a.end))[0]
+    const nextSpan = requestCallSpans[callIndex + 1]
+    const lowerBound = Math.max(currentFunctionRange?.start ?? 0, latestCompletedSpan?.end ?? 0)
     const upperBound = Math.min(currentFunctionRange?.end ?? source.length - 1, nextSpan?.start ?? source.length)
     const requestContext = source.slice(lowerBound, Math.max(close + 1, upperBound))
-    const isFetch = callee === "fetch"
+    const isFetch = callee === "fetch" || callee.endsWith(".fetch")
     const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
     const options = isXHR ? "" : requestConfig ? args[0] ?? "" : callee.endsWith(".request") ? args.slice(1).join(",")
       : isFetch ? args.slice(1).join(",") : /\.(?:get|head|options|delete)$/i.test(callee) ? args.slice(1).join(",") : args.slice(2).join(",")
-    const optionText = options + "\n" + source.slice(index, close + 1)
+    const optionText = options + "\n" + source.slice(index, match.end)
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
     const hasDynamicMethodOption = isFetch && /\bmethod\b/i.test(optionText) && !methodOption
     const inferredFetchMethod = isFetch && !hasDynamicMethodOption ? "GET" : undefined
