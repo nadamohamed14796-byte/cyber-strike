@@ -499,7 +499,11 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
         expect(canonicalEndpoints).toHaveLength(10)
         expect(canonicalEndpoints.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)).toBe(10)
         expect(graph.edges.filter((edge) => edge.relation === "function-contains-request-candidate")).toHaveLength(1_000)
-        expect(graph.edges.filter((edge) => edge.relation === "request-candidate-maps-to-endpoint")).toHaveLength(1_000)
+        const requestEndpointEdges = graph.edges.filter((edge) => edge.relation === "request-candidate-maps-to-endpoint")
+        expect(requestEndpointEdges).toHaveLength(1_000)
+        expect(new Set(requestEndpointEdges.map((edge) => edge.from))).toHaveLength(1_000)
+        expect(new Set(requestEndpointEdges.map((edge) => edge.to))).toHaveLength(10)
+        expect(requestEndpointEdges.every((edge) => edge.to.startsWith("endpoint:"))).toBe(true)
         await Session.remove(session.id)
       },
     })

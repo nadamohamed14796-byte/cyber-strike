@@ -3276,16 +3276,22 @@ export namespace JavaScriptCorrelation {
           evidence: "Static lexical function attribution links this request call to the nearest matching function declaration; review minified or complex syntax manually.",
         })
       }
-      for (const endpoint of graph.endpointCandidates) {
+      for (const endpoint of scenarioEndpointRecords) {
         if (!endpoint.sourceFiles.includes(candidate.sourceFile)) continue
         if (normalizedTemplateShape(endpoint.path) !== normalizedTemplateShape(candidate.path)) continue
-        if (endpoint.method && candidate.method && endpoint.method.toUpperCase() !== candidate.method.toUpperCase()) continue
+        const sameSourceOperation = candidate.method
+          ? endpoint.operations.some((operation) =>
+              operation.method?.toUpperCase() === candidate.method?.toUpperCase() &&
+              operation.sourceFiles.includes(candidate.sourceFile),
+            )
+          : endpoint.unattributed.sourceFiles.includes(candidate.sourceFile)
+        if (!sameSourceOperation) continue
         graph.edges.push({
           from: requestNode,
           to: endpoint.id,
           relation: "request-candidate-maps-to-endpoint",
           confidence: "candidate",
-          evidence: "The structured request call and endpoint share a source file and normalized path; this is static source evidence, not proof of runtime execution.",
+          evidence: "The structured request call maps to one canonical origin/path endpoint; its method-specific operation retains the source file and contract. Static source evidence does not prove runtime execution.",
         })
       }
     }
