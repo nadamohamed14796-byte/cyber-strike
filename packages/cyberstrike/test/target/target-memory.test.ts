@@ -941,3 +941,94 @@ test("user-confirmed scope without a policy URL must be exactly one asset, not a
     },
   })
 })
+
+
+test("merges JavaScript and captured methods into one canonical endpoint note without mixing contracts", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://endpoint-notes.example.test"
+      const first = await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/users/{id}",
+        sourceFiles: ["javascript/routes.js", "javascript/users.js"],
+        operations: [{
+          method: "POST",
+          methodEvidenceSources: ["javascript"],
+          bodyParameters: ["userId", "email"],
+          headerNames: ["content-type", "authorization"],
+          authSignals: ["bearer-token"],
+          sourceFiles: ["javascript/users.js"],
+          confidence: "candidate",
+        }],
+        unattributed: {
+          queryParameters: ["route-level-clue"],
+          sourceFiles: ["javascript/routes.js"],
+        },
+      })
+
+      const second = await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/users/{userId}",
+        operations: [{
+          method: "GET",
+          methodEvidenceSources: ["traffic"],
+          queryParameters: ["include"],
+          requestIDs: ["req-get-1"],
+          observedInTraffic: true,
+          confidence: "observed",
+        }],
+      })
+
+      const repeatedTraffic = await TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/users/{anotherId}",
+        operations: [{
+          method: "GET",
+          methodEvidenceSources: ["traffic"],
+          requestIDs: ["req-get-2"],
+          observedInTraffic: true,
+          confidence: "observed",
+        }],
+      })
+
+      expect(first.created).toBe(true)
+      expect(second.created).toBe(false)
+      expect(second.note.id).toBe(first.note.id)
+      expect(repeatedTraffic.note.id).toBe(first.note.id)
+      expect(repeatedTraffic.updated).toBe(false)
+
+      const endpointNotes = TargetMemory.allNotes(first.workspace.id).filter((note) => note.kind === "endpoint")
+      expect(endpointNotes).toHaveLength(1)
+      const note = endpointNotes[0]!
+      const structured = note.content.match(
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+      )
+      expect(structured).not.toBeNull()
+      const record = JSON.parse(structured![1]!)
+      expect(record.path).toBe("/api/users/{id}")
+      expect(record.operations.map((operation: { method: string }) => operation.method)).toEqual(["GET", "POST"])
+
+      const get = record.operations.find((operation: { method: string }) => operation.method === "GET")
+      const post = record.operations.find((operation: { method: string }) => operation.method === "POST")
+      expect(get.queryParameters).toEqual(["include"])
+      expect(get.bodyParameters).toEqual([])
+      expect(get.requestIDs).toEqual(["req-get-1"])
+      expect(get.methodEvidenceSources).toContain("traffic")
+      expect(get.methodEvidenceSources).not.toContain("javascript")
+
+      expect(post.bodyParameters).toEqual(["userId", "email"])
+      expect(post.queryParameters).toEqual([])
+      expect(post.headerNames).toEqual(["content-type", "authorization"])
+      expect(post.authSignals).toEqual(["bearer-token"])
+      expect(post.methodEvidenceSources).toContain("javascript")
+
+      expect(record.unattributed.queryParameters).toEqual(["route-level-clue"])
+      expect(record.unattributed.queryParameters).not.toContain("include")
+    },
+  })
+})
