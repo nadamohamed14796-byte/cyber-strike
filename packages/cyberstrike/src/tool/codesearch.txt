@@ -1,12 +1,12 @@
-- Search and get relevant context for any programming task using Exa Code API
-- Provides the highest quality and freshest context for libraries, SDKs, and APIs
-- Use this tool for ANY question or task related to programming
-- Returns comprehensive code examples, documentation, and API references
-- Optimized for finding specific programming patterns and solutions
+- Retrieve focused external programming references and documentation using Exa Code API.
+- Supports queries for any programming language, framework, library, SDK, API, compiler/runtime error, or implementation pattern.
+- A short, sanitized code excerpt can be included when it helps identify the relevant symbols or behavior.
+- This tool retrieves reference context; it does not execute, debug, or repair the user's code by itself. The agent must analyze the actual supplied code and produce the requested solution.
+- Use it only when current/version-specific external documentation or a non-obvious library/API behavior is needed. Do not call it for every programming task or for self-contained algorithms.
+- Do not send complete private source files, secrets, credentials, tokens, or personal data to the external search service. Form focused queries from non-sensitive symbols, versions, and error messages.
 
 Usage notes:
-  - Adjustable token count (1000-50000) for focused or comprehensive results
-  - Default 5000 tokens provides balanced context for most queries
-  - Use lower values for specific questions, higher values for comprehensive documentation
-  - Supports queries about frameworks, libraries, APIs, and programming concepts
-  - Examples: 'React useState hook examples', 'Python pandas dataframe filtering', 'Express.js middleware'
+  - Adjustable token count (1000-50000); default 5000 tokens.
+  - Query may be a natural-language question, API/library symbol, sanitized error message, or short sanitized code excerpt.
+  - Prefer focused queries such as 'Python 3.13 asyncio TaskGroup cancellation semantics' or 'React 19 useActionState TypeScript signature'.
+  - Search results are supporting references only. Verify them against the user's exact language, dependency version, code, and runtime behavior.
