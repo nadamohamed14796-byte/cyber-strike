@@ -57,6 +57,22 @@ export namespace LLM {
   }
 
 
+  export function shouldRequireInitialToolCall(input: {
+    requireToolCallThisTurn?: boolean
+    toolChoice?: "auto" | "required" | "none"
+    modelSupportsToolCalls: boolean
+    activeToolCount: number
+    actionableRequest: boolean
+  }): boolean {
+    return (
+      input.requireToolCallThisTurn !== false &&
+      !input.toolChoice &&
+      input.modelSupportsToolCalls &&
+      input.activeToolCount > 0 &&
+      input.actionableRequest
+    )
+  }
+
   export async function stream(input: StreamInput) {
     const l = log
       .clone()
@@ -207,12 +223,13 @@ export namespace LLM {
     // For an explicit action request, require a tool only on the first model step;
     // later steps return to auto and can produce the final response.
     const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
-    const requireInitialToolCall =
-      input.requireToolCallThisTurn !== false &&
-      !input.toolChoice &&
-      input.model.capabilities.toolcall &&
-      activeTools.length > 0 &&
-      actionableRequest
+    const requireInitialToolCall = shouldRequireInitialToolCall({
+      requireToolCallThisTurn: input.requireToolCallThisTurn,
+      toolChoice: input.toolChoice,
+      modelSupportsToolCalls: input.model.capabilities.toolcall,
+      activeToolCount: activeTools.length,
+      actionableRequest,
+    })
     if (activeTools.length > 0) {
       const toolExecutionContract = [
         "## Tool Execution Contract",
