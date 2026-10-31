@@ -222,7 +222,10 @@ function requestCallExpressions(source: string): JavaScriptRequestCallExpression
     true,
     ts.ScriptKind.TSX,
   )
-  if (sourceFile.parseDiagnostics.length > 0) {
+  const parseDiagnostics = (
+    sourceFile as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }
+  ).parseDiagnostics ?? []
+  if (parseDiagnostics.length > 0) {
     return [...source.matchAll(legacyPattern)].flatMap((match) => {
       const start = match.index ?? 0
       const open = start + match[0].lastIndexOf("(")
