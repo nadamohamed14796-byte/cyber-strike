@@ -58,6 +58,8 @@ const parameters = z.object({
   command: z.string().describe("The command that triggered this task").optional(),
   request_id: z.string().describe("Request ID to use as current request context (parent session).").optional(),
   request_context: z.string().describe("Optional text to prepend before the task (e.g. extra context).").optional(),
+  // Internal routing hint: keep the dedicated Hunter visible directly under the root session.
+  parent_session_id: z.string().describe("Internal: parent session for a dedicated Impact Hunter child; must share the caller's root.").optional(),
   background: z.boolean().describe("Start the subagent in the background and return its task_id immediately; use only when the caller can safely continue without the result.").optional(),
 })
 
@@ -233,6 +235,17 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       const hasTaskPermission = PermissionNext.evaluate("task", "*", agent.permission).action !== "deny"
 
+      const parentSessionID = params.parent_session_id ?? ctx.sessionID
+      if (params.parent_session_id) {
+        if (params.subagent_type !== "impact-hunter") {
+          throw new Error("Only the dedicated Impact Hunter may be attached directly to a root session.")
+        }
+        const parent = await Session.get(params.parent_session_id)
+        if (Session.root(parent.id) !== Session.root(ctx.sessionID)) {
+          throw new Error("Impact Hunter parent_session_id must belong to the caller's current root session.")
+        }
+      }
+
       const session = await iife(async () => {
         if (params.task_id) {
           const found = await Session.get(params.task_id).catch(() => {})
@@ -263,7 +276,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         }
 
         return await Session.create({
-          parentID: ctx.sessionID,
+          parentID: parentSessionID,
           title: params.description + ` (@${agent.name} subagent)`,
           permission: [
             {
