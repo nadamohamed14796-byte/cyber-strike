@@ -907,7 +907,9 @@ export function mergeStructuredJavaScriptEndpoints(
       origin,
       path: request.path,
       method,
-      methodEvidenceSources: method ? ["javascript"] : [],
+      methodEvidenceSources: method
+        ? ["javascript", ...(request.observedRequestIDs.length ? ["traffic" as const] : [])]
+        : [],
       sourceFiles: [request.sourceFile],
       observedRequestIDs: [...request.observedRequestIDs],
       pathParameters: [...request.pathParameters],
@@ -1407,7 +1409,10 @@ export function groupCanonicalJavaScriptEndpoints(
       }
       record.operations.push(operation)
     }
-    operation.sourceFiles = unique([...operation.sourceFiles, ...incoming.sourceFiles])
+    const methodSourceFiles = (incoming.methodEvidenceSources ?? []).includes("javascript")
+      ? incoming.sourceFiles
+      : []
+    operation.sourceFiles = unique([...operation.sourceFiles, ...methodSourceFiles])
     operation.observedRequestIDs = unique([...operation.observedRequestIDs, ...incoming.observedRequestIDs])
     operation.pathParameters = unique([...(operation.pathParameters ?? []), ...(incoming.pathParameters ?? [])])
     operation.queryParameters = unique([...(operation.queryParameters ?? []), ...(incoming.queryParameters ?? [])])
