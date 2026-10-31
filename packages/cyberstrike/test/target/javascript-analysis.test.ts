@@ -429,6 +429,19 @@ test("analyzes a route found after the former 1 MB source boundary", () => {
 })
 
 
+test("extracts validated request content types from fetch, axios, and config-object calls", () => {
+  const source = [
+    'fetch("/api/import", { method: "POST", headers: { "Content-Type": "Application/JSON; charset=utf-8" }, body: "{}" })',
+    'axios.post("/api/export", payload, { headers: { "content-type": "text/csv; charset=utf-8" } })',
+    'client.request({ url: "/api/data", method: "POST", headers: { "Content-Type": "application/vnd.api+json" } })',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.requests.find((request) => request.path === "/api/import")?.contentTypes).toEqual(["application/json"])
+  expect(result.requests.find((request) => request.path === "/api/export")?.contentTypes).toEqual(["text/csv"])
+  expect(result.requests.find((request) => request.path === "/api/data")?.contentTypes).toEqual(["application/vnd.api+json"])
+  expect(result.requests.every((request) => request.confidence === "candidate")).toBe(true)
+})
+ 
 test("extracts request metadata from dollar-prefixed JavaScript identifiers", () => {
   const source = [
     "async function loadItems() {",

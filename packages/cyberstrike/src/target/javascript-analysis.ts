@@ -559,7 +559,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const line = lineNumber(lineStarts, index)
     const sourceFunction = currentFunctionRange?.name ?? null
     const item: JavaScriptRequestCandidate = {
-      id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers), contentTypes]) .digest("hex").slice(0, 16),
+      id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers), contentTypes])).digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, origin: endpoint.origin, path: endpoint.path,
       pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
       bodyParameters: cleanUnique(bodyParams), headerNames: cleanUnique(headers), contentTypes,
