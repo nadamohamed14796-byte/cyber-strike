@@ -82,6 +82,7 @@ test("builds source-linked additional scenarios and connects workflow, endpoint,
     secretCandidates: [{
       kind: "api-secret-assignment",
       line: 51,
+      functionName: "resetPassword",
       fingerprint: "fingerprint-only",
       confidence: "candidate",
       sourceFile: "javascript/assets/app.js",
@@ -103,12 +104,17 @@ test("builds source-linked additional scenarios and connects workflow, endpoint,
   expect(tenantScenario.relatedEndpointIDs).toEqual([])
   expect(tenantScenario.observedRequestIDs).toEqual([])
   expect(scenarios.some((item) => item.category === "multi-tenant-authorization")).toBe(true)
-  expect(scenarios.some((item) => item.category === "dom-xss-review" && item.riskSignalIDs.includes("risk-dom-1"))).toBe(true)
+  const domXssScenario = scenarios.find((item) => item.category === "dom-xss-review" && item.riskSignalIDs.includes("risk-dom-1"))!
+  expect(domXssScenario.recommendedChecks.some((check) => check.includes("actual source"))).toBe(true)
   const dataScenario = scenarios.find((item) => item.category === "sensitive-data-exposure")!
   expect(dataScenario.signals.some((signal) => signal.kind === "sensitive-field" && signal.value === "email")).toBe(true)
   expect(dataScenario.recommendedChecks.some((check) => check.includes("matched personal values"))).toBe(true)
   const credentialScenario = scenarios.find((item) => item.category === "credential-exposure-review")!
   expect(credentialScenario.signals[0]?.value).toBe("sha256:fingerprint-only")
+  expect(credentialScenario.sourceFunction).toBe("resetPassword")
+  expect(credentialScenario.relatedRequestCandidateIDs).toEqual(["request-candidate-reset"])
+  expect(credentialScenario.relatedEndpointIDs).toEqual(["endpoint-reset"])
+  expect(credentialScenario.observedRequestIDs).toEqual(["request-reset-1"])
   expect(JSON.stringify(scenarios)).not.toContain("raw-secret-value")
 })
 
@@ -1153,6 +1159,7 @@ test("redacts legacy raw secret values when sanitizing an old graph artifact", (
       secretCandidates: [{
         kind: "api-key",
         line: 1,
+        functionName: "rotateCredential",
         value: secret,
         fingerprint: "0123456789abcdefabcd",
         confidence: "candidate",
@@ -1168,6 +1175,7 @@ test("redacts legacy raw secret values when sanitizing an old graph artifact", (
   expect(sanitized.analysis?.secretCandidates[0]).toEqual({
     kind: "api-key",
     line: 1,
+    functionName: "rotateCredential",
     fingerprint: "0123456789abcdefabcd",
     confidence: "candidate",
   })

@@ -31,6 +31,26 @@ test("attributes application and authorization hints to their containing functio
   expect(result.roleHints.find((item) => item.kind === "admin-role-hint")?.functionName).toBe("adminDashboard")
 })
 
+test("attributes secret candidates to their enclosing function and detects known token formats", () => {
+  const awsKey = "AKIA1234567890ABCDEF"
+  const genericToken = "ghp_" + "A".repeat(36)
+  const source = [
+    "async function rotateCredential(accountId) {",
+    '  const config = { value: "' + awsKey + '" }',
+    '  const token = "' + genericToken + '"',
+    '  return fetch("/api/accounts/" + accountId + "/rotate", { method: "POST" })',
+    "}",
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const awsCandidate = result.secretCandidates.find((item) => item.kind === "aws-access-key-id")
+  const githubCandidate = result.secretCandidates.find((item) => item.kind === "github-token")
+  expect(awsCandidate?.functionName).toBe("rotateCredential")
+  expect(githubCandidate?.functionName).toBe("rotateCredential")
+  expect(awsCandidate?.fingerprint).toMatch(/^[a-f0-9]{20}$/)
+  expect(JSON.stringify(result)).not.toContain(awsKey)
+  expect(JSON.stringify(result)).not.toContain(genericToken)
+})
+
 test("extracts named functions and parameters", () => {
   const source = [
     "async function getInvoice(invoiceId, includeItems = false) {",

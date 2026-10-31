@@ -409,6 +409,7 @@ function sanitizeJavaScriptSourceAnalysisForPersistence(analysis: JavaScriptSour
     secretCandidates: analysis.secretCandidates.map((candidate) => ({
       kind: candidate.kind,
       line: candidate.line,
+      functionName: candidate.functionName ?? null,
       fingerprint: candidate.fingerprint,
       confidence: candidate.confidence,
     })),
@@ -1541,7 +1542,7 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
       ).sort((a, b) => a.line - b.line || a.kind.localeCompare(b.kind)),
     }))
   const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\0"))
-  const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
+  const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint, item.functionName ?? ""].join("\0"))
   const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
   const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
   const applicationHints = mergeRecords(graphs.map((g) => g.javascriptAnalysis.applicationHints ?? []), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))

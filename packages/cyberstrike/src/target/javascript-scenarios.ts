@@ -383,8 +383,8 @@ export function createJavaScriptScenarioCandidates(input: {
       kind: item.kind,
       value: "sha256:" + item.fingerprint,
       line: item.line,
-      sourceFunction: null,
-    }, null)
+      sourceFunction: item.functionName ?? null,
+    }, item.functionName ?? null)
   }
 
   const output: JavaScriptScenarioCandidate[] = []

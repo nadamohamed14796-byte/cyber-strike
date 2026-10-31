@@ -44,6 +44,8 @@ export interface JavaScriptRequestCandidate {
 export interface JavaScriptSecretCandidate {
   kind: string
   line: number
+  /** Enclosing statically identified function, when available. */
+  functionName?: string | null
   /** SHA-256 fingerprint only; the matched value is never retained in analysis output. */
   fingerprint: string
   confidence: "candidate"
@@ -556,16 +558,44 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       }
 
   const secrets = new Map<string, JavaScriptSecretCandidate>()
-  const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,})\2/gi
-  for (const match of source.matchAll(secretPattern)) {
-    const rawValue = match[3] ?? ""
-    if (!rawValue || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(rawValue.trim())) continue
+  const addSecretCandidate = (kind: string, rawValue: string, index: number) => {
+    const value = rawValue.trim()
+    if (!value || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(value)) return
+    const containingFunction = functionRanges
+      .filter((range) => range.start <= index && index <= range.end)
+      .sort((a, b) => (a.end - a.start) - (b.end - a.start))[0]
     const item: JavaScriptSecretCandidate = {
-      kind: (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"), line: lineNumber(lineStarts, match.index ?? 0),
-      fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
+      kind,
+      line: lineNumber(lineStarts, index),
+      functionName: containingFunction?.name ?? null,
+      fingerprint: createHash("sha256").update(value).digest("hex").slice(0, 20),
+      confidence: "candidate",
     }
     secrets.set(item.kind + ":" + item.fingerprint, item)
-      }
+  }
+  const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,})\2/gi
+  for (const match of source.matchAll(secretPattern)) {
+    addSecretCandidate(
+      (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"),
+      match[3] ?? "",
+      match.index ?? 0,
+    )
+  }
+  // Recognize common provider token formats even when the variable name is generic.
+  // Only a fingerprint and source location are retained, never the matched value.
+  const signatureSecretPatterns: Array<{ kind: string; pattern: RegExp }> = [
+    { kind: "aws-access-key-id", pattern: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g },
+    { kind: "google-api-key", pattern: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+    { kind: "github-token", pattern: /\b(?:gh[pousr]_[A-Za-z0-9_]{30,255}|github_pat_[A-Za-z0-9_]{30,255})\b/g },
+    { kind: "slack-token", pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g },
+    { kind: "stripe-secret-key", pattern: /\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b/g },
+    { kind: "jwt-like-token", pattern: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
+  ]
+  for (const rule of signatureSecretPatterns) {
+    for (const match of source.matchAll(rule.pattern)) {
+      addSecretCandidate(rule.kind, match[0] ?? "", match.index ?? 0)
+    }
+  }
 
   // Sensitive-data indicators retain field/class and source location only. Matched values
   // are deliberately discarded; these are static leads, not proof of a data leak.
