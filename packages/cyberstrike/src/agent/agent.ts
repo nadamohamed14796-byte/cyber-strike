@@ -639,7 +639,7 @@ export namespace Agent {
             web_write_function: "allow",
             web_update_credential_claims: "allow",
             // A concrete analyzer finding must be persisted through the canonical
-            // report tool. Impact Hunter is dispatched only after confirmed validation and explicit triage approval.
+            // report tool. Proof-gap mode handles evidence-backed missing-PoC candidates; approved-impact mode follows confirmed validation and triage.
             report_vulnerability: "allow",
           }),
           user,
