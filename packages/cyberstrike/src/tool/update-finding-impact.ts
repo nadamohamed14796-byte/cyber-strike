@@ -19,15 +19,15 @@ const SEVERITY_RANK: Record<z.infer<typeof Severity>, number> = {
 
 export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
   description: [
-    "Update the SAME approved finding after Impact Hunter has independently demonstrated a stronger security impact.",
+    "Update the SAME approved finding after Impact Hunter has independently demonstrated additional or stronger security impact. The severity may stay the same when the additional impact is real but remains in the same program severity band.",
     "This tool is restricted to the impact-hunter agent. It never creates a new finding.",
     "The latest ten-check validation must be confirmed, security_impact must be pass with concrete evidence, and a separate impact hypothesis under finding:<id>:impact:<slug> must have a valid evidence-backed CONFIRMED outcome in the durable verification ledger.",
-    "Every supplied evidence_ref must exactly match a valid CONFIRMED durable verification ledger entry under a new finding:<id>:impact:<slug> hypothesis key, and that evidence must be newer than the baseline validation ID supplied at handoff. New severity must be strictly higher than the existing severity. Hypothetical chains, possible impact, response status alone, or a proposed attack path are not evidence.",
+    "Every supplied evidence_ref must exactly match a valid CONFIRMED durable verification ledger entry under a new finding:<id>:impact:<slug> hypothesis key, and that evidence must be newer than the baseline validation ID supplied at handoff. Severity may stay the same or increase, never decrease; an unchanged severity records a stronger consequence that remains in the same program band. Hypothetical chains, possible impact, response status alone, or a proposed attack path are not evidence.",
     "The tool appends the impact rationale and evidence references to the existing finding and synchronizes its target reference. It does not replace validation or triage; run validate_finding after the new impact test before using this tool.",
   ].join("\n"),
   parameters: z.object({
     id: z.string().trim().min(1).describe("Existing approved finding ID; this tool updates that record in place."),
-    severity: Severity.describe("New severity, strictly higher than the current severity and justified by demonstrated additional impact."),
+    severity: Severity.describe("Evidence-supported resulting severity. It may equal the current severity when the new impact remains in the same band, or increase when the program rubric justifies it; it may never decrease."),
     demonstratedImpact: z.string().trim().min(40).max(3500).describe("Exact additional security consequence that was observed and reproducible; identify affected data, actor, privilege, or state."),
     severityRationale: z.string().trim().min(40).max(2000).describe("Why the new severity follows the program rubric, including prerequisites, scope, and limits."),
     baseline_validation_id: z.string().trim().min(1).describe("Exact baseline_validation_id supplied in this Impact Hunter task handoff."),
@@ -56,13 +56,14 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
         metadata: { updated: false, reason: "finding_not_approved", currentStatus: finding.status },
       }
     }
-    if (SEVERITY_RANK[params.severity] <= SEVERITY_RANK[finding.severity]) {
+    if (SEVERITY_RANK[params.severity] < SEVERITY_RANK[finding.severity]) {
       return {
         title: "Impact update blocked",
-        output: "Requested severity " + params.severity + " is not higher than the existing " + finding.severity + ". The tool only accepts evidence-backed upward impact changes.",
-        metadata: { updated: false, reason: "severity_not_higher", currentSeverity: finding.severity, requestedSeverity: params.severity },
+        output: "Requested severity " + params.severity + " is lower than the existing " + finding.severity + ". Impact Hunter may preserve the current band or raise it with proof, but may never downgrade it.",
+        metadata: { updated: false, reason: "severity_downgrade", currentSeverity: finding.severity, requestedSeverity: params.severity },
       }
     }
+    const severityChanged = params.severity !== finding.severity
 
     const validationHistory = FindingValidation.history({ sessionID, vulnerabilityID: finding.id, limit: 100 })
     const baselineValidation = validationHistory.find((item) => item.id === params.baseline_validation_id)
@@ -177,7 +178,9 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
       output: [
         "Updated the existing finding in place; no duplicate was created.",
         "Previous severity: " + finding.severity,
-        "New severity: " + params.severity,
+        severityChanged
+          ? "New severity: " + params.severity
+          : "Severity unchanged: " + finding.severity + " (additional demonstrated impact recorded within the same severity band).",
         "Additional demonstrated impact: " + redactTargetNoteSecrets(params.demonstratedImpact.trim()),
         "Severity rationale: " + redactTargetNoteSecrets(params.severityRationale.trim()),
         "Evidence references: " + params.evidence_refs.join(", "),
@@ -189,6 +192,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
         findingID: finding.id,
         previousSeverity: finding.severity,
         severity: params.severity,
+        severityChanged,
         evidence_refs: params.evidence_refs,
         target_reference: targetReference ?? null,
         target_reference_error: targetReferenceError ?? null,
