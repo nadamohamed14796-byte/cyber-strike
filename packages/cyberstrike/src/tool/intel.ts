@@ -6,7 +6,7 @@ import { Session } from "../session"
 
 export const AddIntelTool = Tool.define("add_intel", {
   description:
-    "Add a meaningful intelligence hypothesis or finding discovered during security testing. Use this for significant assets, technologies, authentication/business-rule observations, vulnerability hypotheses, and validated findings. Do not create one Intel entry per endpoint method, parameter, request, or source file: endpoint and operation observations belong in the canonical target endpoint inventory, where methods are nested beneath one route identity and evidence provenance is preserved. Each meaningful Intel entry automatically gets a VRT (Vulnerability Rating Taxonomy) checklist and can feed coverage and chain detection.",
+    "Add a meaningful intelligence hypothesis or finding discovered during security testing. Use this for significant assets, technologies, authentication/business-rule observations, vulnerability hypotheses, and validated findings. Do not create one Intel entry per endpoint method, parameter, request, or source file: endpoint and operation observations must be persisted with the `target_endpoint` tool in the canonical target endpoint inventory, where methods are nested beneath one route identity and evidence provenance is preserved. Each meaningful Intel entry automatically gets a VRT (Vulnerability Rating Taxonomy) checklist and can feed coverage and chain detection.",
   parameters: z.object({
     type: Intel.Type.describe(
       "Type of intelligence entry: endpoint, subdomain, technology, credential, parameter, vulnerability_hint, configuration, api_schema, authentication_flow, business_rule, sensitive_data, infrastructure",
