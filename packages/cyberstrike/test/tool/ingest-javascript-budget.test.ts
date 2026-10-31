@@ -7,12 +7,52 @@ import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
-import { IngestJavaScriptURLsTool } from "../../src/tool/ingest-javascript-urls"
+import { extractHTMLScriptURLs, extractJavaScriptImportURLs, IngestJavaScriptURLsTool } from "../../src/tool/ingest-javascript-urls"
 import { tmpdir } from "../fixture/fixture"
 
 const MiB = 1024 * 1024
 const ASSET_SIZE = 22 * MiB
 const FORMER_AGGREGATE_LIMIT = 64 * MiB
+
+test("discovers HTML modulepreload and script preload assets using the resolved base URL", () => {
+  const pageURL = "https://app.example.test/pages/start"
+  const html = [
+    '<base href="/app/">',
+    '<script type="module" src="./main.js"></script>',
+    '<link rel="modulepreload" href="./chunks/shared.js">',
+    '<link as="script" rel="preload" href="/static/legacy.js">',
+    '<link rel="preload" as="style" href="/static/site.css">',
+    '<link rel="preload" as="script" href="data:text/javascript,ignored">',
+  ].join("\\n")
+  expect(extractHTMLScriptURLs(html, pageURL).sort()).toEqual([
+    "https://app.example.test/app/chunks/shared.js",
+    "https://app.example.test/app/main.js",
+    "https://app.example.test/static/legacy.js",
+  ])
+})
+
+test("discovers static imports, dynamic imports, workers, importScripts, and literal module loaders", () => {
+  const assetURL = "https://app.example.test/assets/main.js"
+  const source = [
+    'import helper from "./modules/helper.js";',
+    'export { load } from "../shared/load.js";',
+    'import("./features/lazy.js");',
+    'new Worker(new URL("./workers/export.js", import.meta.url));',
+    'importScripts("../workers/runtime.js");',
+    'require("../vendor/legacy.cjs");',
+    'System.import("./compat/module.js");',
+    'require("react");',
+  ].join("\\n")
+  expect(extractJavaScriptImportURLs(source, assetURL).sort()).toEqual([
+    "https://app.example.test/assets/compat/module.js",
+    "https://app.example.test/assets/features/lazy.js",
+    "https://app.example.test/assets/modules/helper.js",
+    "https://app.example.test/shared/load.js",
+    "https://app.example.test/vendor/legacy.cjs",
+    "https://app.example.test/workers/export.js",
+    "https://app.example.test/workers/runtime.js",
+  ])
+})
 
 function fixedSizeBody(size: number) {
   let remaining = size

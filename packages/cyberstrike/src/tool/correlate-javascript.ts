@@ -54,6 +54,8 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           "Application/integration intelligence hints: " + (graph.javascriptAnalysis.applicationHints ?? []).length,
           "Static JavaScript sink candidates (not confirmed findings): " + graph.javascriptAnalysis.riskSignals.length,
           "Static endpoint literals: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+          "Additional scenario candidates: " + (graph.additionalScenarios ?? []).length,
+          "Sensitive data-field/literal candidates: " + (graph.javascriptAnalysis.dataExposureSignals ?? []).length,
           "Unique endpoint candidates: " + graph.endpointCandidates.length,
           "Candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
           "Captured response evidence nodes: " + graph.evidence.length,
@@ -84,6 +86,8 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           javascript_role_hints: graph.javascriptAnalysis.roleHints.length,
           javascript_application_hints: (graph.javascriptAnalysis.applicationHints ?? []).length,
           javascript_risk_signals: graph.javascriptAnalysis.riskSignals.length,
+          javascript_scenarios: (graph.additionalScenarios ?? []).length,
+          javascript_data_exposure_signals: (graph.javascriptAnalysis.dataExposureSignals ?? []).length,
           requests: graph.requests.length,
           web_functions: graph.webFunctions.length,
           observations: graph.observations.length,
@@ -93,6 +97,10 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           source_inventory_available: graph.sourceFiles.length > 0,
           analysis_complete: graph.sourceFiles.length > 0 &&
             !graph.notes.some((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")) &&
+            !graph.sourceFiles.some((file) => Boolean(file.sourceMapStatus && file.sourceMapStatus !== "analyzed")) &&
+            !graph.sourceFiles.some((file) => (file.analysis?.notes ?? []).some((note) =>
+              note.startsWith("PARTIAL SOURCE:") || note.startsWith("INLINE SOURCE MAP UNPARSED:"),
+            )) &&
             !(graph.sourceMapReferences ?? []).some((item) => !["analyzed", "out-of-scope"].includes(item.status)),
         },
       }

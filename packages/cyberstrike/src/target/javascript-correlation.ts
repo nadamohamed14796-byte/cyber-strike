@@ -9,6 +9,7 @@ import { SessionTable, RequestTable, RequestJavaScriptCaptureTable, RequestObser
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
 import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint, type JavaScriptWorkflowSignal } from "./javascript-analysis"
+import { createJavaScriptScenarioCandidates, type JavaScriptScenarioCandidate } from "./javascript-scenarios"
 
 /**
  * SQLite builds have a finite bind-parameter budget. Split IN lists into safe
@@ -228,7 +229,7 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const found = new Set<string>()
   // Absolute URLs count only when they are the first argument of a recognizable
   // network call. Arbitrary strings include docs, namespaces, assets and examples.
-  const calls = /\\b(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\\w$]*\\.(?:get|post|put|patch|delete|head|options|request|open))\\s*\\(/gi
+  const calls = /\b(?:fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
   for (const call of content.matchAll(calls)) {
     const start = (call.index ?? 0) + call[0].length
     const tail = content.slice(start)
@@ -237,7 +238,7 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
     if (close < 0) continue
     const args = splitTopLevelArguments(callText.slice(1, close))
     const first = call[0].toLowerCase().endsWith(".open(") ? args[1] : args[0]
-    const literal = first?.match(/^\\s*['"\\x60]([^'"\\x60]+)['"\\x60]/)?.[1]
+    const literal = first?.match(/^\s*['"\x60]([^'"\x60]+)['\x60]/)?.[1]
     if (!literal) continue
     const normalized = normalizeEndpointLiteral(literal)
     if (normalized) found.add(normalized)
@@ -245,7 +246,7 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
 
   // Retain conventional API-like relative routes as candidates, without turning
   // arbitrary URLs, framework namespaces, or static assets into endpoints.
-  const routes = /["'\\x60](\\/(?:api|graphql|rest|rpc|v\\d+|oauth|auth|admin|internal)(?:\\/[^"'\\x60\\s]*)?)["'\\x60]/gi
+  const routes = /["'\x60](\/(?:api|graphql|rest|rpc|v\d+|oauth|auth|admin|internal)(?:\/[^"'\x60\s]*)?)["'\x60]/gi
   for (const match of content.matchAll(routes)) {
     const normalized = normalizeEndpointLiteral(match[1]!)
     if (normalized) found.add(normalized)
@@ -1088,8 +1089,11 @@ export interface JavaScriptCorrelationGraph {
     riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
     applicationHints?: Array<JavaScriptApplicationHint & { sourceFile: string }>
     workflowSignals?: Array<JavaScriptWorkflowSignal & { sourceFile: string }>
+    dataExposureSignals?: Array<import("./javascript-analysis").JavaScriptDataExposureSignal & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
+  /** Source-linked review scenarios from workflow, application, role, risk, and secret clues. */
+  additionalScenarios?: JavaScriptScenarioCandidate[]
   evidence: Array<{
     id: string
     requestID: string
@@ -1433,14 +1437,38 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
   const workflowSignals = mergeRecords(graphs.map((g) => g.javascriptAnalysis.workflowSignals ?? []), (item) =>
     [item.sourceFile, item.line, item.kind, item.value, item.functionName ?? ""].join("\0"),
   )
+  const dataExposureSignals = mergeRecords(graphs.map((g) => g.javascriptAnalysis.dataExposureSignals ?? []), (item) =>
+    [item.sourceFile, item.line, item.kind, item.field ?? "", item.functionName ?? ""].join("\0"),
+  )
+  const scenarioMap = new Map<string, JavaScriptScenarioCandidate>()
+  for (const graph of graphs) {
+    for (const scenario of graph.additionalScenarios ?? []) {
+      const previous = scenarioMap.get(scenario.id)
+      scenarioMap.set(scenario.id, previous ? {
+        ...previous,
+        ...scenario,
+        sourceLines: [...new Set([...previous.sourceLines, ...scenario.sourceLines])].sort((a, b) => a - b),
+        signals: uniqueValues([...previous.signals, ...scenario.signals], (item) =>
+          [item.evidenceType, item.kind, item.value, item.line, item.sourceFunction ?? ""].join("\0"),
+        ),
+        relatedEndpointIDs: [...new Set([...previous.relatedEndpointIDs, ...scenario.relatedEndpointIDs])],
+        relatedRequestCandidateIDs: [...new Set([...previous.relatedRequestCandidateIDs, ...scenario.relatedRequestCandidateIDs])],
+        observedRequestIDs: [...new Set([...previous.observedRequestIDs, ...scenario.observedRequestIDs])],
+        riskSignalIDs: [...new Set([...previous.riskSignalIDs, ...scenario.riskSignalIDs])],
+        prerequisites: [...new Set([...previous.prerequisites, ...scenario.prerequisites])],
+        recommendedChecks: [...new Set([...previous.recommendedChecks, ...scenario.recommendedChecks])],
+      } : { ...scenario })
+    }
+  }
   const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
   return {
     ...latest,
     javascriptAssets: [...assets.values()].sort((a, b) => a.url.localeCompare(b.url)),
     sourceFiles: [...sourceFiles.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath) || a.sha256.localeCompare(b.sha256)),
     sourceMapReferences: [...sourceMaps.values()].sort((a, b) => a.url.localeCompare(b.url)),
-    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints, workflowSignals },
+    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints, workflowSignals, dataExposureSignals },
     endpointCandidates: mergeCanonicalJavaScriptEndpoints(graphs),
+    additionalScenarios: [...scenarioMap.values()].sort((a, b) => a.sourceFile.localeCompare(b.sourceFile) || a.category.localeCompare(b.category) || a.id.localeCompare(b.id)),
     evidence: uniqueObjects(graphs.flatMap((g) => g.evidence), (x) => x.id),
     requests: uniqueObjects(graphs.flatMap((g) => g.requests), (x) => x.id),
     webFunctions: uniqueObjects(graphs.flatMap((g) => g.webFunctions), (x) => x.id),
@@ -1604,6 +1632,8 @@ function renderCanonicalJavaScriptAnalysis(
     "- Application/integration hints: " + applicationHints.length,
     "- Static risk-sink candidates: " + riskSignals.length,
     "- Business/token/data-operation flow signals: " + (graph.javascriptAnalysis.workflowSignals ?? []).length,
+    "- Additional review scenarios (candidate only): " + (graph.additionalScenarios ?? []).length,
+    "- Sensitive-data field/literal candidates (not verified leaks): " + (graph.javascriptAnalysis.dataExposureSignals ?? []).length,
     "- Captured requests correlated: " + graph.requests.length,
     "- Response evidence records: " + graph.evidence.length,
     "- Failed asset fetches: " + failedAssets.length,
@@ -1667,6 +1697,22 @@ function renderCanonicalJavaScriptAnalysis(
 
     "## Feature and behavior trace (static candidates; use these to locate code and correlate UI actions)",
     ...renderJavaScriptWorkflowTrace(graph),
+    "",
+    "## Sensitive data indicators (candidate only; raw values omitted)",
+    ...((graph.javascriptAnalysis.dataExposureSignals ?? []).length ? (graph.javascriptAnalysis.dataExposureSignals ?? []).map((item) =>
+      "- " + item.kind + (item.field ? " — field: " + item.field : " — embedded contact literal; value omitted") + " — " + safeSummaryText(item.sourceFile) + ":" + item.line + (item.functionName ? " — function: " + safeSummaryText(item.functionName) : "")
+    ) : ["- No sensitive data-field or embedded email indicators matched."]),
+    "",
+    "## Additional hypothesis scenarios (candidate only; not automatically tested)",
+    ...((graph.additionalScenarios ?? []).length ? (graph.additionalScenarios ?? []).map((scenario) =>
+      "- " + scenario.title + " [" + scenario.category + "] — " + safeSummaryText(scenario.sourceFile) + ":" + scenario.sourceLines.join(",") +
+      (scenario.sourceFunction ? " — function: " + safeSummaryText(scenario.sourceFunction) : "") +
+      " — SHA-256: " + scenario.sourceSHA256 +
+      " — signals: " + scenario.signals.map((signal) => signal.kind + "@" + signal.line).join(", ") +
+      " — endpoints: " + (scenario.relatedEndpointIDs.join(", ") || "none linked") +
+      " — request IDs: " + (scenario.observedRequestIDs.join(", ") || "none linked") +
+      " — next checks: " + scenario.recommendedChecks.join("; ")
+    ) : ["- No additional scenario candidates were generated from current static signals."]),
     "",
     "## Roles, permissions, tenants and feature flags",
     ...(roleHints.length ? roleHints.map((item) =>
@@ -2492,12 +2538,17 @@ export namespace JavaScriptCorrelation {
       ...sourceFiles.filter((file) => !localSourceIsPersistedCapture(file)),
       ...capturedSources,
     ]
+    const sourceMapIdentity = (value: string) => {
+      const url = safeURL(value)
+      return url ? url.origin + url.pathname : value.split(/[?#]/, 1)[0]!
+    }
     const sourceMapRecordsByURL = new Map<string, JavaScriptSourceFile[]>()
     for (const file of mergedSourceFiles) {
       if (!file.sourceMapURL || file.sourceMapSource || file.sourceMapInline) continue
-      const records = sourceMapRecordsByURL.get(file.sourceMapURL) ?? []
+      const identity = sourceMapIdentity(file.sourceMapURL)
+      const records = sourceMapRecordsByURL.get(identity) ?? []
       records.push(file)
-      sourceMapRecordsByURL.set(file.sourceMapURL, records)
+      sourceMapRecordsByURL.set(identity, records)
     }
     const sourceMapReferenceInputs = new Map<string, Set<string>>()
     for (const file of mergedSourceFiles) {
@@ -2511,7 +2562,7 @@ export namespace JavaScriptCorrelation {
     for (const [url, sources] of sourceMapReferenceInputs) {
       const decision = await scopeDecisionFor(url)
       const scopeAllowed = decision.allowed && Boolean(decision.workspace) && relatedTargetIDs.has(decision.workspace!.id)
-      const capturedMaps = sourceMapRecordsByURL.get(url) ?? []
+      const capturedMaps = sourceMapRecordsByURL.get(sourceMapIdentity(url)) ?? []
       let status: NonNullable<JavaScriptCorrelationGraph["sourceMapReferences"]>[number]["status"]
       let note: string
       if (!scopeAllowed) {
@@ -2737,6 +2788,7 @@ export namespace JavaScriptCorrelation {
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         applicationHints: mergedSourceFiles.flatMap((file) => (file.analysis?.applicationHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         workflowSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.workflowSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        dataExposureSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.dataExposureSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
       },
       endpointCandidates: [],
       evidence: relevantRequests
@@ -2860,6 +2912,17 @@ export namespace JavaScriptCorrelation {
       graph.javascriptAnalysis.requestCandidates,
       graph.requests,
     )
+    graph.additionalScenarios = createJavaScriptScenarioCandidates({
+      sourceFiles: graph.sourceFiles,
+      requestCandidates: graph.javascriptAnalysis.requestCandidates,
+      endpoints: graph.endpointCandidates,
+      workflowSignals: graph.javascriptAnalysis.workflowSignals ?? [],
+      applicationHints: graph.javascriptAnalysis.applicationHints ?? [],
+      roleHints: graph.javascriptAnalysis.roleHints,
+      riskSignals: graph.javascriptAnalysis.riskSignals,
+      secretCandidates: graph.javascriptAnalysis.secretCandidates,
+      dataExposureSignals: graph.javascriptAnalysis.dataExposureSignals ?? [],
+    })
     for (const endpoint of graph.endpointCandidates) {
       for (const sourceFile of endpoint.sourceFiles) {
         graph.edges.push({
@@ -2909,6 +2972,53 @@ export namespace JavaScriptCorrelation {
           relation: "request-candidate-maps-to-endpoint",
           confidence: "candidate",
           evidence: "The structured request call and endpoint share a source file and normalized path; this is static source evidence, not proof of runtime execution.",
+        })
+      }
+    }
+
+    for (const scenario of graph.additionalScenarios ?? []) {
+      const scenarioNode = "javascript-scenario:" + scenario.id
+      graph.edges.push({
+        from: "javascript-file:" + scenario.sourceFile,
+        to: scenarioNode,
+        relation: "source-supports-scenario-candidate",
+        confidence: "candidate",
+        evidence: "Static workflow/application/role/risk/secret markers at source lines " + scenario.sourceLines.join(", ") + " motivate this review scenario; they do not establish a vulnerability.",
+      })
+      for (const endpointID of scenario.relatedEndpointIDs) {
+        graph.edges.push({
+          from: scenarioNode,
+          to: endpointID,
+          relation: "scenario-reviews-endpoint-candidate",
+          confidence: "candidate",
+          evidence: "The scenario and endpoint share source-linked JavaScript evidence; test relevance and server behavior remain unverified.",
+        })
+      }
+      for (const candidateID of scenario.relatedRequestCandidateIDs) {
+        graph.edges.push({
+          from: scenarioNode,
+          to: "javascript-request-candidate:" + candidateID,
+          relation: "scenario-reviews-request-candidate",
+          confidence: "candidate",
+          evidence: "The scenario and structured request candidate share source/function context; the candidate may be static-only and is not proof of a transmitted request.",
+        })
+      }
+      for (const requestID of scenario.observedRequestIDs) {
+        graph.edges.push({
+          from: scenarioNode,
+          to: "request:" + requestID,
+          relation: "scenario-correlates-observed-request",
+          confidence: "candidate",
+          evidence: "A request ID is associated with a same-source request/endpoint candidate; verify the exact operation, identity, and response before testing.",
+        })
+      }
+      for (const riskID of scenario.riskSignalIDs) {
+        graph.edges.push({
+          from: scenarioNode,
+          to: "javascript-risk:" + riskID,
+          relation: "scenario-reviews-risk-signal",
+          confidence: "candidate",
+          evidence: "A static risk signal contributed to this review scenario; source-to-sink reachability and impact are not confirmed.",
         })
       }
     }
@@ -3022,6 +3132,7 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Local JavaScript files are hashed and scanned only for static URL/path literals; source code is never copied into the graph.")
     graph.notes.push("Static endpoint candidates and source correlations are recorded alongside recon support artifacts; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
+    graph.notes.push("Additional scenario candidates preserve source file/hash/line and linked endpoint/request IDs; they are review plans only and are never dispatched or tested automatically.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
     graph.notes.push("Response previews are length-limited and redacted heuristically; derived JavaScript artifacts retain secret fingerprints and source locations only, never raw candidate values. Captured request/source bodies remain in the existing private capture store for on-demand evidence inspection.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
@@ -3051,6 +3162,7 @@ export namespace JavaScriptCorrelation {
       sourceGraph: path.posix.join("javascript", graphFilename),
       sourceEndpointInventory: path.posix.join("endpoints", endpointFilename),
       cases: testerCases,
+      additionalScenarios: graph.additionalScenarios ?? [],
       notes: [
         "Review plan only; generating this artifact sends no HTTP requests.",
         "Before replay, re-check the persisted scope and use captured baselines; change one input at a time.",
@@ -3085,6 +3197,7 @@ export namespace JavaScriptCorrelation {
       "- Candidate findings: " + graph.findings.length,
       "- Recorded graph edges: " + graph.edges.length,
       "- Tester survey cases: " + testerCases.length,
+      "- Additional scenario candidates: " + (graph.additionalScenarios ?? []).length,
       "- Tester survey artifact: " + testerSurveyRelativePath,
       "",
       "## Captured asset evidence (raw local files; treat as sensitive)",
@@ -3156,6 +3269,7 @@ export namespace JavaScriptCorrelation {
         sessionID: graph.sessionID,
         note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
         endpoints: graph.endpointCandidates,
+        additionalScenarios: graph.additionalScenarios ?? [],
         javascriptAnalysis: graph.javascriptAnalysis,
         sourceMapReferences: graph.sourceMapReferences ?? [],
         testerSurvey: testerSurveyRelativePath,

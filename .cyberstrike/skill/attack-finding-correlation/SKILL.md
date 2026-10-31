@@ -29,6 +29,8 @@ This skill organizes and prioritizes evidence; it does not itself prove a vulner
 
 Read the existing workspace manifest, scope decision, asset/host inventory, URL and endpoint inventories, JavaScript manifest, captured request/response references, scan outputs, hypothesis/triage ledger, validation evidence, and prior findings. Reuse existing canonical artifacts; do not create a parallel inventory when a current source-of-truth artifact already exists.
 
+When present, read additionalScenarios from the JavaScript correlation graph/tester survey and endpoint artifact. Treat each as a candidate hypothesis with source/hash/line and linked endpoint/request evidence. Use its category and checks to identify an existing specialist handoff only after checking live traffic, server-side controls, authorization, owned fixtures, and user testing intent. Preserve blocked/inconclusive reasons and update the same scenario/evidence identity after new results; never automatically fan out every scenario or upgrade static hints to findings.
+
 For every imported record retain:
 - stable source record ID and source/tool name/version;
 - observation time and run ID;

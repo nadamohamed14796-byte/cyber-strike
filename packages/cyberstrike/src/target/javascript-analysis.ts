@@ -48,6 +48,14 @@ export interface JavaScriptSecretCandidate {
   fingerprint: string
   confidence: "candidate"
 }
+export interface JavaScriptDataExposureSignal {
+  /** The detected data class, never the matched personal value. */
+  kind: "sensitive-field" | "embedded-email-address"
+  field: string | null
+  line: number
+  functionName: string | null
+  confidence: "candidate"
+}
 export interface JavaScriptRoleHint { kind: string; value: string; line: number }
 export interface JavaScriptApplicationHint { kind: string; value: string; line: number; confidence: "candidate" }
 export interface JavaScriptRiskSignal {
@@ -67,6 +75,8 @@ export interface JavaScriptSourceAnalysis {
   applicationHints?: JavaScriptApplicationHint[]
   /** Security-relevant business/token/data-layer flow markers with enclosing-function attribution. */
   workflowSignals?: JavaScriptWorkflowSignal[]
+  /** Sensitive field and embedded contact-data indicators; raw values are never retained. */
+  dataExposureSignals?: JavaScriptDataExposureSignal[]
   notes: string[]
 }
 
@@ -557,6 +567,31 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     secrets.set(item.kind + ":" + item.fingerprint, item)
       }
 
+  // Sensitive-data indicators retain field/class and source location only. Matched values
+  // are deliberately discarded; these are static leads, not proof of a data leak.
+  const dataExposureSignals = new Map<string, JavaScriptDataExposureSignal>()
+  const addDataExposureSignal = (kind: JavaScriptDataExposureSignal["kind"], field: string | null, index: number) => {
+    const containingFunction = functionRanges
+      .filter((range) => range.start <= index && index <= range.end)
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+    const item: JavaScriptDataExposureSignal = {
+      kind,
+      field,
+      line: lineNumber(lineStarts, index),
+      functionName: containingFunction?.name ?? null,
+      confidence: "candidate",
+    }
+    dataExposureSignals.set([kind, field ?? "", item.line, item.functionName ?? ""].join(":"), item)
+  }
+  const sensitiveFieldPattern = /\b(email|emailAddress|phone|phoneNumber|mobile|address|postalAddress|dateOfBirth|dob|ssn|socialSecurityNumber|passportNumber|nationalId|taxId|iban|bankAccount|cardNumber|paymentDetails|medicalRecord|accessToken|refreshToken|sessionToken|password|apiKey|clientSecret|privateKey|resetToken)\b["']?\s*:/gi
+  for (const match of source.matchAll(sensitiveFieldPattern)) {
+    addDataExposureSignal("sensitive-field", (match[1] ?? "").toLowerCase(), match.index ?? 0)
+  }
+  const embeddedEmailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+  for (const match of source.matchAll(embeddedEmailPattern)) {
+    addDataExposureSignal("embedded-email-address", null, match.index ?? 0)
+  }
+
   const roles = new Map<string, JavaScriptRoleHint>()
   const rolePattern = /\b(isAdmin|is_admin|adminOnly|requireAdmin|hasRole|checkPermission|hasPermission|featureFlag|feature_flag|debugMode|debug_mode|internalOnly|superuser|impersonate|impersonation|role|permission)\b/gi
 
@@ -701,6 +736,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     applicationHints: [...applicationHints.values()],
     workflowSignals: [...workflowSignals.values()],
+    dataExposureSignals: [...dataExposureSignals.values()],
     notes: [
       "Static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",

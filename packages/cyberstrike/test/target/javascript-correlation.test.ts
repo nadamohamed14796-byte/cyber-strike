@@ -8,7 +8,105 @@ import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
 import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { tmpdir } from "../fixture/fixture"
+import { createJavaScriptScenarioCandidates } from "../../src/target/javascript-scenarios"
 import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
+
+
+test("builds source-linked additional scenarios and connects workflow, endpoint, request, risk, and secret evidence", () => {
+  const scenarios = createJavaScriptScenarioCandidates({
+    sourceFiles: [{ relativePath: "javascript/assets/app.js", sha256: "source-hash" }],
+    requestCandidates: [{
+      id: "request-candidate-reset",
+      sourceFile: "javascript/assets/app.js",
+      sourceFunction: "resetPassword",
+      method: "POST",
+      urlTemplate: "/api/password/reset",
+      host: "app.example.test",
+      origin: "https://app.example.test",
+      path: "/api/password/reset",
+      pathParameters: [],
+      queryParameters: ["flow"],
+      bodyParameters: ["code", "newPassword"],
+      headerNames: ["content-type"],
+      authSignals: [],
+      cookieSignals: ["credentialed-request-may-send-cookies"],
+      authAssessment: "signals-present",
+      sourceLine: 14,
+      confidence: "candidate",
+      observedRequestIDs: ["request-reset-1"],
+    }],
+    endpoints: [{
+      id: "endpoint-reset",
+      path: "/api/password/reset",
+      method: "POST",
+      sourceFiles: ["javascript/assets/app.js"],
+      observedRequestIDs: ["request-reset-1"],
+    }],
+    workflowSignals: [{
+      kind: "account-recovery-flow",
+      value: "password reset verification",
+      line: 12,
+      functionName: "resetPassword",
+      confidence: "candidate",
+      sourceFile: "javascript/assets/app.js",
+    }],
+    applicationHints: [{
+      kind: "business-workflow",
+      value: "file export",
+      line: 28,
+      confidence: "candidate",
+      sourceFile: "javascript/assets/app.js",
+    }],
+    roleHints: [{
+      kind: "tenant-role-check",
+      value: "workspaceAdmin",
+      line: 34,
+      sourceFile: "javascript/assets/app.js",
+    }],
+    riskSignals: [{
+      id: "risk-dom-1",
+      kind: "dom-html-sink",
+      line: 44,
+      functionName: "renderProfile",
+      confidence: "candidate",
+      sourceFile: "javascript/assets/app.js",
+    }],
+    dataExposureSignals: [{
+      kind: "sensitive-field",
+      field: "email",
+      line: 57,
+      functionName: "renderProfile",
+      confidence: "candidate",
+      sourceFile: "javascript/assets/app.js",
+    }],
+    secretCandidates: [{
+      kind: "api-secret-assignment",
+      line: 51,
+      fingerprint: "fingerprint-only",
+      confidence: "candidate",
+      sourceFile: "javascript/assets/app.js",
+    }],
+  })
+
+  const identity = scenarios.find((item) => item.category === "identity-session")!
+  expect(identity.status).toBe("candidate")
+  expect(identity.sourceSHA256).toBe("source-hash")
+  expect(identity.sourceLines).toContain(12)
+  expect(identity.relatedEndpointIDs).toEqual(["endpoint-reset"])
+  expect(identity.relatedRequestCandidateIDs).toEqual(["request-candidate-reset"])
+  expect(identity.observedRequestIDs).toEqual(["request-reset-1"])
+  expect(identity.recommendedChecks.some((check) => check.includes("two controlled accounts"))).toBe(true)
+
+  expect(scenarios.some((item) => item.category === "file-transfer")).toBe(true)
+  expect(scenarios.some((item) => item.category === "multi-tenant-authorization")).toBe(true)
+  expect(scenarios.some((item) => item.category === "dom-xss-review" && item.riskSignalIDs.includes("risk-dom-1"))).toBe(true)
+  const dataScenario = scenarios.find((item) => item.category === "sensitive-data-exposure")!
+  expect(dataScenario.signals.some((signal) => signal.kind === "sensitive-field" && signal.value === "email")).toBe(true)
+  expect(dataScenario.recommendedChecks.some((check) => check.includes("matched personal values"))).toBe(true)
+  const credentialScenario = scenarios.find((item) => item.category === "credential-exposure-review")!
+  expect(credentialScenario.signals[0]?.value).toBe("sha256:fingerprint-only")
+  expect(JSON.stringify(scenarios)).not.toContain("raw-secret-value")
+})
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)

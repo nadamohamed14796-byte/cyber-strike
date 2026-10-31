@@ -1,6 +1,21 @@
 import { expect, test } from "bun:test"
 import { analyzeJavaScriptSource } from "../../src/target/javascript-analysis"
 
+test("flags sensitive data fields and embedded email literals without retaining values", () => {
+  const source = [
+    'const profile = { email: "private.person@example.test", phoneNumber: "+15555550123", dateOfBirth: "1990-01-01" }',
+    'function renderProfile(data) { return data.email + data.phoneNumber }',
+  ].join("\\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.dataExposureSignals?.map((item) => item.kind)).toContain("sensitive-field")
+  expect(result.dataExposureSignals?.some((item) => item.kind === "sensitive-field" && item.field === "dateofbirth")).toBe(true)
+  expect(result.dataExposureSignals?.some((item) => item.kind === "embedded-email-address")).toBe(true)
+  const serialized = JSON.stringify(result)
+  expect(serialized).not.toContain("private.person@example.test")
+  expect(serialized).not.toContain("+15555550123")
+  expect(serialized).not.toContain("1990-01-01")
+})
+
 test("extracts named functions and parameters", () => {
   const source = [
     "async function getInvoice(invoiceId, includeItems = false) {",

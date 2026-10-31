@@ -190,6 +190,8 @@ export function extractJavaScriptImportURLs(body: string, assetURL: string): str
     /\bimport\s+(?:(?:[\w$*{},\s]+?)\s+from\s*)?["']([^"'\\\r\n]+)["']/g,
     /\bexport\s+(?:[\w$*{},\s]+?)\s+from\s*["']([^"'\\\r\n]+)["']/g,
     /\bimport\s*\(\s*["']([^"'\\\r\n]+)["']\s*\)/g,
+    /\b(?:require|System\.import|importScripts)\s*\(\s*["']([^"'\\\r\n]+)["']\s*\)/g,
+    /\bnew\s+Worker\s*\(\s*new\s+URL\s*\(\s*["']([^"'\\\r\n]+)["']/g,
   ]
   for (const pattern of patterns) {
     for (const match of body.matchAll(pattern)) {
@@ -212,16 +214,33 @@ export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   if (baseValue) {
     try { baseURL = new URL(baseValue, pageURL).toString() } catch { /* Keep the page URL as the base. */ }
   }
-  const pattern = /<script\b([^>]*)>/gi
-  for (const match of body.matchAll(pattern)) {
+  const enqueue = (candidate: string | undefined) => {
+    const value = candidate?.trim() ?? ""
+    if (!value || /^(?:data:|blob:|javascript:)/i.test(value)) return
+    try {
+      const resolved = normalizeURL(new URL(value, baseURL).toString())
+      if (resolved) output.add(resolved)
+    } catch { /* Ignore malformed script/module preload URLs. */ }
+  }
+  const scriptPattern = /<script\b([^>]*)>/gi
+  for (const match of body.matchAll(scriptPattern)) {
     const attributes = match[1] ?? ""
     const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    const src = (srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? "").trim()
-    if (!src || /^(?:data:|blob:|javascript:)/i.test(src)) continue
-    try {
-      const resolved = normalizeURL(new URL(src, baseURL).toString())
-      if (resolved) output.add(resolved)
-    } catch { /* Ignore malformed script src values. */ }
+    enqueue(srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3])
+  }
+  // Module/preload links can reference bundles that are not repeated in a script[src].
+  const linkPattern = /<link\b([^>]*)>/gi
+  for (const match of body.matchAll(linkPattern)) {
+    const attributes = match[1] ?? ""
+    const relMatch = /\brel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    const asMatch = /\bas\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    const rel = (relMatch?.[1] ?? relMatch?.[2] ?? relMatch?.[3] ?? "").toLowerCase().split(/\s+/)
+    const as = (asMatch?.[1] ?? asMatch?.[2] ?? asMatch?.[3] ?? "").toLowerCase()
+    const isModulePreload = rel.includes("modulepreload")
+    const isScriptPreload = rel.includes("preload") && as === "script"
+    if (!isModulePreload && !isScriptPreload) continue
+    const hrefMatch = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    enqueue(hrefMatch?.[1] ?? hrefMatch?.[2] ?? hrefMatch?.[3])
   }
   return [...output]
 }
@@ -312,7 +331,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
     "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. The complete response body is downloaded and processed regardless of URL-list length or file size; no URL-count, batch, aggregate-byte, per-file-byte, URL-string-length, or provenance-string-length cap is imposed. The invocation processes the full dynamic worklist (including discovered imports and source maps), writing progress and manifest updates as it goes. Cancellation leaves unfinished URLs pending for resume.",
-    "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
+    "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports, literal CommonJS/System.import loaders, Worker/importScripts references, HTML script src, modulepreload/preload-as-script links, and source-map references are discovered and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
   ].join("\n"),
@@ -805,6 +824,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let analysisError: string | undefined
     let analyzedSourceRecords = 0
     let analysisCoverageGaps = 0
+    let additionalScenarioCandidates = 0
+    let resultGraphSensitiveDataCount = 0
     const localJavaScriptInputs = await hasLocalJavaScriptInputs(root)
     const hasUnfinishedQueue = [...byURL.values()].some((record) =>
       record.status === "pending" || (record.status === "failed" && record.retryable === true),
@@ -827,14 +848,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         // JavaScriptCorrelation resolves workspace identity by exact canonical target URL.
         const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: workspace.targetURL, localOnly: true })
         analyzedSourceRecords = result.graph.sourceFiles.length
+        additionalScenarioCandidates = (result.graph.additionalScenarios ?? []).length
+        resultGraphSensitiveDataCount = (result.graph.javascriptAnalysis.dataExposureSignals ?? []).length
         analysisCoverageGaps =
           result.graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")).length +
           result.graph.sourceFiles.filter((file) => Boolean(file.sourceMapStatus && file.sourceMapStatus !== "analyzed")).length +
+          result.graph.sourceFiles.filter((file) => (file.analysis?.notes ?? []).some((note) =>
+            note.startsWith("PARTIAL SOURCE:") || note.startsWith("INLINE SOURCE MAP UNPARSED:"),
+          )).length +
           (result.graph.sourceMapReferences ?? []).filter((item) => !["analyzed", "out-of-scope"].includes(item.status)).length
         analysisSummary = [
           "JavaScript correlation snapshot: " + result.graphPath,
           "Endpoint inventory: " + result.endpointPath,
           "Unique endpoint candidates: " + result.graph.endpointCandidates.length,
+          "Additional scenario candidates: " + (result.graph.additionalScenarios ?? []).length,
+          "Sensitive data-field/literal candidates: " + (result.graph.javascriptAnalysis.dataExposureSignals ?? []).length,
           "Unique source records: " + analyzedSourceRecords,
           "Source-map references: " + (result.graph.sourceMapReferences ?? []).length,
           "Unresolved source/inventory gaps: " + analysisCoverageGaps,
@@ -950,6 +978,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         received_bytes: receivedBytes,
         analysis_error: analysisError,
         analysis_coverage_gaps: analysisCoverageGaps,
+        additional_scenarios: additionalScenarioCandidates,
+        sensitive_data_candidates: resultGraphSensitiveDataCount,
         analyzed_source_records: analyzedSourceRecords,
         analysis_complete: completeAnalysis,
         interrupted: ctx.abort.aborted,
