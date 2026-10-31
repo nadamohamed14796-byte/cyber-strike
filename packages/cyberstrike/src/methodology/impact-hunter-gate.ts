@@ -60,31 +60,40 @@ export function supportingRequestIDs(
 ): string[] {
   const requests = Request.get(Session.root(sessionID))
   const known = new Map(requests.map((request) => [request.id, request]))
-  const preferred = preferredRequestIDs.filter((id) => known.has(id))
-  if (!finding.endpoint?.trim()) return [...new Set(preferred)]
+  if (!finding.endpoint?.trim()) {
+    return [...new Set(preferredRequestIDs.filter((id) => known.has(id)))]
+  }
 
   const expected = endpointParts(finding.endpoint)
-  const matching = requests
-    .filter((request) => {
-      if (expected.method && request.method !== expected.method) return false
-      const actualPath = normalizePath(request.normalized_path)
-      const canonicalPath = request.canonical_path ? normalizePath(request.canonical_path) : undefined
-      if (actualPath !== expected.path && canonicalPath !== expected.path) return false
-      if (expected.origin) {
-        const actualOrigin = request.origin ?? (
-          request.scheme && request.host
-            ? request.scheme + "://" + request.host + (request.port ? ":" + request.port : "")
-            : undefined
-        )
-        if (!actualOrigin) return false
-        try {
-          if (new URL(actualOrigin).origin !== expected.origin) return false
-        } catch {
-          return false
-        }
+  const matchesEndpoint = (request: Request.Info) => {
+    if (expected.method && request.method !== expected.method) return false
+    const actualPath = normalizePath(request.normalized_path)
+    const canonicalPath = request.canonical_path ? normalizePath(request.canonical_path) : undefined
+    if (actualPath !== expected.path && canonicalPath !== expected.path) return false
+    if (expected.origin) {
+      const actualOrigin = request.origin ?? (
+        request.scheme && request.host
+          ? request.scheme + "://" + request.host + (request.port ? ":" + request.port : "")
+          : undefined
+      )
+      if (!actualOrigin) return false
+      try {
+        if (new URL(actualOrigin).origin !== expected.origin) return false
+      } catch {
+        return false
       }
-      return true
-    })
+    }
+    return true
+  }
+
+  // A caller-supplied Request ID is a useful priority hint, not an evidence
+  // bypass. It must still match the finding's exact method, path, and origin.
+  const preferred = preferredRequestIDs.filter((id) => {
+    const request = known.get(id)
+    return Boolean(request && matchesEndpoint(request))
+  })
+  const matching = requests
+    .filter(matchesEndpoint)
     .sort((a, b) => b.time.updated - a.time.updated)
     .map((request) => request.id)
 
