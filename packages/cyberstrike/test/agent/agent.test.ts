@@ -184,11 +184,27 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
       expect(agent?.prompt).toContain("Impact escalation objective — inspect the strongest realistic path")
       expect(agent?.prompt).toContain("Every approved finding enters this review regardless of its starting rating")
       expect(agent?.prompt).toContain("The goal is the highest *proven* impact, never the highest imagined severity")
+      expect(agent?.prompt).toContain("proof_gap")
+      expect(agent?.prompt).toContain("approved_impact")
+      expect(agent?.prompt).toContain("hackerone-disclosed-reports")
+      expect(agent?.prompt).toContain("src-hunter-payloader-web")
+      expect(agent?.prompt).toContain("update_finding_evidence")
+      expect(agent?.prompt).toContain("ingest_javascript_urls")
+      expect(agent?.prompt).toContain("You are not isolated")
       expect(evalPerm(agent, "task")).toBe("allow")
       // Impact Hunter must be able to discover reference skills and read their
       // companion files; starting the subagent is not enough if either tool is denied.
       expect(evalPerm(agent, "skill")).toBe("allow")
       expect(evalPerm(agent, "read")).toBe("allow")
+      // TaskTool exposes every specialist whose task permission is not denied.
+      // Verify the same registry filter used at runtime, so Hunter can call narrow
+      // testers rather than being isolated behind a hard-coded subset.
+      const availableTesters = (await Agent.entries()).filter((entry) => entry.id.startsWith("proxy-tester-"))
+      expect(availableTesters.length).toBeGreaterThan(0)
+      for (const entry of availableTesters) {
+        expect(PermissionNext.evaluate("task", entry.id, agent!.permission).action, entry.id).not.toBe("deny")
+      }
+
       for (const tool of [
         "web_get_session_context",
         "web_get_detail",
@@ -196,6 +212,7 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
         "web_get_vulnerabilities",
         "web_get_vuln_detail",
         "correlate_javascript",
+        "ingest_javascript_urls",
         "validate_finding",
         "chain_link",
         "validate_chain",
@@ -204,6 +221,7 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
         "report_vulnerability",
         "triage_vulnerability",
         "update_finding_impact",
+        "update_finding_evidence",
         "research_knowledge",
         "target_note",
         "add_intel",
