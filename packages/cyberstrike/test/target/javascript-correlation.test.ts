@@ -605,10 +605,24 @@ test("merges equivalent named route placeholders and unions all source evidence"
     authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal", sourceLine: 3,
     confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: [],
   }])
-  expect(endpoints).toHaveLength(1)
-  expect(endpoints[0]?.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js", "javascript/users.js"])
-  expect(endpoints[0]?.observedRequestIDs).toContain("req-users")
-  expect(endpoints[0]?.observedInTraffic).toBe(true)
+  expect(endpoints).toHaveLength(2)
+  const routeLevel = endpoints.find((endpoint) => endpoint.method === null)!
+  const getOperation = endpoints.find((endpoint) => endpoint.method === "GET")!
+  expect(routeLevel.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js"])
+  expect(routeLevel.observedRequestIDs).toContain("req-users")
+  expect(routeLevel.observedInTraffic).toBe(true)
+  expect(getOperation.sourceFiles).toEqual(["javascript/users.js"])
+  expect(getOperation.observedRequestIDs).toEqual([])
+
+  const [canonical] = groupCanonicalJavaScriptEndpoints([{
+    endpointCandidates: endpoints,
+    requests: [{ id: "req-users", method: "GET" }],
+  }])
+  expect(canonical?.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js", "javascript/users.js"])
+  expect(canonical?.operations.map((operation) => operation.method)).toEqual(["GET"])
+  expect(canonical?.operations[0]?.sourceFiles).toEqual(["javascript/users.js"])
+  expect(canonical?.operations[0]?.observedRequestIDs).toEqual(["req-users"])
+  expect(canonical?.unattributed.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js"])
 })
 
 test("groups one canonical endpoint with isolated method contracts and traffic-only operations", () => {
@@ -869,21 +883,39 @@ test("keeps endpoint identity method-specific while merging parameter evidence f
     ],
   )
 
-  expect(endpoints).toHaveLength(2)
+  expect(endpoints).toHaveLength(3)
+  const routeLevel = endpoints.find((endpoint) => endpoint.method === null)
   const getEndpoint = endpoints.find((endpoint) => endpoint.method === "GET")
   const postEndpoint = endpoints.find((endpoint) => endpoint.method === "POST")
+  expect(routeLevel?.sourceFiles).toEqual(["javascript/routes.js"])
+  expect(routeLevel?.observedRequestIDs).toEqual(["req-get", "req-post"])
   expect(getEndpoint).toBeDefined()
   expect(postEndpoint).toBeDefined()
   expect(getEndpoint?.id).not.toBe(postEndpoint?.id)
-  expect(getEndpoint?.sourceFiles).toEqual(["javascript/routes.js", "javascript/users.js", "javascript/users-expanded.js"])
+  expect(getEndpoint?.sourceFiles).toEqual(["javascript/users.js", "javascript/users-expanded.js"])
   expect(getEndpoint?.pathParameters).toEqual(["id", "userId"])
   expect(getEndpoint?.queryParameters).toEqual(["role", "include"])
   expect(getEndpoint?.bodyParameters).toEqual([])
   expect(getEndpoint?.observedRequestIDs).toEqual(["req-get"])
-  expect(postEndpoint?.sourceFiles).toContain("javascript/update-user.js")
+  expect(postEndpoint?.sourceFiles).toEqual(["javascript/update-user.js"])
   expect(postEndpoint?.bodyParameters).toEqual(["role"])
   expect(postEndpoint?.queryParameters).toEqual([])
   expect(postEndpoint?.observedRequestIDs).toEqual(["req-post"])
+
+  const [canonical] = groupCanonicalJavaScriptEndpoints([{
+    endpointCandidates: endpoints,
+    requests: [{ id: "req-get", method: "GET" }, { id: "req-post", method: "POST" }],
+  }])
+  expect(canonical?.operations.map((operation) => operation.method)).toEqual(["GET", "POST"])
+  expect(canonical?.unattributed.sourceFiles).toEqual(["javascript/routes.js"])
+  expect(canonical?.operations.find((operation) => operation.method === "GET")?.sourceFiles)
+    .toEqual(["javascript/users.js", "javascript/users-expanded.js"])
+  expect(canonical?.operations.find((operation) => operation.method === "POST")?.sourceFiles)
+    .toEqual(["javascript/update-user.js"])
+  expect(canonical?.operations.find((operation) => operation.method === "GET")?.observedRequestIDs)
+    .toEqual(["req-get"])
+  expect(canonical?.operations.find((operation) => operation.method === "POST")?.observedRequestIDs)
+    .toEqual(["req-post"])
 })
 
 

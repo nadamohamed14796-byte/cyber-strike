@@ -3233,7 +3233,9 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         .slice(0, 32)
       const identityKey = "endpoint:" + identityHash
       const identityMarker = "<!-- cyberstrike-note-identity:" + identityKey + " -->"
-      const unique = (values: string[] = []) => [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))]
+      const unique = <T extends string>(values: T[] = []): T[] => [
+        ...new Set(values.filter((value): value is T => typeof value === "string" && value.length > 0)),
+      ]
       const normalizeOperation = (method: string) => {
         const normalized = method.trim().toUpperCase()
         if (!/^[!#$%&'*+.^_`|~0-9A-Z-]+$/.test(normalized)) {
@@ -3481,10 +3483,10 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             "Canonical endpoint operations with multiple evidence sources require explicit per-source evidence entries.",
           )
         }
-        const evidenceInputs = incoming.evidence ?? (() => {
-          const sources = declaredSources.length
+        const evidenceInputs: EndpointOperationEvidenceInput[] = incoming.evidence ?? (() => {
+          const sources: EndpointEvidenceSource[] = declaredSources.length
             ? declaredSources
-            : [operation.observedInTraffic ? "traffic" as const : "other" as const]
+            : [operation.observedInTraffic ? "traffic" : "other"]
           if (sources.includes("javascript") && sources.includes("traffic")) {
             return [
               {
@@ -3500,22 +3502,20 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
               },
             ]
           }
-          return sources.map((source) => ({
+          return sources.map((source): EndpointOperationEvidenceInput => ({
             source,
             ...operationFields,
-            confidence: incoming.confidence ?? (source === "traffic" ? "observed" as const : "candidate" as const),
+            confidence: incoming.confidence ?? (source === "traffic" ? "observed" : "candidate"),
           }))
         })()
         for (const evidenceInput of evidenceInputs) {
-          let evidence = operation.evidence.find((item) => item.source === evidenceInput.source)
-          if (!evidence) {
-            evidence = {
-              source: evidenceInput.source,
-              ...emptyFields(),
-              confidence: evidenceInput.confidence ?? "candidate",
-            }
-            operation.evidence.push(evidence)
+          const existingEvidence = operation.evidence.find((item) => item.source === evidenceInput.source)
+          const evidence: StoredEndpointEvidence = existingEvidence ?? {
+            source: evidenceInput.source,
+            ...emptyFields(),
+            confidence: evidenceInput.confidence ?? "candidate",
           }
+          if (!existingEvidence) operation.evidence.push(evidence)
           for (const source of [
             "pathParameters", "queryParameters", "bodyParameters", "headerNames",
             "authSignals", "cookieSignals", "contentTypes", "operationIds", "operationSummaries",

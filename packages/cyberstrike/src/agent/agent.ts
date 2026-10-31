@@ -828,6 +828,7 @@ export namespace Agent {
             target_notes_read: "allow",
             target_artifact: "allow",
             target_note: "allow",
+            target_endpoint: "allow",
             validate_finding: "allow",
             correlate_javascript: "allow",
             report_vulnerability: "allow",

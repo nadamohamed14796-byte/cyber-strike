@@ -3475,6 +3475,12 @@ export namespace JavaScriptCorrelation {
       ],
     }
     const urlList = graph.javascriptAssets.map((asset) => asset.url).join("\n")
+    const endpointRecords = groupCanonicalJavaScriptEndpoints([graph])
+    const operationCount = endpointRecords.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)
+    const trafficOperationCount = endpointRecords.reduce(
+      (sum, endpoint) => sum + endpoint.operations.filter((operation) => operation.observedInTraffic).length,
+      0,
+    )
     const content = [
       "# JavaScript Correlation Snapshot",
       "",

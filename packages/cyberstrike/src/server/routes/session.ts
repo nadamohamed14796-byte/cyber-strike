@@ -593,8 +593,8 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
             }
           }
 
-          const observedSlots = normalized.observedParams ?? []
-          const namesAt = (location: "path" | "query" | "body") => [...new Set(
+          const observedSlots = Observation.operationTreeForRequest(sessionID, req.id)?.params ?? []
+          const namesAt = (location: "path" | "query" | "body"): string[] => [...new Set(
             observedSlots.filter((slot) => slot.loc === location).map((slot) => slot.name),
           )]
           await TargetMemory.mergeCanonicalEndpointRecord({

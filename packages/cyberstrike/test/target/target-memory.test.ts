@@ -965,6 +965,22 @@ test("migrates legacy flattened endpoint evidence without inventing per-source o
           requestIDs: ["req-legacy-post"],
           observedInTraffic: true,
           confidence: "observed",
+          evidence: [
+            {
+              source: "javascript",
+              pathParameters: ["id"],
+              bodyParameters: ["role"],
+              headerNames: ["authorization"],
+              authSignals: ["bearer-token"],
+              sourceFiles: ["javascript/legacy.js"],
+              confidence: "candidate",
+            },
+            {
+              source: "traffic",
+              requestIDs: ["req-legacy-post"],
+              confidence: "observed",
+            },
+          ],
         }],
       })
 
@@ -1101,7 +1117,7 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       expect(second.created).toBe(false)
       expect(second.note.id).toBe(first.note.id)
       expect(repeatedTraffic.note.id).toBe(first.note.id)
-      expect(repeatedTraffic.updated).toBe(false)
+      expect(repeatedTraffic.updated).toBe(true)
 
       const endpointNotes = TargetMemory.allNotes(first.workspace.id).filter((note) => note.kind === "endpoint")
       expect(endpointNotes).toHaveLength(1)
@@ -1122,12 +1138,13 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       const post = record.operations.find((operation: { method: string }) => operation.method === "POST")
       expect(get.queryParameters).toEqual(["include"])
       expect(get.bodyParameters).toEqual([])
-      expect(get.requestIDs).toEqual(["req-get-1"])
+      expect(get.requestIDs).toEqual(["req-get-1", "req-get-2"])
       expect(get.methodEvidenceSources).toContain("traffic")
       expect(get.methodEvidenceSources).not.toContain("javascript")
       expect(get.evidence).toHaveLength(1)
       expect(get.evidence[0]?.source).toBe("traffic")
       expect(get.evidence[0]?.queryParameters).toEqual(["include"])
+      expect(get.evidence[0]?.requestIDs).toEqual(["req-get-1", "req-get-2"])
 
       expect(post.bodyParameters).toEqual(["userId", "email"])
       expect(post.queryParameters).toEqual([])
