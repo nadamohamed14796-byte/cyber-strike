@@ -88,7 +88,7 @@ async function dispatch(
       "title: " + redactTargetNoteSecrets(finding.title),
       "claimed_severity: " + (finding.candidate ?? finding.severity),
       "recorded_severity: " + finding.severity,
-      "endpoint: " + (finding.endpoint ?? "not recorded"),
+      "endpoint: " + redactTargetNoteSecrets(finding.endpoint ?? "not recorded"),
       "status: " + finding.status,
       "target_id: " + (finding.target_id ?? "not assigned"),
       "supporting_request_ids: " + (gate.requestIDs.length ? gate.requestIDs.join(", ") : "none"),
