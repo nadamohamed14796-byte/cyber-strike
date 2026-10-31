@@ -52,7 +52,8 @@ test("proof-gap gate admits a NEW no-PoC candidate only with scoped target and m
         })
         expect(result.allowed).toBe(true)
         expect(result.mode).toBe("proof_gap")
-        expect(result.requestIDs).toContain(request?.id)
+        expect(request).toBeDefined()
+        expect(result.requestIDs).toContain(request!.id)
         expect(result.baselineValidationID).toBeUndefined()
       } finally {
         await Session.remove(session.id)
@@ -207,7 +208,8 @@ test("execution-unconfirmed candidates can enter proof-gap mode even when poc co
           preferredRequestIDs: request?.id ? [request.id] : [],
         })
         expect(result.allowed).toBe(true)
-        expect(result.requestIDs).toContain(request?.id)
+        expect(request).toBeDefined()
+        expect(result.requestIDs).toContain(request!.id)
       } finally {
         await Session.remove(session.id)
       }

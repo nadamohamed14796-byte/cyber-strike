@@ -35,7 +35,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     evidence_refs: z.array(z.string().trim().min(3).max(500)).min(1).max(30)
       .describe("Exact evidenceRef strings recorded in valid CONFIRMED durable verification_attempt entries for the supplied impact_hypothesis_key, after the baseline validation."),
   }),
-  async execute(params, ctx) {
+  async execute(params, ctx): Promise<{ title: string; output: string; metadata: Tool.Metadata }> {
     if (ctx.agent !== "impact-hunter") {
       return {
         title: "Impact update blocked",
@@ -68,14 +68,14 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     const validationHistory = FindingValidation.history({ sessionID, vulnerabilityID: finding.id, limit: 100 })
     const baselineValidation = validationHistory.find((item) => item.id === params.baseline_validation_id)
     const latest = validationHistory[0]
-    if (!hasCompleteConfirmedValidation(baselineValidation)) {
+    if (!baselineValidation || !hasCompleteConfirmedValidation(baselineValidation)) {
       return {
         title: "Impact update blocked",
         output: "baseline_validation_id does not match a stored confirmed validation for this finding. Re-read the exact handoff context; no severity change was made.",
         metadata: { updated: false, reason: "baseline_validation_not_found" },
       }
     }
-    if (!hasCompleteConfirmedValidation(latest) || latest.id === baselineValidation.id || latest.time_created <= baselineValidation.time_created) {
+    if (!latest || !hasCompleteConfirmedValidation(latest) || latest.id === baselineValidation.id || latest.time_created <= baselineValidation.time_created) {
       return {
         title: "Impact update blocked",
         output: "A newer confirmed ten-check validation is required after the Impact Hunter handoff. Run validate_finding after the new impact tests; the initial approval validation is not sufficient.",
@@ -145,7 +145,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
 
     const updated = Vulnerability.update({
       sessionID,
-      id: finding.id,
+      id: params.id,
       severity: params.severity,
       description: updatedDescription,
       expectedStatus: "approved",

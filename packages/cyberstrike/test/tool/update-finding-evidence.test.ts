@@ -137,7 +137,7 @@ test("PoC evidence update rejects references not present in the durable proof le
     async fn() {
       const session = await Session.create({})
       try {
-        const finding = makeCandidate(session.id)
+        const finding = await makeCandidate(session.id)
         const proof = recordConfirmedProof(session.id, finding, "dom-source-sink")
         const tool = await UpdateFindingEvidenceTool.init()
         const result = await tool.execute({

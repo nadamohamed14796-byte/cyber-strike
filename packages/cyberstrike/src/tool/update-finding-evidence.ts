@@ -30,7 +30,7 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
     source_line_start: z.number().int().positive().optional().describe("Optional starting line for the verified source location."),
     source_line_end: z.number().int().positive().optional().describe("Optional ending line for the verified source location."),
   }),
-  async execute(params, ctx) {
+  async execute(params, ctx): Promise<{ title: string; output: string; metadata: Tool.Metadata }> {
     if (ctx.agent !== "impact-hunter") {
       return {
         title: "Finding evidence update blocked",
@@ -121,7 +121,7 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       : ""
     const updated = Vulnerability.update({
       sessionID,
-      id: finding.id,
+      id: params.id,
       description: descriptionCore + evidenceBlock + validationTail,
       severity: finding.candidate ?? finding.severity,
       title: finding.title.replace(/^\[UNCONFIRMED CANDIDATE\]\s*/, ""),
