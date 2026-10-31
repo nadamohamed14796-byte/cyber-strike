@@ -84,6 +84,11 @@ Tools remain available for this recovery turn. Choose a materially different nex
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
 
+  /** Insert command arguments literally without interpreting replacement metacharacters. */
+  export function substituteCommandArguments(template: string, args: string): string {
+    return template.replaceAll("$ARGUMENTS", () => args)
+  }
+
   const state = Instance.state(
     () => {
       const data: Record<
@@ -2230,7 +2235,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return args[argIndex]
     })
     const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
-    let template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
+    let template = substituteCommandArguments(withArgs, input.arguments)
 
     // If command doesn't explicitly handle arguments (no $N or $ARGUMENTS placeholders)
     // but user provided arguments, append them to the template
