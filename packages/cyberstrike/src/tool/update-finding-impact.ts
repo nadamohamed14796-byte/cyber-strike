@@ -39,7 +39,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     if (ctx.agent !== "impact-hunter") {
       return {
         title: "Impact update blocked",
-        output: "Only the dedicated Impact Hunter may raise an approved finding's severity. No record was changed.",
+        output: "Only the dedicated Impact Hunter may update impact on an approved finding. No record was changed.",
         metadata: { updated: false, reason: "impact_hunter_only" },
       }
     }
@@ -126,7 +126,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
       "Additional demonstrated impact: " + redactTargetNoteSecrets(params.demonstratedImpact.trim()),
       "Severity rationale: " + redactTargetNoteSecrets(params.severityRationale.trim()),
       "Durable evidence references: " + params.evidence_refs.join(", "),
-      "The updated severity is based only on the additional impact validated in the latest ten-check assessment.",
+      "The retained or raised severity is based only on the additional impact validated in the latest ten-check assessment.",
     ].join("\n")
     // FindingValidation.record replaces the trailing [Latest finding validation]
     // block on the next validation run. Keep all Impact Hunter history BEFORE that
