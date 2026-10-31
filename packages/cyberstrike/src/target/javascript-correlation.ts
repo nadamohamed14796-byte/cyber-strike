@@ -2515,7 +2515,9 @@ export namespace JavaScriptCorrelation {
           matchingRecord = ingestedAssetRecords.find((record) =>
             record.localPath &&
             path.resolve(record.localPath) === parentPath &&
-            (record.assetKind === "html" || /text\\/html|application\\/xhtml\\+xml/i.test(record.contentType ?? "")),
+            (record.assetKind === "html" ||
+              (record.contentType ?? "").toLowerCase().startsWith("text/html") ||
+              (record.contentType ?? "").toLowerCase().startsWith("application/xhtml+xml")),
           )
         }
       }
