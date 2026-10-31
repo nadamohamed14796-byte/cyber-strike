@@ -103,8 +103,9 @@ export function supportingRequestIDs(
 /**
  * Evaluate the exact same durable prerequisites whenever an agent or tool
  * launches Impact Hunter. proof_gap accepts any NEW, untriaged vulnerability
- * candidate regardless of weakness class, but requires an exact scoped endpoint,
- * target attribution, and a matching request or source file/line evidence anchor.
+ * candidate regardless of weakness class; INFO observations are also eligible for
+ * chain investigation even when their own PoC is complete. Both paths require target
+ * attribution, an exact scoped endpoint, and a matching request or source file/line anchor.
  */
 export function evaluateImpactHunterGate(input: {
   finding: Vulnerability.Info
