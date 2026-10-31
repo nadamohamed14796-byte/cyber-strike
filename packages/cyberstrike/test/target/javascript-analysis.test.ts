@@ -25,7 +25,7 @@ test("attributes application and authorization hints to their containing functio
     'function adminDashboard() {',
     '  if (isAdmin) return fetch("/api/admin/dashboard");',
     '}',
-  ].join("\\n")
+  ].join("\n")
   const result = analyzeJavaScriptSource(source)
   expect(result.applicationHints?.find((item) => item.kind === "business-workflow" && item.value === "export")?.functionName).toBe("exportReport")
   expect(result.roleHints.find((item) => item.kind === "admin-role-hint")?.functionName).toBe("adminDashboard")
