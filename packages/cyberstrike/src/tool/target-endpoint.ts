@@ -21,7 +21,7 @@ const EvidenceInput = z.object({
 })
 
 const OperationInput = z.object({
-  method: z.string().trim().min(1).regex(/^[!#$%&\'*+.^_\`|~0-9A-Z-]+$/i/).describe("HTTP method token for this operation, such as GET or POST. Do not combine multiple methods into one operation."),
+  method: z.string().trim().min(1).regex(/^[!#$%&'*+.^_\`|~0-9A-Z-]+$/i).describe("HTTP method token for this operation, such as GET or POST. Do not combine multiple methods into one operation."),
   method_evidence_sources: z.array(EvidenceSource).optional(),
   path_parameters: z.array(z.string().min(1)).optional(),
   query_parameters: z.array(z.string().min(1)).optional(),
