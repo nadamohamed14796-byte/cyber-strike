@@ -124,6 +124,7 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       id: finding.id,
       description: descriptionCore + evidenceBlock + validationTail,
       severity: finding.candidate ?? finding.severity,
+      title: finding.title.replace(/^\\[UNCONFIRMED CANDIDATE\\]\\s*/, ""),
       candidate: null,
       poc: [
         finding.poc?.trim()
