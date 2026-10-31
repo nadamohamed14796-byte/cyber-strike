@@ -51,7 +51,7 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
         metadata: { updated: false, reason: "finding_not_new", currentStatus: finding.status },
       }
     }
-    if ((finding.candidate ?? finding.severity) === "info") {
+    if (finding.candidate === "info" || finding.severity === "info") {
       return {
         title: "Informational observation is chain-only",
         output: "This INFO observation must remain a supporting chain precursor. Do not clear its candidate marker, rewrite it as a standalone vulnerability, or use PoC-gap evidence updates to approve it. Validate and report only a separate combined finding if the complete chain demonstrates concrete security impact.",
