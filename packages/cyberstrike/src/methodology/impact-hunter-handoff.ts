@@ -97,7 +97,7 @@ async function dispatch(
       "request_id: " + (requestID ?? "not bound to one request; use the complete supporting_request_ids list"),
     ]
 
-    const isInformational = (finding.candidate ?? finding.severity) === "info"
+    const isInformational = finding.candidate === "info" || finding.severity === "info"
     const modeInstructions = mode === "proof_gap"
       ? isInformational
         ? [
