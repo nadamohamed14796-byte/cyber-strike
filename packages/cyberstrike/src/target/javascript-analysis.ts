@@ -657,7 +657,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (!normalizedEndpoint) continue
     const endpoint = requestConfig ? normalizedEndpoint : addConcatenatedPathParameters(normalizedEndpoint, urlExpression)
     const currentFunctionRange = functionRanges.filter((range) => range.start <= index && index <= range.end)
-      .sort((a, b) => (a.end - a.start) - (b.end - a.end))[0]
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
     const nextSpan = requestCallSpans[callIndex + 1]
     const lowerBound = Math.max(currentFunctionRange?.start ?? 0, latestCompletedSpan?.end ?? 0)
     const upperBound = Math.min(currentFunctionRange?.end ?? source.length - 1, nextSpan?.start ?? source.length)
