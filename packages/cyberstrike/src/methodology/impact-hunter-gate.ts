@@ -17,10 +17,10 @@ export interface ImpactHunterGateResult {
 
 function normalizePath(value: string): string {
   try {
-    return new URL(value, "https://cyberstrike.invalid").pathname.replace(/\\/+$/, "") || "/"
+    return new URL(value, "https://cyberstrike.invalid").pathname.replace(new RegExp("/+$"), "") || "/"
   } catch {
     const path = value.split(/[?#]/, 1)[0]?.trim() ?? ""
-    return (path.startsWith("/") ? path : "/" + path).replace(/\\/+$/, "") || "/"
+    return (path.startsWith("/") ? path : "/" + path).replace(new RegExp("/+$"), "") || "/"
   }
 }
 
