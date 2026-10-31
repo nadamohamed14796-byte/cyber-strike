@@ -3121,7 +3121,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     path: string
     sourceFiles?: string[]
     operations: EndpointOperationInput[]
-    unattributed?: Omit<EndpointOperationInput, "method" | "methodEvidenceSources" | "observedInTraffic" | "confidence">
+    unattributed?: Omit<EndpointOperationEvidenceInput, "source">
   }
 
   interface StoredEndpointEvidence extends EndpointOperationEvidenceInput {
@@ -3212,7 +3212,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         if (begin >= 0 && end > begin) {
           try {
             const parsed: unknown = JSON.parse(existing.content.slice(begin + ENDPOINT_RECORD_BEGIN.length, end).trim())
-            if (parsed && typeof parsed === "object" && (parsed as { schemaVersion?: unknown }).schemaVersion === 1) {
+            if (
+              parsed &&
+              typeof parsed === "object" &&
+              (parsed as { schemaVersion?: unknown }).schemaVersion === 1 &&
+              Array.isArray((parsed as { operations?: unknown }).operations)
+            ) {
               state = parsed as StoredEndpointRecord
             }
           } catch {
@@ -3240,6 +3245,23 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         sourceFiles: [],
         operations: [],
         unattributed: emptyFields(),
+      }
+
+      state.sourceFiles ??= []
+      state.operations ??= []
+      state.unattributed ??= emptyFields()
+      for (const operation of state.operations) {
+        operation.methodEvidenceSources ??= []
+        operation.evidence ??= []
+        operation.pathParameters ??= []
+        operation.queryParameters ??= []
+        operation.bodyParameters ??= []
+        operation.headerNames ??= []
+        operation.authSignals ??= []
+        operation.cookieSignals ??= []
+        operation.contentTypes ??= []
+        operation.sourceFiles ??= []
+        operation.requestIDs ??= []
       }
 
       const confidenceRank: Record<NonNullable<EndpointOperationInput["confidence"]>, number> = {
