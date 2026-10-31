@@ -13,8 +13,12 @@ import PROMPT_CODE_ASSISTANCE from "./prompt/code-assistance.txt"
 import type { Provider } from "@/provider/provider"
 
 export namespace SystemPrompt {
+  export function codeAssistance() {
+    return PROMPT_CODE_ASSISTANCE.trim()
+  }
+
   export function instructions() {
-    return PROMPT_CODEX.trim()
+    return [PROMPT_CODEX, codeAssistance()].join("\n\n").trim()
   }
 
   export function provider(model: Provider.Model) {
@@ -26,7 +30,7 @@ export namespace SystemPrompt {
     else if (model.api.id.includes("claude")) prompt = PROMPT_ANTHROPIC
     else if (model.api.id.toLowerCase().includes("trinity")) prompt = PROMPT_TRINITY
     else prompt = PROMPT_ANTHROPIC_WITHOUT_TODO
-    return [prompt, PROMPT_CODE_ASSISTANCE]
+    return [prompt, codeAssistance()]
   }
 
   export async function environment(model: Provider.Model) {
