@@ -3450,11 +3450,9 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
           operation[field] = unique([...operation[field], ...(incoming[field] ?? [])])
         }
         operation.responseStatuses = [...new Set([...operation.responseStatuses, ...(incoming.responseStatuses ?? [])])]
-        // Keep the first representative request link in this human-readable note.
-        // The canonical request store and endpoint inventory retain the complete traffic history.
-        if (operation.requestIDs.length === 0 && (incoming.requestIDs?.length ?? 0) > 0) {
-          operation.requestIDs = unique(incoming.requestIDs ?? [])
-        }
+        // Retain every distinct request reference for this operation; raw request/response
+        // payloads remain in the canonical request store.
+        operation.requestIDs = unique([...operation.requestIDs, ...(incoming.requestIDs ?? [])])
         operation.observedInTraffic ||= incoming.observedInTraffic === true || (incoming.requestIDs?.length ?? 0) > 0
         if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
           operation.methodEvidenceSources.push("traffic")
@@ -3526,9 +3524,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             evidence[source] = unique([...evidence[source], ...(evidenceInput[source] ?? [])])
           }
           evidence.responseStatuses = [...new Set([...evidence.responseStatuses, ...(evidenceInput.responseStatuses ?? [])])]
-          if (evidence.requestIDs.length === 0 && (evidenceInput.requestIDs?.length ?? 0) > 0) {
-            evidence.requestIDs = unique(evidenceInput.requestIDs ?? [])
-          }
+          evidence.requestIDs = unique([...evidence.requestIDs, ...(evidenceInput.requestIDs ?? [])])
           if (!operation.methodEvidenceSources.includes(evidenceInput.source)) {
             operation.methodEvidenceSources.push(evidenceInput.source)
           }
