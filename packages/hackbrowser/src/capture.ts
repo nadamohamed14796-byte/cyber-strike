@@ -1,6 +1,44 @@
 import type { Page, Locator, ElementHandle, Request as PWRequest } from "playwright"
 import type { UIField, UIContext } from "./types.ts"
 
+
+/** Keep complete script, source-map, and HTML response bodies for offline analysis.
+ * Ordinary application responses retain the legacy preview cap to avoid storing
+ * arbitrarily large non-analysis payloads in the browser capture queue.
+ */
+export const MAX_CAPTURED_RESPONSE_BODY_BYTES = 500 * 1024
+
+export function captureResponseBody(input: {
+  url: string
+  headers: Record<string, string>
+  body: string
+  resourceType?: string
+}): { body: string; truncated: boolean } {
+  const contentType = Object.entries(input.headers)
+    .find(([name]) => name.toLowerCase() === "content-type")?.[1]
+    ?.split(";", 1)[0]?.trim().toLowerCase() ?? ""
+  let pathname = ""
+  try {
+    pathname = new URL(input.url).pathname
+  } catch {}
+
+  const completeAnalysisBody =
+    input.resourceType === "script" ||
+    /(?:java|ecma)script|x-javascript|source-map\+json|text\/x-source-map/i.test(contentType) ||
+    /^(?:text\/html|application\/xhtml\+xml)$/.test(contentType) ||
+    /\.(?:m?js|cjs|map|html?|xhtml)$/i.test(pathname)
+
+  if (completeAnalysisBody) return { body: input.body, truncated: false }
+  if (Buffer.byteLength(input.body, "utf8") <= MAX_CAPTURED_RESPONSE_BODY_BYTES) {
+    return { body: input.body, truncated: false }
+  }
+
+  const prefix = Buffer.from(input.body, "utf8")
+    .subarray(0, MAX_CAPTURED_RESPONSE_BODY_BYTES)
+    .toString("utf8")
+  return { body: prefix + "\n[TRUNCATED]", truncated: true }
+}
+
 // ============================================================
 // UI Context Capture
 // ============================================================
