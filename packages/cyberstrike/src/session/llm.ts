@@ -39,6 +39,8 @@ export namespace LLM {
     tools: Record<string, Tool>
     retries?: number
     toolChoice?: "auto" | "required" | "none"
+    /** Prevents requiring a fresh tool call on every assistant continuation for one user turn. */
+    requireToolCallThisTurn?: boolean
   }
 
   export type StreamOutput = StreamTextResult<ToolSet, unknown>
@@ -206,7 +208,11 @@ export namespace LLM {
     // later steps return to auto and can produce the final response.
     const toolChoice = input.toolChoice ?? (activeTools.length > 0 ? "auto" : undefined)
     const requireInitialToolCall =
-      !input.toolChoice && input.model.capabilities.toolcall && activeTools.length > 0 && actionableRequest
+      input.requireToolCallThisTurn !== false &&
+      !input.toolChoice &&
+      input.model.capabilities.toolcall &&
+      activeTools.length > 0 &&
+      actionableRequest
     if (activeTools.length > 0) {
       const toolExecutionContract = [
         "## Tool Execution Contract",
