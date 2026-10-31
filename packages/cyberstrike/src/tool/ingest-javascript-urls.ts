@@ -4,7 +4,7 @@ import path from "node:path"
 import z from "zod"
 import { gunzipSync } from "node:zlib"
 import { TargetMemory } from "../target"
-import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
+import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences, groupCanonicalJavaScriptEndpoints } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
 // Redirects are bounded to prevent unending redirect loops; URL/worklist count
@@ -857,10 +857,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             note.startsWith("PARTIAL SOURCE:") || note.startsWith("INLINE SOURCE MAP UNPARSED:"),
           )).length +
           (result.graph.sourceMapReferences ?? []).filter((item) => !["analyzed", "out-of-scope"].includes(item.status)).length
+        const canonicalEndpoints = groupCanonicalJavaScriptEndpoints([result.graph])
+        const operationCount = canonicalEndpoints.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)
         analysisSummary = [
           "JavaScript correlation snapshot: " + result.graphPath,
           "Endpoint inventory: " + result.endpointPath,
-          "Unique endpoint candidates: " + result.graph.endpointCandidates.length,
+          "Canonical endpoint records: " + canonicalEndpoints.length,
+          "Distinct method operations: " + operationCount,
           "Additional scenario candidates: " + (result.graph.additionalScenarios ?? []).length,
           "Sensitive data-field/literal candidates: " + (result.graph.javascriptAnalysis.dataExposureSignals ?? []).length,
           "Unique source records: " + analyzedSourceRecords,
