@@ -20,7 +20,7 @@ Build a defensible inventory of undocumented, deprecated, orphaned, or version-d
 
 ## Workflow
 1. Collect permitted passive evidence from first-party JavaScript and source maps, OpenAPI/Swagger documents, public changelogs, SDKs, mobile traffic supplied by the owner, API gateway route lists available to the tester, and archived URLs allowed by program rules.
-2. Normalize candidates by host, method, path template, version, content type, auth context, source, and last-seen evidence. Preserve distinct methods and parameter shapes.
+2. Group candidates under one canonical endpoint identity per normalized origin + route template + API version. Nest HTTP methods as independent operations and preserve each operation's content type, parameter shape, auth context, source provenance, and last-seen evidence. Keep contract-only, JavaScript-declared, and traffic-observed methods distinguishable; traffic alone does not establish JavaScript declaration.
 3. Classify each route as current/documented, undocumented active, deprecated, version-drifted, tenant-specific, staging-only, stale, or unverified. Do not infer liveness from a historical URL.
 4. Validate read-only routes first. Compare anonymous, low-privilege, and owner-authorized controlled accounts only where permitted. Use synthetic objects and avoid real-user enumeration or bulk collection.
 5. Test security-property parity between versions: authentication, object/function/property authorization, tenant isolation, sensitive-field exposure, and abuse controls only where specifically allowed.
