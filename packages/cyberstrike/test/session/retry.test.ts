@@ -51,6 +51,16 @@ describe("session.retry.delay", () => {
     expect(SessionRetry.delay(1, error)).toBe(2000)
   })
 
+  test("rejects infinite and negative retry-after-ms hints", () => {
+    expect(SessionRetry.delay(1, apiError({ "retry-after-ms": "Infinity" }))).toBe(2000)
+    expect(SessionRetry.delay(1, apiError({ "retry-after-ms": "-1500" }))).toBe(2000)
+  })
+
+  test("rejects infinite and negative retry-after seconds", () => {
+    expect(SessionRetry.delay(1, apiError({ "retry-after": "Infinity" }))).toBe(2000)
+    expect(SessionRetry.delay(1, apiError({ "retry-after": "-1" }))).toBe(2000)
+  })
+
   test("ignores past date retry hints", () => {
     const pastDate = new Date(Date.now() - 5000).toUTCString()
     const error = apiError({ "retry-after": pastDate })
