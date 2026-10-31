@@ -68,7 +68,7 @@ const EndpointEvidenceFields = z.object({
 })
 
 const Parameters = z.object({
-  target_url: z.string().min(1).describe("Existing canonical target workspace URL; must already be observed and in scope in this session."),
+  target_url: z.string().min(1).describe("Target URL that must resolve through the existing persisted scope to a canonical workspace; no same-session request is required."),
   origin: z.string().url().refine((value) => {
     const url = new URL(value)
     return (url.protocol === "http:" || url.protocol === "https:") &&
@@ -107,7 +107,7 @@ export const TargetEndpointTool = Tool.define<typeof Parameters, Tool.Metadata>(
     "The canonical target workspace and persisted scope must already exist; no same-session request or methodology phase is required. Both the requested target and the concrete endpoint origin/path are checked against saved scope before writing. This tool only records evidence; it does not test the endpoint or confirm a vulnerability.",
   ].join("\n"),
   parameters: Parameters,
-  async execute(params, ctx) {
+  async execute(params) {
     try {
       const requestedTarget = params.target_url
       const targetScope = await TargetMemory.checkURLScope(requestedTarget)
