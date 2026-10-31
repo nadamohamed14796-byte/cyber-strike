@@ -1,6 +1,6 @@
 import z from "zod"
 import { Tool } from "./tool"
-import { JavaScriptCorrelation } from "../target/javascript-correlation"
+import { JavaScriptCorrelation, groupCanonicalJavaScriptEndpoints } from "../target/javascript-correlation"
 
 const CorrelateJavaScriptParameters = z.object({
     target_url: z.string().min(1).describe("Target URL already approved for the current session"),
@@ -27,6 +27,12 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
         localOnly: true,
       })
       const graph = result.graph
+      const canonicalEndpoints = groupCanonicalJavaScriptEndpoints([graph])
+      const operationCount = canonicalEndpoints.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)
+      const trafficOperationCount = canonicalEndpoints.reduce(
+        (sum, endpoint) => sum + endpoint.operations.filter((operation) => operation.observedInTraffic).length,
+        0,
+      )
       return {
         title: graph.sourceFiles.length || result.capturedAssetCount ? "JavaScript correlation saved" : "JavaScript correlation incomplete",
         output: [
@@ -56,8 +62,9 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           "Static endpoint literals: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
           "Additional scenario candidates: " + (graph.additionalScenarios ?? []).length,
           "Sensitive data-field/literal candidates: " + (graph.javascriptAnalysis.dataExposureSignals ?? []).length,
-          "Unique endpoint candidates: " + graph.endpointCandidates.length,
-          "Candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
+          "Canonical endpoint records: " + canonicalEndpoints.length,
+          "Distinct method operations: " + operationCount,
+          "Operations observed in captured traffic: " + trafficOperationCount,
           "Captured response evidence nodes: " + graph.evidence.length,
           "Related requests/responses: " + graph.requests.length,
           "Web functions: " + graph.webFunctions.length,
