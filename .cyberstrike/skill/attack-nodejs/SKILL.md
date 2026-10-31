@@ -165,7 +165,7 @@ rg -n --glob '*.{js,mjs,cjs,ts,tsx}' \
   'app\.(get|post|put|patch|delete|use)|router\.(get|post|put|patch|delete|use)|setTrustProxy|trust proxy|child_process|eval\(|new Function|innerHTML|path\.join|fetch\(' src .
 ```
 
-Group route registrations under one endpoint identity per normalized origin + route template + API version. Keep each HTTP method and middleware chain as separate operation/registration evidence within that endpoint; do not create duplicate endpoint roots for GET versus POST. Trace body parsing, authentication, authorization, validation, handler, service, and side effect in that order. A route declaration alone does not show that middleware is missing.
+Group route registrations under one endpoint identity per normalized origin + route template + API version. Persist route and operation evidence using `target_endpoint`; keep each HTTP method/middleware chain distinct beneath the same endpoint. Keep each HTTP method and middleware chain as separate operation/registration evidence within that endpoint; do not create duplicate endpoint roots for GET versus POST. Trace body parsing, authentication, authorization, validation, handler, service, and side effect in that order. A route declaration alone does not show that middleware is missing.
 
 ### Node-specific review matrix
 
