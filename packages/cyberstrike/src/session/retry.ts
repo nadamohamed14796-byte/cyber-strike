@@ -29,29 +29,42 @@ export namespace SessionRetry {
     })
   }
 
+  function parseNonNegativeDelay(value: string): number | undefined | null {
+    const trimmed = value.trim()
+    // Distinguish malformed numeric values (e.g. -1, Infinity, overflow) from
+    // HTTP-date values. Invalid numeric hints must fall back to exponential
+    // backoff rather than being interpreted as dates or passed to setTimeout.
+    if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(trimmed)) return undefined
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed) || parsed < 0) return null
+    return parsed
+  }
+
   export function delay(attempt: number, error?: MessageV2.APIError) {
     if (error) {
       const headers = error.data.responseHeaders
       if (headers) {
         const retryAfterMs = headers["retry-after-ms"]
         if (retryAfterMs) {
-          const parsedMs = Number.parseFloat(retryAfterMs)
-          if (!Number.isNaN(parsedMs)) {
-            return parsedMs
+          const parsedMs = parseNonNegativeDelay(retryAfterMs)
+          if (parsedMs != null && parsedMs !== undefined) {
+            return Math.ceil(parsedMs)
           }
         }
 
         const retryAfter = headers["retry-after"]
         if (retryAfter) {
-          const parsedSeconds = Number.parseFloat(retryAfter)
-          if (!Number.isNaN(parsedSeconds)) {
+          const parsedSeconds = parseNonNegativeDelay(retryAfter)
+          if (parsedSeconds != null && parsedSeconds !== undefined) {
             // convert seconds to milliseconds
             return Math.ceil(parsedSeconds * 1000)
           }
-          // Try parsing as HTTP date format
-          const parsed = Date.parse(retryAfter) - Date.now()
-          if (!Number.isNaN(parsed) && parsed > 0) {
-            return Math.ceil(parsed)
+          if (parsedSeconds === undefined) {
+            // Try parsing a non-numeric value as an HTTP date.
+            const parsed = Date.parse(retryAfter) - Date.now()
+            if (!Number.isNaN(parsed) && parsed > 0) {
+              return Math.ceil(parsed)
+            }
           }
         }
 
