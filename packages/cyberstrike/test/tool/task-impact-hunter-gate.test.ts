@@ -2,7 +2,6 @@ import { expect, test } from "bun:test"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
-import { Agent } from "../../src/agent/agent"
 import { Vulnerability } from "../../src/session/vulnerability"
 import { TaskTool } from "../../src/tool/task"
 
@@ -34,15 +33,18 @@ test("manual Impact Hunter task dispatch is blocked for an untriaged finding can
             endpoint: "POST https://task-gate.example.test/api/home",
           },
         })
-        const caller = await Agent.get("cyberstrike")
-        expect(caller).toBeDefined()
-        const task = await TaskTool.init({ agent: caller })
+        // Simulate an explicit @-invocation: no inherited agent identity, with
+        // ordinary task permission bypass enabled. The Impact Hunter-specific
+        // evidence gate must still run before creating a child session.
+        const task = await TaskTool.init({} as any)
+        const manualCtx = mockCtx(session.id)
+        manualCtx.extra = { bypassAgentCheck: true }
         await expect(task.execute({
           description: "Impact Hunter",
           subagent_type: "impact-hunter",
           background: true,
           prompt: "Investigate this finding.\nfinding_id: " + finding.id,
-        } as any, mockCtx(session.id))).rejects.toThrow("not explicitly triage-approved")
+        } as any, manualCtx)).rejects.toThrow("not explicitly triage-approved")
         expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
       } finally {
         await Session.remove(session.id)
@@ -73,15 +75,15 @@ test("manual Impact Hunter dispatch is blocked even when a finding is approved w
           status: "approved",
           expectedStatus: "new",
         })).toBe(true)
-        const caller = await Agent.get("cyberstrike")
-        expect(caller).toBeDefined()
-        const task = await TaskTool.init({ agent: caller })
+        const task = await TaskTool.init({} as any)
+        const manualCtx = mockCtx(session.id)
+        manualCtx.extra = { bypassAgentCheck: true }
         await expect(task.execute({
           description: "Impact Hunter",
           subagent_type: "impact-hunter",
           background: true,
           prompt: "Investigate this finding.\nfinding_id: " + finding.id,
-        } as any, mockCtx(session.id))).rejects.toThrow("does not have a latest confirmed ten-check validation")
+        } as any, manualCtx)).rejects.toThrow("does not have a latest confirmed ten-check validation")
       } finally {
         await Session.remove(session.id)
       }
