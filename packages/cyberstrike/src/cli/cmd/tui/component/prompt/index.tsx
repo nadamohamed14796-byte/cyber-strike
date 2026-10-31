@@ -679,6 +679,64 @@ export function Prompt(props: PromptProps) {
           )
         : undefined
 
+    // Selecting Impact Hunter from Tab / the agent picker is a request to start
+    // an independent investigation, not to replace the active discovery agent in
+    // this transcript. Attach the child directly to the root so it inherits the
+    // same finding/request database and appears in the root sidebar.
+    const currentSession = props.sessionID
+      ? sync.data.session.find((item) => item.id === props.sessionID)
+      : undefined
+    if (
+      store.mode !== "shell" &&
+      agentName === "impact-hunter" &&
+      props.sessionID &&
+      !currentSession?.title.startsWith("Impact Hunter")
+    ) {
+      let root = currentSession
+      const visited = new Set<string>()
+      while (root?.parentID && !visited.has(root.id)) {
+        visited.add(root.id)
+        root = sync.data.session.find((item) => item.id === root?.parentID)
+      }
+      const parentID = root?.id ?? props.sessionID
+      try {
+        const created = await sdk.client.session.create({
+          parentID,
+          title: "Impact Hunter - Manual Review",
+        })
+        if (!created.data?.id) throw new Error("The server did not return an Impact Hunter session ID.")
+        await sdk.client.session.promptAsync({
+          sessionID: created.data.id,
+          ...selectedModel,
+          messageID,
+          agent: "impact-hunter",
+          model: selectedModel,
+          variant,
+          parts: [
+            {
+              id: Identifier.ascending("part"),
+              type: "text",
+              text: inputText,
+            },
+            ...nonTextParts.map((x) => ({
+              id: Identifier.ascending("part"),
+              ...x,
+            })),
+          ],
+        })
+        history.append(submittedPrompt)
+        input.extmarks.clear()
+        setStore("prompt", { input: "", parts: [] })
+        setStore("extmarkToPartIndex", new Map())
+        props.onSubmit?.()
+        input.clear()
+        route.navigate({ type: "session", sessionID: created.data.id })
+      } catch (error) {
+        handleSubmissionFailure("Impact Hunter", error, submittedPrompt, props.sessionID)
+      }
+      return
+    }
+
     if (store.mode === "shell") {
       void sdk.client.session.shell({
         sessionID,
