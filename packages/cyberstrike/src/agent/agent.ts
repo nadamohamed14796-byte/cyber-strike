@@ -388,6 +388,7 @@ export namespace Agent {
             websearch: "allow",
             report_vulnerability: "allow",
             triage_vulnerability: "allow",
+            update_finding_impact: "allow",
             validate_finding: "allow",
             correlate_javascript: "allow",
             research_knowledge: "allow",
