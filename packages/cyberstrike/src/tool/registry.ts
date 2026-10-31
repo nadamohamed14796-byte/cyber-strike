@@ -12,6 +12,7 @@ import { VerificationAttemptTool } from "./verification-attempt"
 import { TriageVulnerabilityTool } from "./triage-vulnerability"
 import { ValidateFindingTool } from "./validate-finding"
 import { UpdateFindingImpactTool } from "./update-finding-impact"
+import { UpdateFindingEvidenceTool } from "./update-finding-evidence"
 import { FalsePositiveMemoryTool } from "./false-positive-memory"
 import { CorrelateJavaScriptTool } from "./correlate-javascript"
 import { IngestJavaScriptURLsTool } from "./ingest-javascript-urls"
@@ -177,6 +178,7 @@ export namespace ToolRegistry {
       TriageVulnerabilityTool,
       ValidateFindingTool,
       UpdateFindingImpactTool,
+      UpdateFindingEvidenceTool,
       FalsePositiveMemoryTool,
       IngestJavaScriptURLsTool,
       CorrelateJavaScriptTool,
