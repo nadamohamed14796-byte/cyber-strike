@@ -3,7 +3,7 @@ import { Tool } from "./tool"
 import { Session } from "../session"
 import { Vulnerability } from "../session/vulnerability"
 import { VerificationLedger } from "../session/verification-ledger"
-import { FindingValidation } from "../methodology/finding-validation"
+import { FindingValidation, hasCompleteConfirmedValidation } from "../methodology/finding-validation"
 import { TargetMemory } from "../target"
 import { persistTargetFindingLink } from "../methodology/finding-reference"
 import { redactTargetNoteSecrets } from "../target/redact"
@@ -68,14 +68,14 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     const validationHistory = FindingValidation.history({ sessionID, vulnerabilityID: finding.id, limit: 100 })
     const baselineValidation = validationHistory.find((item) => item.id === params.baseline_validation_id)
     const latest = validationHistory[0]
-    if (!baselineValidation || baselineValidation.verdict !== "confirmed") {
+    if (!hasCompleteConfirmedValidation(baselineValidation)) {
       return {
         title: "Impact update blocked",
         output: "baseline_validation_id does not match a stored confirmed validation for this finding. Re-read the exact handoff context; no severity change was made.",
         metadata: { updated: false, reason: "baseline_validation_not_found" },
       }
     }
-    if (!latest || latest.verdict !== "confirmed" || latest.id === baselineValidation.id || latest.time_created <= baselineValidation.time_created) {
+    if (!hasCompleteConfirmedValidation(latest) || latest.id === baselineValidation.id || latest.time_created <= baselineValidation.time_created) {
       return {
         title: "Impact update blocked",
         output: "A newer confirmed ten-check validation is required after the Impact Hunter handoff. Run validate_finding after the new impact tests; the initial approval validation is not sufficient.",
