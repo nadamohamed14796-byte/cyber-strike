@@ -3262,6 +3262,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       state.sourceFiles ??= []
       state.operations ??= []
       state.unattributed ??= emptyFields()
+      for (const field of [
+        "pathParameters", "queryParameters", "bodyParameters", "headerNames",
+        "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
+      ] as const) {
+        state.unattributed[field] ??= []
+      }
       for (const operation of state.operations) {
         operation.methodEvidenceSources ??= []
         operation.evidence ??= []
