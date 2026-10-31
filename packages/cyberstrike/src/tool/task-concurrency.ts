@@ -107,6 +107,6 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
 // Independent Main Recon and Extension Proxy lanes can progress together, but
 // neither can spawn an unbounded number of live model/tool loops in one process.
 export const AgentTaskConcurrency = createTaskScheduler({
-  maxConcurrent: 3,
+  maxConcurrent: 4,
   maxPerLane: 2,
 })
