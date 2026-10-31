@@ -124,6 +124,21 @@ test("only Impact Hunter can update an approved finding after confirmed ten-chec
         expect(saved?.status).toBe("approved")
         expect(saved?.description).toContain("[Impact Hunter — evidence-backed impact escalation]")
         expect(saved?.description).toContain(impactProof.evidenceRef)
+
+        const laterValidation = await FindingValidation.record({
+          sessionID: session.id,
+          vulnerabilityID: finding.id,
+          checks: FINDING_VALIDATION_CHECKS.map((check) => ({
+            id: check.id,
+            status: "pass" as const,
+            reason: "Rechecked after impact escalation persistence",
+            evidence: "Repeated the controlled evidence review for " + check.id,
+          })),
+        })
+        expect(laterValidation.verdict).toBe("confirmed")
+        const afterRevalidation = Vulnerability.get(session.id).find((row) => row.id === finding.id)
+        expect(afterRevalidation?.description).toContain(impactProof.evidenceRef)
+        expect(afterRevalidation?.description).toContain("[Latest finding validation]")
       } finally {
         await Session.remove(session.id)
       }
