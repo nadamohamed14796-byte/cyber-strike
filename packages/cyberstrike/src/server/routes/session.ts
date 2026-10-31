@@ -2657,7 +2657,17 @@ export const SessionRoutes = lazy(() =>
             if (!targetSession.parentID || !targetSession.title.startsWith("Impact Hunter")) {
               throw new Error("Manual Impact Hunter prompts must run in a dedicated child session under the active root.")
             }
-            await SessionPrompt.prompt({ ...body, sessionID, noReply: true })
+            try {
+              await SessionPrompt.prompt({ ...body, sessionID, noReply: true })
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error)
+              log.error("manual Impact Hunter prompt could not be saved", { sessionID, error })
+              Bus.publish(Session.Event.Error, {
+                sessionID,
+                error: new NamedError.Unknown({ message: `Impact Hunter prompt failed: ${message}` }).toObject(),
+              })
+              return
+            }
             AgentTaskConcurrency.enqueue(
               "impact",
               async () => {
