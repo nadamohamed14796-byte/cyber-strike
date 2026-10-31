@@ -12,6 +12,7 @@ import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
 import { Request } from "../session/request"
+import { Vulnerability } from "../session/vulnerability"
 import { CoverageNote } from "../session/coverage-note"
 import { WebCredential } from "../session/web/web-credential"
 import { Observation } from "../session/observation"
@@ -106,24 +107,29 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Every Impact Hunter launch is evidence-gated, including explicit
       // @-invocations that bypass ordinary task permissions.
       if (params.subagent_type === "impact-hunter") {
-        const findingID = /^finding_id:\\s*([^\\s]+)\\s*$/m.exec(params.prompt)?.[1]
+        const promptLines = params.prompt.split("\n").map((line) => line.trim())
+        const promptField = (name: string) => promptLines
+          .find((line) => line.startsWith(name + ":"))
+          ?.slice(name.length + 1)
+          .trim()
+        const findingID = promptField("finding_id")
         if (!findingID) {
           throw new Error("Impact Hunter dispatch requires an exact finding_id in the task prompt.")
         }
-        const modeValue = /^handoff_mode:\\s*(proof_gap|approved_impact)\\s*$/m.exec(params.prompt)?.[1]
-        if (!modeValue) {
+        const modeValue = promptField("handoff_mode")
+        if (modeValue !== "proof_gap" && modeValue !== "approved_impact") {
           throw new Error("Impact Hunter dispatch requires handoff_mode=proof_gap or handoff_mode=approved_impact.")
         }
-        const mode = modeValue as ImpactHunterMode
+        const mode: ImpactHunterMode = modeValue
         const rootSessionID = Session.root(ctx.sessionID)
-        const finding = (await import("../session/vulnerability")).Vulnerability.get(rootSessionID)
-          .find((item) => item.id === findingID)
+        const finding = Vulnerability.get(rootSessionID).find((item) => item.id === findingID)
         if (!finding) {
           throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " was not found in the current session.")
         }
 
-        const requestIDsInPrompt = [...params.prompt.matchAll(/^supporting_request_ids:\\s*(.+)\\s*$/gim)]
-          .flatMap((match) => (match[1] ?? "").split(",").map((item) => item.trim()))
+        const requestIDsInPrompt = (promptField("supporting_request_ids") ?? "")
+          .split(",")
+          .map((item) => item.trim())
           .filter((item) => item && item.toLowerCase() !== "none")
         const preferredRequestIDs = [...new Set([
           ...(params.request_id ? [params.request_id] : []),
@@ -140,7 +146,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         }
 
         if (mode === "approved_impact") {
-          const baselineValidationID = /^baseline_validation_id:\\s*([^\\s]+)\\s*$/m.exec(params.prompt)?.[1]
+          const baselineValidationID = promptField("baseline_validation_id")
           if (!baselineValidationID || baselineValidationID !== gate.baselineValidationID) {
             throw new Error("Impact Hunter dispatch is blocked: the prompt baseline_validation_id does not match the latest confirmed ten-check validation.")
           }
