@@ -241,10 +241,24 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             // can repeat expensive testing and lose the checkpoint the caller meant to continue.
             throw new Error("Cannot resume task " + params.task_id + ": session not found; refusing to start a duplicate task.")
           }
-          // Task IDs are model-supplied input. Only resume a child owned by this
-          // exact parent session; otherwise a stale/arbitrary ID could attach
-          // another session's private history to the current agent's task.
-          assertTaskResumeScope(found, ctx.sessionID)
+          // Ordinary task IDs stay bound to their exact parent. The one
+          // finding-specific Impact Hunter session may be resumed by another
+          // agent under the SAME root session, but only when its title embeds
+          // the exact finding ID carried by the independently checked handoff.
+          const promptFindingID = params.prompt
+            .split("\\n")
+            .map((line) => line.trim())
+            .find((line) => line.startsWith("finding_id:"))
+            ?.slice("finding_id:".length)
+            .trim()
+          const sameRootImpactHunter = params.subagent_type === "impact-hunter" &&
+            Boolean(found.parentID) &&
+            Session.root(found.parentID!) === Session.root(ctx.sessionID) &&
+            Boolean(promptFindingID) &&
+            found.title === "Impact Hunter finding " + promptFindingID + " (@impact-hunter subagent)"
+          if (found.parentID !== ctx.sessionID && !sameRootImpactHunter) {
+            assertTaskResumeScope(found, ctx.sessionID)
+          }
           return found
         }
 
