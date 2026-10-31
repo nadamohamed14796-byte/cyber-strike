@@ -1,7 +1,7 @@
 import { test, expect, beforeAll, afterAll } from "bun:test"
 import { chromium, type Browser, type Page } from "playwright"
 import { readFileSync } from "fs"
-import { snapshotPageUI } from "../src/capture.ts"
+import { captureResponseBody, MAX_CAPTURED_RESPONSE_BODY_BYTES, snapshotPageUI } from "../src/capture.ts"
 
 let browser: Browser
 
@@ -337,4 +337,32 @@ test("BUG-30: data-test (generic) works as last test-infra fallback", async () =
   expect(comment!.type).toBe("textarea")
 
   await page.close()
+})
+
+
+test("keeps complete JavaScript, source-map, and HTML responses beyond the ordinary capture preview cap", () => {
+  const body = "x".repeat(MAX_CAPTURED_RESPONSE_BODY_BYTES + 4096)
+  const cases = [
+    { url: "https://app.example.test/assets/app.js", headers: { "content-type": "application/javascript" } },
+    { url: "https://app.example.test/assets/app.js.map", headers: { "content-type": "application/json" } },
+    { url: "https://app.example.test/dashboard", headers: { "content-type": "text/html; charset=utf-8" } },
+    { url: "https://app.example.test/scripts/runtime", headers: { "content-type": "application/octet-stream" }, resourceType: "script" },
+  ]
+  for (const item of cases) {
+    const result = captureResponseBody({ ...item, body })
+    expect(result.body).toBe(body)
+    expect(result.truncated).toBe(false)
+  }
+})
+
+test("retains the legacy cap for oversized ordinary JSON responses and marks truncation", () => {
+  const body = "x".repeat(MAX_CAPTURED_RESPONSE_BODY_BYTES + 4096)
+  const result = captureResponseBody({
+    url: "https://app.example.test/api/profile",
+    headers: { "content-type": "application/json" },
+    body,
+  })
+  expect(result.truncated).toBe(true)
+  expect(result.body).toEndWith("\n[TRUNCATED]")
+  expect(Buffer.byteLength(result.body, "utf8")).toBeLessThanOrEqual(MAX_CAPTURED_RESPONSE_BODY_BYTES + Buffer.byteLength("\n[TRUNCATED]", "utf8"))
 })
