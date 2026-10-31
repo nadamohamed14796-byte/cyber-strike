@@ -51,10 +51,10 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
         metadata: { updated: false, reason: "finding_not_new", currentStatus: finding.status },
       }
     }
-    if (finding.poc?.trim()) {
+    if (finding.candidate == null && finding.poc?.trim()) {
       return {
         title: "Finding evidence update blocked",
-        output: "This candidate already has a PoC. Do not overwrite it; validate the current PoC or create a materially distinct hypothesis.",
+        output: "This finding already contains a PoC and is not marked execution-unconfirmed. Do not overwrite it; validate the current PoC or create a materially distinct hypothesis.",
         metadata: { updated: false, reason: "poc_already_present" },
       }
     }
@@ -122,7 +122,13 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       sessionID,
       id: finding.id,
       description: descriptionCore + evidenceBlock + validationTail,
-      poc: redactTargetNoteSecrets(params.poc.trim()),
+      poc: [
+        finding.poc?.trim()
+          ? "[Prior candidate evidence / unverified baseline notes]\n" + redactTargetNoteSecrets(finding.poc.trim())
+          : "",
+        "[Impact Hunter — reproducible PoC backed by durable evidence]",
+        redactTargetNoteSecrets(params.poc.trim()),
+      ].filter(Boolean).join("\n\n"),
       steps_to_reproduce: redactTargetNoteSecrets(params.steps_to_reproduce.trim()),
       business_impact: redactTargetNoteSecrets(params.demonstrated_impact.trim()),
       ...(params.recommendation ? { recommendation: redactTargetNoteSecrets(params.recommendation.trim()) } : {}),
