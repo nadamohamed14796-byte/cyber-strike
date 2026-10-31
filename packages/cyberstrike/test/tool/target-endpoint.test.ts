@@ -89,3 +89,45 @@ test("target_endpoint accepts valid HTTP method tokens and rejects whitespace", 
     operations: [{ method: "BAD METHOD" }],
   }).success).toBe(false)
 })
+
+test("target_endpoint requires separate evidence entries for multiple sources", async () => {
+  const tool = await TargetEndpointTool.init()
+  const base = {
+    target_url: "https://example.com",
+    origin: "https://api.example.com",
+    path: "/api/users",
+  }
+  expect(tool.parameters.safeParse({
+    ...base,
+    operations: [{
+      method: "POST",
+      method_evidence_sources: ["javascript", "traffic"],
+      body_parameters: ["name"],
+    }],
+  }).success).toBe(false)
+
+  expect(tool.parameters.safeParse({
+    ...base,
+    operations: [{
+      method: "POST",
+      method_evidence_sources: ["javascript", "traffic"],
+      body_parameters: ["name"],
+      evidence: [
+        { source: "javascript", body_parameters: ["name"] },
+        { source: "traffic", request_ids: ["req-1"] },
+      ],
+    }],
+  }).success).toBe(true)
+})
+
+test("target_endpoint accepts only pure HTTP(S) origins and path-only route templates", async () => {
+  const tool = await TargetEndpointTool.init()
+  const base = {
+    target_url: "https://example.com",
+    path: "/api/users",
+    operations: [{ method: "GET" }],
+  }
+  expect(tool.parameters.safeParse({ ...base, origin: "https://api.example.com/v1" }).success).toBe(false)
+  expect(tool.parameters.safeParse({ ...base, origin: "https://api.example.com", path: "/api/users?role=admin" }).success).toBe(false)
+  expect(tool.parameters.safeParse({ ...base, origin: "https://api.example.com" }).success).toBe(true)
+})
