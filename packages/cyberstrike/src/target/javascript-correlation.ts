@@ -2424,18 +2424,33 @@ export namespace JavaScriptCorrelation {
         db.select().from(RequestTable).where(inArray(RequestTable.session_id, ids)).all(),
       )),
     )
+    // HTML responses may own separately persisted inline-script captures. Include
+    // their parent request even when the page host differs from the canonical target
+    // host; the exact request URL still passes the persisted scope gate below.
+    const capturedJavaScriptRequestIDs = new Set(
+      Database.use((db) =>
+        chunkForSQLiteIn(sessionIDs).flatMap((ids) =>
+          db.select({ request_id: RequestJavaScriptCaptureTable.request_id })
+            .from(RequestJavaScriptCaptureTable)
+            .where(inArray(RequestJavaScriptCaptureTable.session_id, ids))
+            .all()
+            .map((row) => row.request_id),
+        ),
+      ),
+    )
     const candidateRequests = requests.filter((request) => {
       const hostURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
       if (!hostURL) return false
       const host = hostURL.hostname.toLowerCase()
       const isTargetHost = host === targetURL.hostname || host.endsWith("." + targetURL.hostname)
-      // Keep already-captured script/map responses in the candidate set even on a
+      const hasCapturedJavaScriptSource = capturedJavaScriptRequestIDs.has(request.id)
+      // Keep already-captured script/map/inline-source parent requests even on a
       // different host or path. The authoritative persisted scope gate below decides
       // whether each exact response URL is eligible; a hostname match alone never does.
       const capturedScriptOrMap = isJavaScriptOrSourceMapResponse(
         request.response_content_type,
         request.normalized_path,
-      )
+      ) || hasCapturedJavaScriptSource
       if (isTargetHost) {
         if (host === targetURL.hostname && targetPath !== "/" && !capturedScriptOrMap) {
           const pageURL = safeURL(request.page_url)
