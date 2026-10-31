@@ -9,7 +9,7 @@ import { TargetMemory } from "../../src/target"
 import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { tmpdir } from "../fixture/fixture"
 import { createJavaScriptScenarioCandidates } from "../../src/target/javascript-scenarios"
-import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, groupCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation, mergeCapturedAndLocalJavaScriptSources, linkLocalSourceMapSources } from "../../src/target/javascript-correlation"
+import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, groupCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation, mergeCapturedAndLocalJavaScriptSources, linkLocalSourceMapSources, attachPersistedCaptureSourceURLs } from "../../src/target/javascript-correlation"
 
 
 test("builds source-linked additional scenarios and connects workflow, endpoint, request, risk, and secret evidence", () => {
@@ -1098,6 +1098,61 @@ test("deduplicates ingested assets against captured responses by hash and canoni
     "captured/cdn.example.test/bundle.js-bundle",
   ])
   expect(merged[1]?.sourceRequestID).toBe("req_capture")
+})
+
+test("restores exact URLs for persisted captured files and their virtual source-map children", () => {
+  const capturedJavaScript: JavaScriptSourceFile = {
+    relativePath: "javascript/captured/bundle.js",
+    basename: "bundle.js",
+    sha256: "bundle-sha",
+    bytes: 100,
+    endpointLiterals: [],
+    sourceURL: "https://app.example.test",
+  }
+  const capturedHTMLInline: JavaScriptSourceFile = {
+    ...capturedJavaScript,
+    relativePath: "javascript/captured/page.html#inline-1",
+    basename: "page.inline-1.js",
+  }
+  const mapURL = "local://javascript/captured/source-map.map"
+  const mapRecord: JavaScriptSourceFile = {
+    relativePath: "source-maps/app/hash/source-map.map",
+    basename: "source-map.map",
+    sha256: "map-sha",
+    bytes: 200,
+    endpointLiterals: [],
+    sourceURL: mapURL,
+    sourceMapURL: mapURL,
+    sourceMapStatus: "analyzed",
+  }
+  const embedded: JavaScriptSourceFile = {
+    ...mapRecord,
+    relativePath: "source-maps/app/hash/sources/0001-profile.ts",
+    basename: "profile.ts",
+    sha256: "profile-sha",
+    bytes: 50,
+    sourceMapSource: "src/profile.ts",
+  }
+  const unrelated: JavaScriptSourceFile = {
+    ...capturedJavaScript,
+    relativePath: "javascript/local-only.js",
+  }
+
+  attachPersistedCaptureSourceURLs(
+    [capturedJavaScript, capturedHTMLInline, mapRecord, embedded, unrelated],
+    [
+      { file: "javascript/captured/bundle.js", url: "https://app.example.test/assets/bundle.js?signature=hidden" },
+      { file: "javascript/captured/page.html", url: "https://app.example.test/page.html?cache=1" },
+      { file: "javascript/captured/source-map.map", url: "https://app.example.test/assets/source-map.map?token=hidden" },
+    ],
+  )
+
+  expect(capturedJavaScript.sourceURL).toBe("https://app.example.test/assets/bundle.js")
+  expect(capturedHTMLInline.sourceURL).toBe("https://app.example.test/page.html")
+  expect(mapRecord.sourceMapURL).toBe("https://app.example.test/assets/source-map.map")
+  expect(embedded.sourceMapURL).toBe("https://app.example.test/assets/source-map.map")
+  expect(embedded.sourceURL).toBe("https://app.example.test/assets/source-map.map")
+  expect(unrelated.sourceURL).toBe("https://app.example.test")
 })
 
 test("preserves distinct source-map source identities while deduplicating the same embedded source", () => {
