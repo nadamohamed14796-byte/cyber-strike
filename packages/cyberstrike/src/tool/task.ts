@@ -472,7 +472,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Keep Main Recon and Extension Proxy as independent execution lanes.
       // Each lane may run two sibling specialists; the process-wide scheduler
       // admits at most three agent loops so a fan-out cannot exhaust WSL memory.
-      const taskLane = `${Session.root(ctx.sessionID)}:${callerID === "proxy-agent" ? "extension" : "main"}`
+      const taskLane = `${Session.root(ctx.sessionID)}:${params.subagent_type === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
 
       if (params.background) {
         // Persist the child prompt immediately, then queue its detached loop through
