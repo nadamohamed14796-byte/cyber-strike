@@ -72,6 +72,14 @@ test("Impact Hunter persists a verified PoC onto the same candidate without appr
       const session = await Session.create({})
       try {
         const finding = await makeCandidate(session.id)
+        const baselineNotes = "The captured response contains the submitted marker as encoded HTML text; no executable payload or browser-side trigger has been demonstrated."
+        expect(Vulnerability.update({
+          sessionID: session.id,
+          id: finding.id,
+          poc: baselineNotes,
+          candidate: "high",
+          expectedStatus: "new",
+        })).toBe(true)
         const proof = recordConfirmedProof(session.id, finding, "attribute-context")
         const tool = await UpdateFindingEvidenceTool.init()
         const result = await tool.execute({
@@ -99,7 +107,10 @@ test("Impact Hunter persists a verified PoC onto the same candidate without appr
         const saved = Vulnerability.get(session.id).find((row) => row.id === finding.id)
         expect(saved?.id).toBe(finding.id)
         expect(saved?.status).toBe("new")
-        expect(saved?.severity).toBe("medium")
+        expect(saved?.severity).toBe("high")
+        expect(saved?.candidate).toBeUndefined()
+        expect(saved?.poc).toContain("Prior candidate evidence / unverified baseline notes")
+        expect(saved?.poc).toContain(baselineNotes)
         expect(saved?.poc).toContain("Proof request:")
         expect(saved?.steps_to_reproduce).toContain("researcher-owned test account")
         expect(saved?.business_impact).toContain("controlled marker executes")
@@ -108,6 +119,7 @@ test("Impact Hunter persists a verified PoC onto the same candidate without appr
         expect(saved?.line_end).toBe(202)
         expect(saved?.description).toContain("[Impact Hunter — PoC gap closed; pending full validation]")
         expect(result.output).toContain("remains NEW / unapproved")
+        expect(result.output).toContain("claimed severity restored provisionally")
         expect(result.output).toContain("all ten validate_finding checks")
       } finally {
         await Session.remove(session.id)
