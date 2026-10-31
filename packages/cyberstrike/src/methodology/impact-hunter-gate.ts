@@ -30,13 +30,13 @@ function endpointParts(endpoint: string): { method?: string; origin?: string; pa
   try {
     const url = new URL(raw)
     return {
-      method: methodMatch?.[1]?.toUpperCase(),
+      method: methodMatch?.method,
       origin: url.origin,
       path: normalizePath(url.pathname),
     }
   } catch {
     return {
-      method: methodMatch?.[1]?.toUpperCase(),
+      method: methodMatch?.method,
       path: normalizePath(raw),
     }
   }
