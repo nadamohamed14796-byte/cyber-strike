@@ -1399,6 +1399,18 @@ const verifyButton = <button onClick={verifyEmailToken}>Verify</button>`,
         expect(observedEndpoint?.observedInTraffic).toBe(true)
         expect(result.graph.edges.some((edge) => edge.to === "request:" + apiRequest!.id && edge.relation === "static-endpoint-path-overlap")).toBe(true)
         expect(result.graph.evidence.some((item) => item.requestID === apiRequest!.id)).toBe(true)
+        const canonicalEndpointIDs = new Set(groupCanonicalJavaScriptEndpoints([{
+          endpointCandidates: result.graph.endpointCandidates,
+          requests: result.graph.requests,
+        }]).map((endpoint) => endpoint.id))
+        const linkedScenarios = (result.graph.additionalScenarios ?? []).filter((scenario) => scenario.relatedEndpointIDs.length > 0)
+        expect(linkedScenarios.length).toBeGreaterThan(0)
+        for (const scenario of linkedScenarios) {
+          for (const endpointID of scenario.relatedEndpointIDs) {
+            expect(endpointID.startsWith("endpoint:")).toBe(true)
+            expect(canonicalEndpointIDs.has(endpointID)).toBe(true)
+          }
+        }
         expect(diskGraph.sourceMapReferences.find((item: { url: string }) => item.url === sourceMapURL).status).toBe("analyzed")
         expect(endpointInventory.endpoints.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
         expect(testerSurvey.cases.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
