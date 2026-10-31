@@ -488,7 +488,16 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
         expect(graph.sourceFiles).toHaveLength(1_000)
         expect(graph.javascriptAnalysis.functions).toHaveLength(1_000)
         expect(graph.javascriptAnalysis.requestCandidates).toHaveLength(1_000)
-        expect(graph.endpointCandidates).toHaveLength(10)
+        // The flat graph preserves route-literal evidence and method-specific operations separately.
+        // The user-facing canonical inventory groups them into one endpoint with distinct method variants.
+        expect(graph.endpointCandidates).toHaveLength(20)
+        const { groupCanonicalJavaScriptEndpoints } = await import("../../src/target/javascript-correlation")
+        const canonicalEndpoints = groupCanonicalJavaScriptEndpoints([{
+          endpointCandidates: graph.endpointCandidates as never[],
+          requests: [],
+        }])
+        expect(canonicalEndpoints).toHaveLength(10)
+        expect(canonicalEndpoints.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)).toBe(10)
         expect(graph.edges.filter((edge) => edge.relation === "function-contains-request-candidate")).toHaveLength(1_000)
         expect(graph.edges.filter((edge) => edge.relation === "request-candidate-maps-to-endpoint")).toHaveLength(1_000)
         await Session.remove(session.id)

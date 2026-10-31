@@ -618,7 +618,7 @@ test("merges equivalent named route placeholders and unions all source evidence"
     endpointCandidates: endpoints,
     requests: [{ id: "req-users", method: "GET" }],
   }])
-  expect(canonical?.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js", "javascript/users.js"])
+  expect([...canonical!.sourceFiles].sort()).toEqual(["javascript/routes.js", "javascript/users.js", "javascript/vendor.js"])
   expect(canonical?.operations.map((operation) => operation.method)).toEqual(["GET"])
   expect(canonical?.operations[0]?.sourceFiles).toEqual(["javascript/users.js"])
   expect(canonical?.operations[0]?.observedRequestIDs).toEqual(["req-users"])

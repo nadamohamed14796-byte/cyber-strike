@@ -3212,10 +3212,24 @@ export namespace JavaScriptCorrelation {
       graph.javascriptAnalysis.requestCandidates,
       graph.requests,
     )
+    const scenarioEndpointRecords = groupCanonicalJavaScriptEndpoints([{
+      endpointCandidates: graph.endpointCandidates,
+      requests: graph.requests,
+    }])
+    const scenarioEndpoints = scenarioEndpointRecords.map((endpoint) => ({
+      id: endpoint.id,
+      path: endpoint.path,
+      method: null,
+      sourceFiles: endpoint.sourceFiles,
+      observedRequestIDs: [...new Set([
+        ...endpoint.unattributed.observedRequestIDs,
+        ...endpoint.operations.flatMap((operation) => operation.observedRequestIDs),
+      ])],
+    }))
     graph.additionalScenarios = createJavaScriptScenarioCandidates({
       sourceFiles: graph.sourceFiles,
       requestCandidates: graph.javascriptAnalysis.requestCandidates,
-      endpoints: graph.endpointCandidates,
+      endpoints: scenarioEndpoints,
       workflowSignals: graph.javascriptAnalysis.workflowSignals ?? [],
       applicationHints: graph.javascriptAnalysis.applicationHints ?? [],
       roleHints: graph.javascriptAnalysis.roleHints,
