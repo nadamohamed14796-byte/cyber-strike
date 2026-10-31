@@ -3161,12 +3161,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     return withTargetNoteWriteLock(targetKey, async () => {
       const workspace = await ensure(input.targetURL, { reconcileNotes: false })
       const origin = input.origin ? new URL(input.origin).origin.toLowerCase() : "*"
-      const cleanPath = (input.path.split(/[?#]/, 1)[0] ?? "/").replace(/\\/{2,}/g, "/").replace(/\\/+$/, "") || "/"
+      const cleanPath = (input.path.split(/[?#]/, 1)[0] ?? "/").replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
       const identityShape = cleanPath.split("/").map((segment) =>
-        /^\\{[^}]+\\}$/.test(segment) ? "{}" : segment,
+        /^\{[^}]+\}$/.test(segment) ? "{}" : segment,
       ).join("/")
       const identityHash = createHash("sha256")
-        .update([origin, identityShape].join("\\0"))
+        .update([origin, identityShape].join("\0"))
         .digest("hex")
         .slice(0, 32)
       const identityKey = "endpoint:" + identityHash
@@ -3294,7 +3294,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         ENDPOINT_RECORD_BEGIN,
         structured,
         ENDPOINT_RECORD_END,
-      ].join("\\n")
+      ].join("\n")
       const hasTraffic = state.operations.some((operation) => operation.observedInTraffic)
       return addNoteUnlocked(input.targetURL, {
         kind: "endpoint",
