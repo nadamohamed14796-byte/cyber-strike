@@ -2208,7 +2208,7 @@ export namespace JavaScriptCorrelation {
     const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
     const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, snapshotSelector])).digest("hex").slice(0, 12)
     const graphFilename = filenameHost + "-" + digest + ".json"
-    const endpointFilename = graphFilename
+    const endpointFilename = filenameHost + "-" + digest + "-endpoints.json"
     const testerSurveyRelativePath = path.posix.join("findings", "tester-survey-" + digest + ".json")
     const legacyTesterSurveyRelativePath = path.posix.join("testing", "tester-survey-" + digest + ".json")
     const analysisCache = new Map<string, JavaScriptSourceAnalysis>()
@@ -3292,7 +3292,7 @@ export namespace JavaScriptCorrelation {
       targetURL: graph.targetURL,
       sessionID: graph.sessionID,
       sourceGraph: path.posix.join("javascript", graphFilename),
-      sourceEndpointInventory: path.posix.join("endpoints", endpointFilename),
+      sourceEndpointInventory: path.posix.join("recon", endpointFilename),
       cases: testerCases,
       additionalScenarios: graph.additionalScenarios ?? [],
       notes: [
@@ -3393,7 +3393,7 @@ export namespace JavaScriptCorrelation {
     )
     const endpointPath = await TargetMemory.writeWorkspaceFile(
       workspace,
-      path.posix.join("endpoints", endpointFilename),
+      path.posix.join("recon", endpointFilename),
       JSON.stringify({
         schemaVersion: 2,
         generatedAt: graph.createdAt,

@@ -247,12 +247,12 @@ test("canonical inventories reject malformed rows, mixed errors, and duplicates"
 })
 
 test("JavaScript and endpoint phases require non-skippable canonical handoff files", () => {
-  expect(missingRequiredReconArtifacts("javascript_analysis", ["javascript/graph.json", "endpoints/candidates.json"])).toEqual([
+  expect(missingRequiredReconArtifacts("javascript_analysis", ["javascript/graph.json", "recon/candidates.json"])).toEqual([
     "javascript-analysis.md",
     "endpoints.txt",
   ])
   expect(missingRequiredReconArtifacts("javascript_analysis", ["./javascript-analysis.md", "endpoints.txt"])).toEqual([])
-  expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints/candidates.json"])).toEqual(["endpoints.txt"])
+  expect(missingRequiredReconArtifacts("endpoint_inventory", ["recon/candidates.json"])).toEqual(["endpoints.txt"])
   expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints.txt"])).toEqual([])
 })
 

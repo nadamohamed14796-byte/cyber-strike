@@ -1276,7 +1276,10 @@ const verifyButton = <button onClick={verifyEmailToken}>Verify</button>`,
 
         const diskGraph = JSON.parse(await fs.readFile(result.graphPath, "utf-8"))
         const endpointInventory = JSON.parse(await fs.readFile(result.endpointPath, "utf-8"))
+        const endpointRelativePath = path.relative(result.workspacePath, result.endpointPath).split(path.sep).join("/")
+        expect(endpointRelativePath).toMatch(/^recon\/[^/]+-endpoints\.json$/)
         const testerSurvey = JSON.parse(await fs.readFile(result.testerSurveyPath, "utf-8"))
+        expect(testerSurvey.sourceEndpointInventory).toBe(endpointRelativePath)
         const canonicalSummary = await fs.readFile(result.analysisSummaryPath, "utf-8")
         const canonicalEndpoints = await fs.readFile(result.endpointInventoryPath, "utf-8")
         const capturedIndex = JSON.parse(await fs.readFile(path.join(result.workspacePath, "javascript/captured-index.json"), "utf-8"))
@@ -1338,6 +1341,7 @@ const verifyButton = <button onClick={verifyEmailToken}>Verify</button>`,
         expect(canonicalEndpoints).toContain("/api/profiles/")
         expect(result.analysisSummaryPath).toBe(path.join(configured.workspace.workspacePath, "javascript-analysis.md"))
         expect(result.endpointInventoryPath).toBe(path.join(configured.workspace.workspacePath, "endpoints.txt"))
+        expect(await fs.readdir(result.workspacePath)).not.toContain("endpoints")
         for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey), canonicalSummary, canonicalEndpoints]) {
           expect(artifact).not.toContain(rawSecret)
           expect(artifact).not.toContain("document.body.innerHTML = value")
