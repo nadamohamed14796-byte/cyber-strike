@@ -691,6 +691,36 @@ export function Prompt(props: PromptProps) {
       inputText.charCodeAt(0) !== 47 &&
       agentName === "impact-hunter" &&
       props.sessionID &&
+      currentSession?.title.startsWith("Impact Hunter")
+    ) {
+      try {
+        await sdk.client.session.promptAsync({
+          sessionID: props.sessionID,
+          messageID,
+          agent: "impact-hunter",
+          model: selectedModel,
+          variant,
+          parts: [
+            { id: Identifier.ascending("part"), type: "text", text: inputText },
+            ...nonTextParts.map((x) => ({ id: Identifier.ascending("part"), ...x })),
+          ],
+        })
+        history.append(submittedPrompt)
+        input.extmarks.clear()
+        setStore("prompt", { input: "", parts: [] })
+        setStore("extmarkToPartIndex", new Map())
+        props.onSubmit?.()
+        input.clear()
+      } catch (error) {
+        handleSubmissionFailure("Impact Hunter", error, submittedPrompt, props.sessionID)
+      }
+      return
+    }
+    if (
+      store.mode !== "shell" &&
+      inputText.charCodeAt(0) !== 47 &&
+      agentName === "impact-hunter" &&
+      props.sessionID &&
       !currentSession?.title.startsWith("Impact Hunter")
     ) {
       let root = currentSession
