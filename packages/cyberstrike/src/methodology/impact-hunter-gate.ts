@@ -25,8 +25,14 @@ function normalizePath(value: string): string {
 }
 
 function endpointParts(endpoint: string): { method?: string; origin?: string; path: string } {
-  const methodMatch = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\\s+(.+)$/i.exec(endpoint.trim())
-  const raw = (methodMatch?.[2] ?? endpoint).trim()
+  const trimmed = endpoint.trim()
+  const separator = trimmed.indexOf(" ")
+  const methodCandidate = separator > 0 ? trimmed.slice(0, separator).toUpperCase() : undefined
+  const supportedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+  const methodMatch = methodCandidate && supportedMethods.includes(methodCandidate)
+    ? { method: methodCandidate, url: trimmed.slice(separator + 1).trim() }
+    : undefined
+  const raw = (methodMatch?.url ?? endpoint).trim()
   try {
     const url = new URL(raw)
     return {
