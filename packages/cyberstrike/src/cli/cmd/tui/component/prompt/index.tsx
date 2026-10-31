@@ -688,6 +688,7 @@ export function Prompt(props: PromptProps) {
       : undefined
     if (
       store.mode !== "shell" &&
+      inputText.charCodeAt(0) !== 47 &&
       agentName === "impact-hunter" &&
       props.sessionID &&
       !currentSession?.title.startsWith("Impact Hunter")
