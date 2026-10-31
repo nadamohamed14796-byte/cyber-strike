@@ -187,7 +187,7 @@ test("Impact Hunter severity update rejects non-approved findings and non-Hunter
           evidence_refs: ["test-evidence://not-used"],
         }
         const unapproved = await tool.execute(args, mockCtx(session.id))
-        expect((unapproved.metadata as any).reason).toBe("impact_hunter_only")
+        expect((unapproved.metadata as any).reason).toBe("finding_not_approved")
 
         const nonHunterFinding = await makeApprovedConfirmedFinding(session.id)
         const nonHunter = await tool.execute({
@@ -213,7 +213,7 @@ test("Impact Hunter cannot lower or repeat the current severity through the esca
     async fn() {
       const session = await Session.create({})
       try {
-        const { finding, evidenceRef } = await makeApprovedConfirmedFinding(session.id)
+        const { finding, baselineValidationID } = await makeApprovedConfirmedFinding(session.id)
         const tool = await UpdateFindingImpactTool.init()
         const result = await tool.execute({
           id: finding.id,
