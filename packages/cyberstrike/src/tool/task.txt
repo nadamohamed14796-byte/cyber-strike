@@ -73,7 +73,7 @@ Background execution:
 
 
 Finding escalation contract:
-- The canonical `report_vulnerability` path automatically starts one background Impact Hunter in `proof_gap` mode only when the persisted NEW candidate has no PoC, an exact target-attributed endpoint, and a matching captured request or source file/line anchor. This mode may run before full confirmation solely to build/test the missing PoC; the candidate remains NEW and unreportable.
+- The canonical `report_vulnerability` path automatically starts one background Impact Hunter in `proof_gap` mode only when the persisted NEW candidate has no reproducible PoC (or carries the execution-unconfirmed marker), an exact target-attributed endpoint, and a matching captured request or source file/line anchor. This mode may run before full confirmation solely to build/test the missing PoC; the candidate remains NEW and unreportable.
 - An approved-impact task starts/resumes only after all ten checks are complete/evidence-backed, the durable finding ledger is CONFIRMED, and `triage_vulnerability(status="approved")` succeeds. Its task ID and mode are returned by the handoff.
 - Use this task tool to call other relevant specialist agents when they add independent value. Do not manually duplicate the canonical Hunter task; use its returned task ID. Never spawn Impact Hunter recursively.
 - Started means running, not completed; carry the task ID and handoff mode with the finding and do not treat startup as a PoC, confirmation, or impact verdict.
