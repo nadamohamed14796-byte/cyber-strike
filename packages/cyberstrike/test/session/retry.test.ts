@@ -61,6 +61,11 @@ describe("session.retry.delay", () => {
     expect(SessionRetry.delay(1, apiError({ "retry-after": "-1" }))).toBe(2000)
   })
 
+  test("caps exponential fallback when supplied retry hints are invalid", () => {
+    expect(SessionRetry.delay(10, apiError({ "retry-after": "invalid" }))).toBe(30_000)
+    expect(SessionRetry.delay(10, apiError({ "retry-after-ms": "Infinity" }))).toBe(30_000)
+  })
+
   test("ignores past date retry hints", () => {
     const pastDate = new Date(Date.now() - 5000).toUTCString()
     const error = apiError({ "retry-after": pastDate })
