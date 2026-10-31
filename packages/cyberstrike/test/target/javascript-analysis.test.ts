@@ -182,6 +182,22 @@ test("preserves explicit scheme and port in absolute request candidates", () => 
   expect(request.origin).toBe("http://api.example.com:8080")
 })
 
+test("uses AST call expressions so request-shaped comments and strings are not endpoints", () => {
+  const templateExample = "const templateExample = " + String.fromCharCode(96) + 'axios.get("/api/from-template")' + String.fromCharCode(96)
+  const source = [
+    'const documentation = \'fetch("/api/from-string")\'',
+    templateExample,
+    '/* fetch("/api/from-comment") */',
+    'function loadRealRoute() { return fetch("/api/real") }',
+    'function updateNestedClient() { return this.http.transport.post("/api/nested", { title: "safe" }) }',
+  ].join("\n")
+  const requests = analyzeJavaScriptSource(source).requests
+  expect(requests.map((request) => request.path).sort()).toEqual(["/api/nested", "/api/real"])
+  expect(requests.find((request) => request.path === "/api/real")?.sourceFunction).toBe("loadRealRoute")
+  expect(requests.find((request) => request.path === "/api/nested")?.method).toBe("POST")
+  expect(requests.find((request) => request.path === "/api/nested")?.bodyParameters).toContain("title")
+})
+
 test("extracts axios methods and request body field names", () => {
   const result = analyzeJavaScriptSource('axios.post("/api/items", { title: "demo", visibility: "private" })')
   expect(result.requests[0]?.method).toBe("POST")
