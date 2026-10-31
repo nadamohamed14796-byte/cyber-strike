@@ -124,8 +124,11 @@ export function evaluateImpactHunterGate(input: {
     if (finding.status !== "new") {
       return { allowed: false, mode, reason: "proof-gap investigation accepts only a NEW, untriaged candidate", requestIDs }
     }
-    if (finding.poc?.trim()) {
-      return { allowed: false, mode, reason: "finding already contains a PoC; use the normal validation/approval lifecycle", requestIDs }
+    // candidate != null is the canonical execution-unconfirmed marker. Its
+    // poc field may contain only a baseline request/response or an encoded
+    // reflection note; do not mistake that material for a reproducible PoC.
+    if (finding.candidate == null && finding.poc?.trim()) {
+      return { allowed: false, mode, reason: "finding already contains a PoC and is not marked execution-unconfirmed", requestIDs }
     }
     if (!finding.target_id || !TargetMemory.list().some((workspace) => workspace.id === finding.target_id)) {
       return { allowed: false, mode, reason: "candidate is not linked to an existing target workspace", requestIDs }
