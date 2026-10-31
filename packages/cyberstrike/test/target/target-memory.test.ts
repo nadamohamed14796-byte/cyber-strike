@@ -1032,6 +1032,17 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
     directory: tmp.path,
     async fn() {
       const targetURL = "https://endpoint-notes.example.test"
+      await expect(TargetMemory.mergeCanonicalEndpointRecord({
+        targetURL,
+        origin: "https://api.example.test",
+        path: "/api/users/{id}",
+        operations: [{
+          method: "PATCH",
+          methodEvidenceSources: ["javascript", "traffic"],
+          bodyParameters: ["name"],
+        }],
+      })).rejects.toThrow("require explicit per-source evidence entries")
+
       const first = await TargetMemory.mergeCanonicalEndpointRecord({
         targetURL,
         origin: "https://api.example.test",
@@ -1043,6 +1054,12 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
           bodyParameters: ["userId", "email"],
           headerNames: ["content-type", "authorization"],
           contentTypes: ["application/json"],
+          operationIds: ["updateUser"],
+          operationSummaries: ["Updates the selected user's profile"],
+          responseStatuses: [200],
+          responseContentTypes: ["application/json"],
+          responseFields: ["id", "email", "updatedAt"],
+          behaviorSignals: ["profile-update"],
           authSignals: ["bearer-token"],
           sourceFiles: ["javascript/users.js"],
           confidence: "candidate",
@@ -1089,6 +1106,10 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       const endpointNotes = TargetMemory.allNotes(first.workspace.id).filter((note) => note.kind === "endpoint")
       expect(endpointNotes).toHaveLength(1)
       const note = endpointNotes[0]!
+      expect(note.content).toContain("## GET")
+      expect(note.content).toContain("## POST")
+      expect(note.content).toContain("- What it does: Updates the selected user's profile")
+      expect(note.content).toContain("- Response fields: id, email, updatedAt")
       const structured = note.content.match(
         /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\n([\s\S]*?)\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
       )
@@ -1114,6 +1135,12 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       expect(post.contentTypes).toEqual(["application/json"])
       expect(post.evidence[0]?.contentTypes).toEqual(["application/json"])
       expect(post.authSignals).toEqual(["bearer-token"])
+      expect(post.operationIds).toEqual(["updateUser"])
+      expect(post.operationSummaries).toEqual(["Updates the selected user's profile"])
+      expect(post.responseStatuses).toEqual([200])
+      expect(post.responseContentTypes).toEqual(["application/json"])
+      expect(post.responseFields).toEqual(["id", "email", "updatedAt"])
+      expect(post.behaviorSignals).toEqual(["profile-update"])
       expect(post.methodEvidenceSources).toContain("javascript")
       expect(post.evidence).toHaveLength(1)
       expect(post.evidence[0]?.source).toBe("javascript")
