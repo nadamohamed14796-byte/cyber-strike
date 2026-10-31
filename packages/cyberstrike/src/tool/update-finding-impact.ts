@@ -107,7 +107,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
           attempt.outcome === "confirmed" &&
           attempt.validConditions &&
           Boolean(attempt.evidenceRef?.trim()) &&
-          attempt.timeCreated > baselineValidation.time_created &&
+          attempt.timeCreated >= baselineValidation.time_created &&
           attempt.timeCreated <= latest.time_created,
         )
         .map((attempt) => attempt.evidenceRef!.trim()),
