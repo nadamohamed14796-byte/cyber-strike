@@ -6,6 +6,7 @@ import { Identifier } from "../id/id"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import PROMPT_RECON from "./template/recon.txt"
+import PROMPT_SOLVE from "./template/solve.txt"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import { RECON_SPECIALIZED_COVERAGE_PROMPT } from "../methodology/recon"
@@ -58,6 +59,7 @@ export namespace Command {
     REVIEW: "review",
     UPDATE: "update",
     RECON: "recon",
+    SOLVE: "solve",
   } as const
 
   const state = Instance.state(async () => {
@@ -89,6 +91,13 @@ export namespace Command {
         source: "command",
         template: [PROMPT_RECON, RECON_SPECIALIZED_COVERAGE_PROMPT].join("\n\n"),
         hints: hints("$ARGUMENTS"),
+      },
+      [Default.SOLVE]: {
+        name: Default.SOLVE,
+        description: "solve, debug, explain, review, or improve code in any language",
+        source: "command",
+        template: PROMPT_SOLVE,
+        hints: hints(PROMPT_SOLVE),
       },
       [Default.UPDATE]: {
         name: Default.UPDATE,
