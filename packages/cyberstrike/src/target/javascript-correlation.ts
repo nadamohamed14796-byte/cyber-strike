@@ -1294,6 +1294,7 @@ export function mergeCanonicalJavaScriptEndpoints(
         queryParameters: uniqueStrings(endpoint.queryParameters ?? []),
         bodyParameters: uniqueStrings(endpoint.bodyParameters ?? []),
         headerNames: uniqueStrings(endpoint.headerNames ?? []),
+        contentTypes: uniqueStrings(endpoint.contentTypes ?? []),
         authSignals: uniqueStrings(endpoint.authSignals ?? []),
         cookieSignals: uniqueStrings(endpoint.cookieSignals ?? []),
         methodEvidenceSources: uniqueStrings(endpoint.methodEvidenceSources ?? []) as Array<"javascript" | "traffic">,
@@ -1306,6 +1307,7 @@ export function mergeCanonicalJavaScriptEndpoints(
     existing.queryParameters = uniqueStrings([...(existing.queryParameters ?? []), ...(endpoint.queryParameters ?? [])])
     existing.bodyParameters = uniqueStrings([...(existing.bodyParameters ?? []), ...(endpoint.bodyParameters ?? [])])
     existing.headerNames = uniqueStrings([...(existing.headerNames ?? []), ...(endpoint.headerNames ?? [])])
+    existing.contentTypes = uniqueStrings([...(existing.contentTypes ?? []), ...(endpoint.contentTypes ?? [])])
     existing.authSignals = uniqueStrings([...(existing.authSignals ?? []), ...(endpoint.authSignals ?? [])])
     existing.cookieSignals = uniqueStrings([...(existing.cookieSignals ?? []), ...(endpoint.cookieSignals ?? [])])
     existing.methodEvidenceSources = uniqueStrings([
@@ -1337,6 +1339,7 @@ export interface CanonicalJavaScriptEndpointRecord {
     queryParameters: string[]
     bodyParameters: string[]
     headerNames: string[]
+    contentTypes: string[]
     authSignals: string[]
     cookieSignals: string[]
     observedRequestIDs: string[]
@@ -1424,6 +1427,7 @@ export function groupCanonicalJavaScriptEndpoints(
     operation.queryParameters = unique([...(operation.queryParameters ?? []), ...(incoming.queryParameters ?? [])])
     operation.bodyParameters = unique([...(operation.bodyParameters ?? []), ...(incoming.bodyParameters ?? [])])
     operation.headerNames = unique([...(operation.headerNames ?? []), ...(incoming.headerNames ?? [])])
+    operation.contentTypes = unique([...(operation.contentTypes ?? []), ...(incoming.contentTypes ?? [])])
     operation.authSignals = unique([...(operation.authSignals ?? []), ...(incoming.authSignals ?? [])])
     operation.cookieSignals = unique([...(operation.cookieSignals ?? []), ...(incoming.cookieSignals ?? [])])
     operation.methodEvidenceSources = unique([
@@ -1450,6 +1454,7 @@ export function groupCanonicalJavaScriptEndpoints(
     unassigned.queryParameters = unique([...unassigned.queryParameters, ...(item.queryParameters ?? [])])
     unassigned.bodyParameters = unique([...unassigned.bodyParameters, ...(item.bodyParameters ?? [])])
     unassigned.headerNames = unique([...unassigned.headerNames, ...(item.headerNames ?? [])])
+    unassigned.contentTypes = unique([...unassigned.contentTypes, ...(item.contentTypes ?? [])])
     unassigned.authSignals = unique([...unassigned.authSignals, ...(item.authSignals ?? [])])
     unassigned.cookieSignals = unique([...unassigned.cookieSignals, ...(item.cookieSignals ?? [])])
 
@@ -1470,6 +1475,7 @@ export function groupCanonicalJavaScriptEndpoints(
           queryParameters: [],
           bodyParameters: [],
           headerNames: [],
+          contentTypes: [],
           authSignals: [],
           cookieSignals: [],
           observedInTraffic: true,
@@ -1801,6 +1807,11 @@ function renderCanonicalJavaScriptAnalysis(
 ): string {
   const manifestAssets = (manifest?.assets ?? []).filter((item) => typeof item.url === "string")
   const endpointRecords = groupCanonicalJavaScriptEndpoints([graph])
+  const operationCount = endpointRecords.reduce((sum, endpoint) => sum + endpoint.operations.length, 0)
+  const trafficOperationCount = endpointRecords.reduce(
+    (sum, endpoint) => sum + endpoint.operations.filter((operation) => operation.observedInTraffic).length,
+    0,
+  )
   const manifestByURL = new Map(manifestAssets.map((asset) => [asset.url, asset]))
   const assets = new Map<string, JavaScriptCorrelationGraph["javascriptAssets"][number]>()
   for (const asset of graph.javascriptAssets) assets.set(asset.url, asset)
@@ -2040,7 +2051,7 @@ function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelation
       const unassigned = endpoint.unattributed
       const hasUnassigned = unassigned.sourceFiles.length || unassigned.pathParameters.length ||
         unassigned.queryParameters.length || unassigned.bodyParameters.length ||
-        unassigned.headerNames.length || unassigned.authSignals.length ||
+        unassigned.headerNames.length || unassigned.contentTypes.length || unassigned.authSignals.length ||
         unassigned.cookieSignals.length || unassigned.observedRequestIDs.length
       const unassignedLines = hasUnassigned ? [
         "  Method-unattributed endpoint evidence (not copied into any operation):",
@@ -2048,6 +2059,7 @@ function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelation
           " — query_params=[" + unassigned.queryParameters.map(inline).join(", ") + "]" +
           " — body_params=[" + unassigned.bodyParameters.map(inline).join(", ") + "]",
         "    headers=[" + unassigned.headerNames.map(inline).join(", ") + "]" +
+          " — content_types=[" + unassigned.contentTypes.map(inline).join(", ") + "]" +
           " — auth=[" + unassigned.authSignals.map(inline).join(", ") + "]" +
           " — cookies=[" + unassigned.cookieSignals.map(inline).join(", ") + "]",
         "    sources=[" + unassigned.sourceFiles.map(inline).join(", ") + "]" +
@@ -3479,8 +3491,9 @@ export namespace JavaScriptCorrelation {
       "- Secret-like assignments (fingerprints only; candidate only): " + graph.javascriptAnalysis.secretCandidates.length,
       "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
       "- Static JavaScript sink candidates (not confirmed findings): " + graph.javascriptAnalysis.riskSignals.length,
-      "- Unique endpoint candidates: " + graph.endpointCandidates.length,
-      "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
+      "- Canonical endpoint records: " + endpointRecords.length,
+      "- Distinct method operations: " + operationCount,
+      "- Operations observed in captured traffic: " + trafficOperationCount,
       "- Captured response evidence nodes: " + graph.evidence.length,
       "- Related captured requests: " + graph.requests.length,
       "- Web functions: " + graph.webFunctions.length,
@@ -3595,6 +3608,7 @@ export namespace JavaScriptCorrelation {
           queryParameters: operation.queryParameters ?? [],
           bodyParameters: operation.bodyParameters ?? [],
           headerNames: operation.headerNames ?? [],
+          contentTypes: operation.contentTypes ?? [],
           authSignals: operation.authSignals ?? [],
           cookieSignals: operation.cookieSignals ?? [],
           sourceFiles: operation.sourceFiles ?? [],
