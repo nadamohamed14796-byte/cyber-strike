@@ -1,4 +1,5 @@
 import { Session } from "../session"
+import { Session } from "../session"
 import { Request } from "../session/request"
 import { Vulnerability } from "../session/vulnerability"
 import { TargetMemory } from "../target"
