@@ -3583,7 +3583,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             item.requestIDs.length ? "requests=" + item.requestIDs.join(",") : "",
             item.sourceFiles.length ? "files=" + item.sourceFiles.map(inline).join(",") : "",
           ].filter(Boolean).join("; "),
-        ) : ["  - No source-specific evidence attached yet."],
+        ) : ["  - No source-specific evidence attached yet."]),
         "",
       ])
       const hasUnattributed = state.unattributed.pathParameters.length ||
