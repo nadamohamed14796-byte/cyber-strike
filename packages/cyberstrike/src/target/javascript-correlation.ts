@@ -226,13 +226,28 @@ function normalizeEndpointLiteral(value: string): string | undefined {
 
 export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const found = new Set<string>()
-  const callArgument = /(?:fetch|axios\.(?:get|post|put|patch|delete)|\.open)\s*\(\s*["'\`]([^"'\`]+)["'\`]/gi
-  const routeString = /["'\`]((?:https?:\/\/)[^"'\`\s]+|\/(?:api|graphql|rest|rpc|v\d+|auth|admin|users|account|orders|cart|checkout|upload|download|search|profile)(?:\/[^"'\`\s]*)?)["'\`]/gi
-  for (const pattern of [callArgument, routeString]) {
-    for (const match of content.matchAll(pattern)) {
-      const normalized = normalizeEndpointLiteral(match[1])
-      if (normalized) found.add(normalized)
-    }
+  // Absolute URLs count only when they are the first argument of a recognizable
+  // network call. Arbitrary strings include docs, namespaces, assets and examples.
+  const calls = /\\b(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\\w$]*\\.(?:get|post|put|patch|delete|head|options|request|open))\\s*\\(/gi
+  for (const call of content.matchAll(calls)) {
+    const start = (call.index ?? 0) + call[0].length
+    const tail = content.slice(start, Math.min(content.length, start + 12000))
+    const close = findCallEnd(tail, 0)
+    if (close < 0) continue
+    const args = splitTopLevelArguments(tail.slice(0, close))
+    const first = call[0].toLowerCase().endsWith(".open(") ? args[1] : args[0]
+    const literal = first?.match(/^\\s*['"\\x60]([^'"\\x60]+)['"\\x60]/)?.[1]
+    if (!literal) continue
+    const normalized = normalizeEndpointLiteral(literal)
+    if (normalized) found.add(normalized)
+  }
+
+  // Retain conventional API-like relative routes as candidates, without turning
+  // arbitrary URLs, framework namespaces, or static assets into endpoints.
+  const routes = /["'\\x60](\\/(?:api|graphql|rest|rpc|v\\d+|oauth|auth|admin|internal)(?:\\/[^"'\\x60\\s]*)?)["'\\x60]/gi
+  for (const match of content.matchAll(routes)) {
+    const normalized = normalizeEndpointLiteral(match[1]!)
+    if (normalized) found.add(normalized)
   }
   return [...found]
 }
