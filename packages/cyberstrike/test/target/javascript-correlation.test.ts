@@ -127,6 +127,16 @@ test("extracts and deduplicates static endpoint literals from common JavaScript 
   expect(new Set(endpoints).size).toBe(endpoints.length)
 })
 
+test("parses HTTP call arguments across nested objects and strings containing delimiters", () => {
+  const source = [
+    'client.open("POST", "/api/records", { note: "a ) and , stay inside this string", nested: { ids: [1, 2] } })',
+    'fetch("/api/search?filter=a,b", { headers: { "X-Filter": "a,b)", "X-Trace": "one,two" }, body: JSON.stringify({ nested: [1, 2] }) })',
+  ].join("\\n")
+  const endpoints = extractStaticJavaScriptEndpoints(source)
+  expect(endpoints).toContain("/api/records")
+  expect(endpoints).toContain("/api/search")
+})
+
 test("does not promote arbitrary links, namespaces, or static assets to API endpoints", () => {
   const source = [
     'const help = "https://help.example.com/";',

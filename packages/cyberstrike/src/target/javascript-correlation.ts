@@ -225,6 +225,100 @@ function normalizeEndpointLiteral(value: string): string | undefined {
   return normalized.length > 1 ? normalizeJavaScriptEndpointPath(normalized).path : undefined
 }
 
+function skipJavaScriptQuotedLiteral(input: string, start: number): number {
+  const quote = input[start]
+  let escaped = false
+  for (let index = start + 1; index < input.length; index++) {
+    const char = input[index]!
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+    if (char === quote) return index + 1
+  }
+  return input.length
+}
+
+function skipJavaScriptComment(input: string, start: number): number | undefined {
+  if (input[start] !== "/") return undefined
+  if (input[start + 1] === "/") {
+    const end = input.indexOf("\n", start + 2)
+    return end < 0 ? input.length : end + 1
+  }
+  if (input[start + 1] === "*") {
+    const end = input.indexOf("*/", start + 2)
+    return end < 0 ? input.length : end + 2
+  }
+  return undefined
+}
+
+/** Find a call's matching close-paren while ignoring strings, templates, and comments. */
+function findCallEnd(input: string, start: number): number {
+  let round = 0
+  let curly = 0
+  let square = 0
+  for (let index = start; index < input.length; index++) {
+    const char = input[index]!
+    if (char === "'" || char === '"' || char === "\x60") {
+      index = skipJavaScriptQuotedLiteral(input, index) - 1
+      continue
+    }
+    const commentEnd = skipJavaScriptComment(input, index)
+    if (commentEnd !== undefined) {
+      index = commentEnd - 1
+      continue
+    }
+    if (char === "(") round++
+    else if (char === ")") {
+      round--
+      if (round === 0) return index
+      if (round < 0) return -1
+    } else if (char === "{") curly++
+    else if (char === "}") curly = Math.max(0, curly - 1)
+    else if (char === "[") square++
+    else if (char === "]") square = Math.max(0, square - 1)
+  }
+  return -1
+}
+
+/** Split function arguments without splitting nested object/array/call expressions. */
+function splitTopLevelArguments(input: string): string[] {
+  const output: string[] = []
+  let start = 0
+  let round = 0
+  let curly = 0
+  let square = 0
+  for (let index = 0; index < input.length; index++) {
+    const char = input[index]!
+    if (char === "'" || char === '"' || char === "\x60") {
+      index = skipJavaScriptQuotedLiteral(input, index) - 1
+      continue
+    }
+    const commentEnd = skipJavaScriptComment(input, index)
+    if (commentEnd !== undefined) {
+      index = commentEnd - 1
+      continue
+    }
+    if (char === "(") round++
+    else if (char === ")") round = Math.max(0, round - 1)
+    else if (char === "{") curly++
+    else if (char === "}") curly = Math.max(0, curly - 1)
+    else if (char === "[") square++
+    else if (char === "]") square = Math.max(0, square - 1)
+    else if (char === "," && round === 0 && curly === 0 && square === 0) {
+      output.push(input.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  const finalArgument = input.slice(start).trim()
+  if (finalArgument || output.length) output.push(finalArgument)
+  return output
+}
+
 export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const found = new Set<string>()
   // Absolute URLs count only when they are the first argument of a recognizable
