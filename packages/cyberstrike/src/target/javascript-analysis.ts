@@ -571,7 +571,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       fingerprint: createHash("sha256").update(value).digest("hex").slice(0, 20),
       confidence: "candidate",
     }
-    secrets.set(item.kind + ":" + item.fingerprint, item)
+    // Keep every source location. The same token may appear in multiple call paths;
+    // collapsing on kind+fingerprint would discard the other function/line evidence.
+    secrets.set([item.kind, item.fingerprint, item.line, item.functionName ?? ""].join(":"), item)
   }
   const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,})\2/gi
   for (const match of source.matchAll(secretPattern)) {

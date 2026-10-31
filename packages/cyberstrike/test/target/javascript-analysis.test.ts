@@ -51,6 +51,26 @@ test("attributes secret candidates to their enclosing function and detects known
   expect(JSON.stringify(result)).not.toContain(genericToken)
 })
 
+test("preserves repeated token occurrences across distinct functions", () => {
+  const sharedKey = "AKIA1234567890ABCDEF"
+  const source = [
+    "function rotateCredential() {",
+    '  const config = { value: "' + sharedKey + '" }',
+    "}",
+    "function refreshCredential() {",
+    '  const config = { value: "' + sharedKey + '" }',
+    "}",
+  ].join("\\n")
+  const result = analyzeJavaScriptSource(source)
+  const occurrences = result.secretCandidates.filter((item) => item.kind === "aws-access-key-id")
+  expect(occurrences).toHaveLength(2)
+  expect(occurrences.map((item) => ({ line: item.line, functionName: item.functionName }))).toEqual([
+    { line: 2, functionName: "rotateCredential" },
+    { line: 5, functionName: "refreshCredential" },
+  ])
+  expect(JSON.stringify(result)).not.toContain(sharedKey)
+})
+
 test("extracts named functions and parameters", () => {
   const source = [
     "async function getInvoice(invoiceId, includeItems = false) {",
