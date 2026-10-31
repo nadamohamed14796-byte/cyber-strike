@@ -959,6 +959,7 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
           methodEvidenceSources: ["javascript"],
           bodyParameters: ["userId", "email"],
           headerNames: ["content-type", "authorization"],
+          contentTypes: ["application/json"],
           authSignals: ["bearer-token"],
           sourceFiles: ["javascript/users.js"],
           confidence: "candidate",
@@ -1027,6 +1028,8 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       expect(post.bodyParameters).toEqual(["userId", "email"])
       expect(post.queryParameters).toEqual([])
       expect(post.headerNames).toEqual(["content-type", "authorization"])
+      expect(post.contentTypes).toEqual(["application/json"])
+      expect(post.evidence[0]?.contentTypes).toEqual(["application/json"])
       expect(post.authSignals).toEqual(["bearer-token"])
       expect(post.methodEvidenceSources).toContain("javascript")
       expect(post.evidence).toHaveLength(1)
