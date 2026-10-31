@@ -15,11 +15,22 @@ test("target_endpoint accepts method-specific operations and source-specific evi
         body_parameters: ["name", "email"],
         header_names: ["content-type", "authorization"],
         content_types: ["application/json"],
+        operation_ids: ["updateUser"],
+        operation_summaries: ["Updates the selected user's profile"],
+        response_statuses: [200],
+        response_content_types: ["application/json"],
+        response_fields: ["id", "email", "updatedAt"],
+        behavior_signals: ["profile-update"],
         evidence: [{
           source: "javascript",
           body_parameters: ["name", "email"],
           header_names: ["content-type", "authorization"],
           content_types: ["application/json"],
+          operation_summaries: ["Updates the selected user's profile"],
+          response_statuses: [200],
+          response_content_types: ["application/json"],
+          response_fields: ["id", "email", "updatedAt"],
+          behavior_signals: ["profile-update"],
           source_files: ["assets/users.js"],
           confidence: "candidate",
         }],
@@ -48,6 +59,9 @@ test("target_endpoint accepts method-specific operations and source-specific evi
   expect(parsed.operations).toHaveLength(2)
   expect(parsed.operations[0]?.method).toBe("POST")
   expect(parsed.operations[0]?.content_types).toEqual(["application/json"])
+  expect(parsed.operations[0]?.operation_summaries).toEqual(["Updates the selected user's profile"])
+  expect(parsed.operations[0]?.response_statuses).toEqual([200])
+  expect(parsed.operations[0]?.response_fields).toEqual(["id", "email", "updatedAt"])
   expect(parsed.operations[0]?.evidence?.[0]?.source).toBe("javascript")
   expect(parsed.operations[1]?.method).toBe("GET")
   expect(parsed.operations[1]?.request_ids).toEqual(["req-get-1"])
