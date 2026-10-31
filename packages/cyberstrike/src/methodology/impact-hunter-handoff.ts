@@ -158,6 +158,9 @@ async function dispatch(
         subagent_type: "impact-hunter",
         background: true,
         ...(existing ? { task_id: existing.id } : {}),
+        // Keep the Hunter as a direct root child so the parent session's sidebar
+        // can expose an explicit Open action while the original agent keeps running.
+        parent_session_id: Session.root(ctx.sessionID),
         ...(requestID ? { request_id: requestID } : {}),
         prompt,
       },
