@@ -3307,6 +3307,24 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       for (const operation of state.operations) {
         operation.methodEvidenceSources ??= []
         operation.evidence ??= []
+        for (const evidence of operation.evidence) {
+          evidence.pathParameters ??= []
+          evidence.queryParameters ??= []
+          evidence.bodyParameters ??= []
+          evidence.headerNames ??= []
+          evidence.authSignals ??= []
+          evidence.cookieSignals ??= []
+          evidence.contentTypes ??= []
+          evidence.operationIds ??= []
+          evidence.operationSummaries ??= []
+          evidence.responseStatuses ??= []
+          evidence.responseContentTypes ??= []
+          evidence.responseFields ??= []
+          evidence.behaviorSignals ??= []
+          evidence.sourceFiles ??= []
+          evidence.requestIDs ??= []
+          evidence.confidence ??= operation.confidence ?? "candidate"
+        }
         operation.pathParameters ??= []
         operation.queryParameters ??= []
         operation.bodyParameters ??= []
