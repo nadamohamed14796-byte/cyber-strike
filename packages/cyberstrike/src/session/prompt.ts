@@ -44,6 +44,7 @@ import { Tool } from "@/tool/tool"
 import { PermissionNext } from "@/permission/next"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
+import { hasToolCallForUserTurn } from "./tool-call-turn"
 import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
@@ -973,6 +974,7 @@ export namespace SessionPrompt {
         tools,
         model,
         toolChoice: format.type === "json_schema" ? "required" : undefined,
+        requireToolCallThisTurn: !hasToolCallForUserTurn(msgs, lastUser.id),
       })
 
       // Context usage logging
