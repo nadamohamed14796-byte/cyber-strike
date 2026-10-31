@@ -604,9 +604,13 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
     // JavaScript response captures automatically refresh the target's static
     // analysis/correlation graph after the request agent finishes. The builder
     // reads only already-captured, in-scope traffic and persists redacted metadata.
+    const hasPersistedJavaScriptSources = Request.hasJavaScriptCaptures(req.id)
     const isJavaScriptOrSourceMap =
       Boolean(req.processed_response?.trim()) &&
-      isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
+      (
+        isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath) ||
+        hasPersistedJavaScriptSources
+      )
     if (isJavaScriptOrSourceMap && normalized.origin) {
   try {
         const observedURL = new URL(normalized.normalizedPath, normalized.origin).href

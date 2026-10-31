@@ -369,6 +369,18 @@ export namespace Request {
     return { requestID: request.id, captured: inserted.length > 0, contentHash: sources[0]?.contentHash }
   }
 
+  /** True when a request owns a persisted JavaScript or executable inline-script capture. */
+  export function hasJavaScriptCaptures(requestID: string): boolean {
+    const capture = Database.use((db) =>
+      db.select({ id: RequestJavaScriptCaptureTable.id })
+        .from(RequestJavaScriptCaptureTable)
+        .where(eq(RequestJavaScriptCaptureTable.request_id, requestID))
+        .limit(1)
+        .get(),
+    )
+    return Boolean(capture)
+  }
+
   function rowToInfo(row: typeof RequestTable.$inferSelect): Info {
     return {
       id: row.id,
