@@ -35,6 +35,8 @@ export interface JavaScriptRequestCandidate {
   queryParameters: string[]
   bodyParameters: string[]
   headerNames: string[]
+  /** Explicit literal media types found in request configuration; static candidate only. */
+  contentTypes?: string[]
   authSignals: string[]
   cookieSignals: string[]
   authAssessment: "signals-present" | "no-static-auth-signal"
@@ -501,6 +503,17 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...Array.from(requestContext.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']+)["']/gi), (m) => m[1]!),
       ...Array.from(requestContext.matchAll(/\b(Authorization|Cookie|Set-Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
+    const rawContentTypes = [
+      ...Array.from(optionText.matchAll(/["']?(?:content-type|contentType)["']?\s*:\s*["']([^"'\r\n]+)["']/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']content-type["']\s*,\s*["']([^"'\r\n]+)["']/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/\.setRequestHeader\s*\(\s*["']content-type["']\s*,\s*["']([^"'\r\n]+)["']/gi), (m) => m[1]!),
+    ]
+    const contentTypes = cleanUnique(rawContentTypes.map((value) => value.split(";", 1)[0]!.trim().toLowerCase()))
+      .filter((value) => {
+        const [type, subtype, ...extra] = value.split("/")
+        const validMimeToken = (token: string) => /^[!#$%&'*+.^_`|~0-9a-z-]+$/i.test(token)
+        return Boolean(type && subtype && extra.length === 0 && validMimeToken(type) && validMimeToken(subtype))
+      })
     const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
     const directObject = isBodyMethod && bodyArgs.trim().startsWith("{")
       ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
@@ -546,10 +559,10 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const line = lineNumber(lineStarts, index)
     const sourceFunction = currentFunctionRange?.name ?? null
     const item: JavaScriptRequestCandidate = {
-      id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers)])).digest("hex").slice(0, 16),
+      id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers), contentTypes]) .digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, origin: endpoint.origin, path: endpoint.path,
       pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
-      bodyParameters: cleanUnique(bodyParams), headerNames: cleanUnique(headers),
+      bodyParameters: cleanUnique(bodyParams), headerNames: cleanUnique(headers), contentTypes,
       authSignals: cleanUnique(authSignals), cookieSignals: cleanUnique(cookieSignals),
       authAssessment: authSignals.length || cookieSignals.length ? "signals-present" : "no-static-auth-signal",
       sourceLine: line, confidence: "candidate",
