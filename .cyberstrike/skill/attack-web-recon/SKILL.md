@@ -120,7 +120,7 @@ Treat recon as a resumable workflow, not a one-shot scan. Before each phase, loa
 | Passive discovery | Scope snapshot and source list | Candidate hosts with source/time/confidence | DNS validation |
 | DNS/alias | Candidate hosts | A/AAAA/CNAME/NS/TXT observations, wildcard and parked-domain notes | HTTP only for eligible hosts |
 | HTTP/service | Eligible resolved hosts | Status/redirect/TLS/title/fingerprint with timestamps | Crawl/API mapping |
-| URL/API | Live app, approved archives/specs, captured requests | Normalized method + route + content-type + parameter-shape inventory | JS correlation and focused review |
+| URL/API | Live app, approved archives/specs, captured requests | Canonical origin + route-template inventory with nested method operations; preserve method-specific content-type and parameter shapes | JS correlation and focused review |
 | JavaScript | Captured first-party assets and hashes | Candidate routes/sinks/auth hints with source offsets and redaction | Correlate with actual requests |
 | Triage | All phase artifacts | Deduplicated queue with evidence, confidence, next skill, and blocked reason | Testing only when a concrete signal exists |
 
@@ -168,7 +168,7 @@ Use agent-executable CLI tools and local scripts. Browser interfaces, browser ex
 Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
 
 ### Helper-script contract
-Merge URL sources while retaining provenance, method, parameter names, and observation time. Keep one endpoint record with multiple parameter observations and distinguish passive discoveries from active probes.
+Merge URL sources while retaining provenance, method, parameter names, and observation time. Keep one endpoint record per origin + route template, with each method as a separate operation carrying its own parameter observations; distinguish passive discoveries from active probes and keep traffic-only methods labeled as traffic evidence.
 
 Normalize outputs into the canonical inventory and keep provenance, timestamps, tool/version, errors, confidence, and artifact paths with each observation. Retain raw output only when it adds unique evidence, reproducibility, or diagnostic value; do not create a raw copy for every tool/run. Redact secrets, support JSON/JSONL where useful, and include local fixtures.
 
