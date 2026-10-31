@@ -550,7 +550,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
     // captured request row; duplicating it under requests/<id>.json made workspaces
     // balloon without adding evidence. The note contains no raw headers/cookies/body.
     if (normalized.origin) {
-  try {
+      try {
         const observedURL = new URL(normalized.normalizedPath, normalized.origin)
         const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
         if (scopeDecision.allowed && scopeDecision.workspace) {
@@ -560,6 +560,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
           const authSignals = new Set<string>()
           const cookieSignals = new Set<string>()
           const requestHeaderBlock = (req.raw_request ?? "").split(/\r?\n\r?\n/, 1)[0] ?? ""
+
           for (const headerLine of requestHeaderBlock.split(/\r?\n/).slice(1)) {
             const separator = headerLine.indexOf(":")
             if (separator <= 0) continue
@@ -567,34 +568,16 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
             const value = headerLine.slice(separator + 1).trim()
             if (!name) continue
             headerNames.add(name)
+
             if (name === "content-type") {
               const mediaType = value.split(";", 1)[0]?.trim().toLowerCase() ?? ""
-              if (/^[a-z0-9!#          const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
-          await TargetMemory.mergeCanonicalEndpointRecord({
-            targetURL: scopeDecision.workspace.targetURL,
-            origin: observedURL.origin,
-            path: endpointPath,
-            operations: [{
-              method: normalized.method,
-              methodEvidenceSources: ["traffic"],
-              requestIDs: [req.id],
-              observedInTraffic: true,
-              confidence: "observed",
-            }],
-          })^_.+-]+\/[a-z0-9!#          const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
-          await TargetMemory.mergeCanonicalEndpointRecord({
-            targetURL: scopeDecision.workspace.targetURL,
-            origin: observedURL.origin,
-            path: endpointPath,
-            operations: [{
-              method: normalized.method,
-              methodEvidenceSources: ["traffic"],
-              requestIDs: [req.id],
-              observedInTraffic: true,
-              confidence: "observed",
-            }],
-          })^_.+-]+$/.test(mediaType)) contentTypes.add(mediaType)
+              const [type, subtype, ...extra] = mediaType.split("/")
+              const validMimeToken = (token: string) => /^[!#$%&'*+.^_`|~0-9a-z-]+$/i.test(token)
+              if (type && subtype && extra.length === 0 && validMimeToken(type) && validMimeToken(subtype)) {
+                contentTypes.add(mediaType)
+              }
             }
+
             if (name === "authorization" || name === "proxy-authorization") {
               authSignals.add(name + "-present")
               const [scheme, remainder] = value.split(/\s+/, 2)
@@ -608,6 +591,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
               authSignals.add("csrf-token-header-present")
             }
           }
+
           const observedSlots = normalized.observedParams ?? []
           const namesAt = (location: "path" | "query" | "body") => [...new Set(
             observedSlots.filter((slot) => slot.loc === location).map((slot) => slot.name),
