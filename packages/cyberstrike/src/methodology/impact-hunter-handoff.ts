@@ -6,6 +6,7 @@ import { requestIDFromRecentPromptTexts } from "../tool/task-resume"
 import { Vulnerability } from "../session/vulnerability"
 import { evaluateImpactHunterGate, type ImpactHunterMode } from "./impact-hunter-gate"
 import { redactTargetNoteSecrets } from "../target/redact"
+import { createModeAwareFlightRegistry } from "./mode-aware-flight"
 
 export interface ImpactHunterHandoffResult {
   started: boolean
@@ -177,16 +178,16 @@ async function dispatch(
   }
 }
 
-type ImpactHunterHandoffFlight = {
-  mode: ImpactHunterMode
-  promise: Promise<ImpactHunterHandoffResult>
-}
-
-// Serialize handoffs by root + finding, not by mode. Otherwise a proof_gap
-// dispatch racing an approval event can both observe "no child" and create two
-// Hunters for the same finding. A mode transition is queued behind the first
-// handoff and then resumes the same finding-specific child session.
-const impactHunterHandoffFlights = new Map<string, ImpactHunterHandoffFlight>()
+const runImpactHunterHandoff = createModeAwareFlightRegistry<string, ImpactHunterMode, ImpactHunterHandoffResult>(
+  (key, mode) => {
+    // key is rootSessionID:findingID; ctx/finding are captured by the call below.
+    const [rootSessionID, findingID] = key.split(":")
+    if (rootSessionID !== Session.root(ctx.sessionID) || findingID !== finding.id) {
+      return Promise.resolve({ started: false, mode, reason: "Impact Hunter handoff identity changed while queued" })
+    }
+    return dispatch(ctx, finding, mode)
+  },
+)
 
 export function startImpactHunterHandoff(
   ctx: Tool.Context,
@@ -198,21 +199,5 @@ export function startImpactHunterHandoff(
   }
 
   const key = Session.root(ctx.sessionID) + ":" + finding.id
-  const active = impactHunterHandoffFlights.get(key)
-  if (active?.mode === mode) return active.promise
-
-  // Different modes are meaningful state transitions (proof_gap → approved_impact),
-  // so don't discard the newer mode; serialize it after the current dispatch.
-  const pending = active
-    ? active.promise.then(() => dispatch(ctx, finding, mode), () => dispatch(ctx, finding, mode))
-    : dispatch(ctx, finding, mode)
-  const flight = { mode, promise: pending }
-  impactHunterHandoffFlights.set(key, flight)
-  const cleanup = () => {
-    if (impactHunterHandoffFlights.get(key) === flight) {
-      impactHunterHandoffFlights.delete(key)
-    }
-  }
-  void pending.then(cleanup, cleanup)
-  return pending
-}
+  return runImpactHunterHandoff(key, mode)
+}}
