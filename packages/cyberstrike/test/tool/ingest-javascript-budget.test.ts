@@ -483,7 +483,7 @@ test("processes 10,000 distinct JavaScript URLs without a fixed worklist cap", a
             functions: Array<{ name: string; sourceFile: string }>
             requestCandidates: Array<{ sourceFunction: string | null; sourceFile: string }>
           }
-          edges: Array<{ relation: string }>
+          edges: Array<{ from: string; to: string; relation: string }>
         }
         expect(graph.sourceFiles).toHaveLength(1_000)
         expect(graph.javascriptAnalysis.functions).toHaveLength(1_000)
