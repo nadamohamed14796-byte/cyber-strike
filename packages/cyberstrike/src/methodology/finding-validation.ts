@@ -7,6 +7,7 @@ import { TargetMemory } from "../target"
 import { VerificationLedger } from "../session/verification-ledger"
 import { VerificationAttempts as VerificationPolicy } from "./verification-attempts"
 import { FalsePositiveKnowledge } from "./false-positive-knowledge"
+import { persistTargetFindingLink } from "./finding-reference"
 import {
   FindingValidationTable,
   type FindingValidationCheckRecord,
@@ -399,6 +400,26 @@ export namespace FindingValidation {
           : {}),
       description,
     })
+
+    // Keep the target-local pointer aligned with the validation disposition. An
+    // unapproved row remains a candidate even when its validation is confirmed;
+    // only triage approval may promote it to a reportable finding-reference.
+    try {
+      const currentFinding = Vulnerability.get(rootSessionID).find((row) => row.id === input.vulnerabilityID)
+      const workspace = currentFinding?.target_id
+        ? TargetMemory.list().find((item) => item.id === currentFinding.target_id)
+        : undefined
+      if (currentFinding && workspace) {
+        await persistTargetFindingLink({
+          workspace,
+          vulnerability: currentFinding,
+          sessionID: rootSessionID,
+          validationState: assessment.verdict,
+        })
+      }
+    } catch (error) {
+      console.warn("[cyberstrike] target finding reference could not be synchronized after validation:", error instanceof Error ? error.message : String(error))
+    }
 
     let falsePositiveMemorySaved = false
     let falsePositiveMemoryRetracted = false
