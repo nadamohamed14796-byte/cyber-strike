@@ -32,6 +32,7 @@ import { WebObject } from "../../session/web/web-object"
 import { WebFunction } from "../../session/web/web-function"
 import { WebRetest } from "../../session/web/web-retest"
 import { Agent } from "../../agent/agent"
+import { AgentTaskConcurrency } from "../../tool/task-concurrency"
 import { Config } from "../../config/config"
 import { Provider } from "../../provider/provider"
 import { Snapshot } from "@/snapshot"
@@ -2652,6 +2653,27 @@ export const SessionRoutes = lazy(() =>
           const isProxyBroker =
             (targetSession.title === PROXY_BROKER_TITLE || targetSession.title === LEGACY_PROXY_BROKER_TITLE) &&
             !!targetSession.parentID
+          if (body.agent === "impact-hunter") {
+            if (!targetSession.parentID || !targetSession.title.startsWith("Impact Hunter")) {
+              throw new Error("Manual Impact Hunter prompts must run in a dedicated child session under the active root.")
+            }
+            await SessionPrompt.prompt({ ...body, sessionID, noReply: true })
+            AgentTaskConcurrency.enqueue(
+              "impact",
+              async () => {
+                await SessionPrompt.loop({ sessionID })
+              },
+              (error) => {
+                const message = error instanceof Error ? error.message : String(error)
+                log.error("manual Impact Hunter session failed", { sessionID, error })
+                Bus.publish(Session.Event.Error, {
+                  sessionID,
+                  error: new NamedError.Unknown({ message: `Impact Hunter failed: ${message}` }).toObject(),
+                })
+              },
+            )
+            return
+          }
           const runPrompt = async () => {
             try {
               await SessionPrompt.prompt({
