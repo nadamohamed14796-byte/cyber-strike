@@ -73,4 +73,4 @@ Use a curated in-scope URL list and the program's permitted request rates; archi
 `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` normalizes/deduplicates already-collected candidates and removes query values; it does not fetch them.
 
 ### Result handling
-For each candidate preserve discovery source, last-seen time, live-response evidence, method/auth context, API version, and confidence. Keep one canonical endpoint record with multiple source observations.
+For each candidate preserve discovery source, last-seen time, live-response evidence, method/auth context, API version, and confidence. Keep one canonical endpoint record per normalized origin + route template + API version, with each HTTP method nested as its own operation. Merge source observations into the existing operation; do not create a duplicate endpoint for a newly observed method. Preserve contract-only, JavaScript-declared, and traffic-observed provenance separately.
