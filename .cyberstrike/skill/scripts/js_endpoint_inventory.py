@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 EXTS = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".html", ".json", ".map"}
-URL_RE = re.compile(r"""https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+""")
+URL_RE = re.compile(r"""(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\\w$]*\\.(?:get|post|put|patch|delete|head|options|request))\\s*\\(\\s*["'\\x60](https?://[^"'\\x60\\s]+)""", re.I)
 PATH_RE = re.compile(r"""(?<![A-Za-z0-9])/(?:api|graphql|rest|v[0-9]+|oauth|auth|admin|internal)/[A-Za-z0-9_./{}:-]{1,180}""", re.I)
 SENSITIVE = re.compile(r"(?i)(token|secret|password|api[_-]?key|authorization|cookie|signature|session)")
 
