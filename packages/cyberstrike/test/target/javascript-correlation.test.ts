@@ -9,7 +9,7 @@ import { TargetMemory } from "../../src/target"
 import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { tmpdir } from "../fixture/fixture"
 import { createJavaScriptScenarioCandidates } from "../../src/target/javascript-scenarios"
-import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
+import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, groupCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 
 test("builds source-linked additional scenarios and connects workflow, endpoint, request, risk, and secret evidence", () => {
@@ -611,7 +611,7 @@ test("merges equivalent named route placeholders and unions all source evidence"
   expect(endpoints[0]?.observedInTraffic).toBe(true)
 })
 
-test("canonical endpoint merge keeps captured request IDs attached to their actual HTTP method", () => {
+test("groups one canonical endpoint with isolated method contracts and traffic-only operations", () => {
   const route = "/api/users/{id}"
   const generic: JavaScriptEndpointCandidate = {
     id: "endpoint:generic",
@@ -620,7 +620,8 @@ test("canonical endpoint merge keeps captured request IDs attached to their actu
     origin: "https://api.example.test",
     path: route,
     sourceFiles: ["javascript/routes.js"],
-    observedRequestIDs: ["req-get", "req-post"],
+    observedRequestIDs: ["req-get", "req-post", "req-delete"],
+    queryParameters: ["route-level-query-clue"],
     observedInTraffic: true,
     confidence: "observed",
   }
@@ -631,8 +632,10 @@ test("canonical endpoint merge keeps captured request IDs attached to their actu
     origin: "https://api.example.test",
     path: route,
     method: "GET",
+    methodEvidenceSources: ["javascript"],
     sourceFiles: ["javascript/get.js"],
     observedRequestIDs: [],
+    queryParameters: ["include"],
     observedInTraffic: false,
     confidence: "candidate",
   }
@@ -641,25 +644,73 @@ test("canonical endpoint merge keeps captured request IDs attached to their actu
     id: "endpoint:post",
     method: "POST",
     sourceFiles: ["javascript/post.js"],
+    queryParameters: [],
+    bodyParameters: ["userId", "email"],
+    headerNames: ["content-type", "authorization"],
+    authSignals: ["bearer-token"],
   }
   const requests = [
     { id: "req-get", method: "GET" },
     { id: "req-post", method: "POST" },
+    { id: "req-delete", method: "DELETE" },
   ]
-  const endpoints = mergeCanonicalJavaScriptEndpoints([
-    { endpointCandidates: [generic], requests },
-    { endpointCandidates: [get, post], requests },
+  const [endpoint] = groupCanonicalJavaScriptEndpoints([
+    { endpointCandidates: [generic, get, post], requests },
   ])
-  expect(endpoints).toHaveLength(2)
-  const getEndpoint = endpoints.find((endpoint) => endpoint.method === "GET")!
-  const postEndpoint = endpoints.find((endpoint) => endpoint.method === "POST")!
-  expect(getEndpoint.observedRequestIDs).toContain("req-get")
-  expect(getEndpoint.observedRequestIDs).not.toContain("req-post")
-  expect(postEndpoint.observedRequestIDs).toContain("req-post")
-  expect(postEndpoint.observedRequestIDs).not.toContain("req-get")
-  expect(endpoints.every((endpoint) => endpoint.sourceFiles.includes("javascript/routes.js"))).toBe(true)
+
+  expect(endpoint).toBeDefined()
+  expect(endpoint!.path).toBe(route)
+  expect(endpoint!.operations.map((operation) => operation.method)).toEqual(["DELETE", "GET", "POST"])
+  const getOperation = endpoint!.operations.find((operation) => operation.method === "GET")!
+  const postOperation = endpoint!.operations.find((operation) => operation.method === "POST")!
+  const deleteOperation = endpoint!.operations.find((operation) => operation.method === "DELETE")!
+
+  expect(getOperation.queryParameters).toEqual(["include"])
+  expect(getOperation.bodyParameters).toEqual([])
+  expect(getOperation.sourceFiles).toEqual(["javascript/get.js"])
+  expect(getOperation.observedRequestIDs).toContain("req-get")
+  expect(getOperation.methodEvidenceSources).toEqual(["javascript", "traffic"])
+
+  expect(postOperation.bodyParameters).toEqual(["userId", "email"])
+  expect(postOperation.queryParameters).toEqual([])
+  expect(postOperation.headerNames).toEqual(["content-type", "authorization"])
+  expect(postOperation.authSignals).toEqual(["bearer-token"])
+  expect(postOperation.sourceFiles).toEqual(["javascript/post.js"])
+  expect(postOperation.observedRequestIDs).toContain("req-post")
+  expect(postOperation.observedRequestIDs).not.toContain("req-get")
+  expect(postOperation.methodEvidenceSources).toEqual(["javascript", "traffic"])
+
+  expect(deleteOperation.methodEvidenceSources).toEqual(["traffic"])
+  expect(deleteOperation.sourceFiles).toEqual([])
+  expect(deleteOperation.observedRequestIDs).toEqual(["req-delete"])
+  expect(endpoint!.unattributed.queryParameters).toEqual(["route-level-query-clue"])
+  expect(endpoint!.unattributed.queryParameters).not.toContain("include")
+  expect(endpoint!.sourceFiles).toEqual(["javascript/routes.js", "javascript/get.js", "javascript/post.js"])
 })
 
+test("correlates each captured method separately without attributing traffic-only methods to JavaScript", () => {
+  const endpoints = correlateStaticJavaScriptEndpoints(
+    [{
+      relativePath: "javascript/routes.js",
+      basename: "routes.js",
+      sha256: "route-hash",
+      bytes: 100,
+      endpointLiterals: ["/api/users/{id}"],
+    }],
+    [
+      { id: "get-1", method: "GET", host: "app.example.test", url: "https://app.example.test/api/users/7", normalizedPath: "/api/users/7", responseStatus: 200 },
+      { id: "post-1", method: "POST", host: "app.example.test", url: "https://app.example.test/api/users/7", normalizedPath: "/api/users/7", responseStatus: 200 },
+    ],
+    "app.example.test",
+  )
+  expect(endpoints).toHaveLength(2)
+  const get = endpoints.find((endpoint) => endpoint.method === "GET")!
+  const post = endpoints.find((endpoint) => endpoint.method === "POST")!
+  expect(get.observedRequestIDs).toEqual(["get-1"])
+  expect(post.observedRequestIDs).toEqual(["post-1"])
+  expect(get.methodEvidenceSources).toEqual(["traffic"])
+  expect(post.methodEvidenceSources).toEqual(["traffic"])
+})
 
 test("generates an idempotent tester survey with request shape and resumable check progress", () => {
   const candidate = {
