@@ -241,8 +241,8 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           throw new Error("Only the dedicated Impact Hunter may be attached directly to a root session.")
         }
         const parent = await Session.get(params.parent_session_id)
-        if (Session.root(parent.id) !== Session.root(ctx.sessionID)) {
-          throw new Error("Impact Hunter parent_session_id must belong to the caller's current root session.")
+        if (parent.id !== Session.root(ctx.sessionID)) {
+          throw new Error("Impact Hunter parent_session_id must be the caller's exact root session.")
         }
       }
 
