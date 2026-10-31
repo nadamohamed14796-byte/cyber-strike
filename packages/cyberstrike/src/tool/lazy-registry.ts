@@ -1,3 +1,4 @@
+import { createHash } from "crypto"
 import { Log } from "../util/log"
 import { MCP } from "../mcp"
 import { Bus } from "../bus"
@@ -28,6 +29,7 @@ export namespace LazyToolRegistry {
     category: string
     source: "mcp" | "plugin" | "builtin"
     mcpServer?: string
+    inputSchemaFingerprint: string
   }
 
   export interface LoadedTool {
@@ -123,10 +125,24 @@ export namespace LazyToolRegistry {
     }
   }
 
+  function fingerprintInputSchema(schema: unknown): string {
+    const stable = (value: unknown): string => {
+      if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]"
+      if (value !== null && typeof value === "object") {
+        const object = value as Record<string, unknown>
+        return "{" + Object.keys(object).sort().map((key) =>
+          JSON.stringify(key) + ":" + stable(object[key]),
+        ).join(",") + "}"
+      }
+      return JSON.stringify(value) ?? String(value)
+    }
+    return createHash("sha256").update(stable(schema)).digest("hex")
+  }
+
   /** Replace one server's snapshot after a successful listTools call. */
   export function reconcileServerTools(
     serverName: string,
-    definitions: Array<{ name: string; description?: string }>,
+    definitions: Array<{ name: string; description?: string; inputSchema?: unknown }>,
   ): void {
     const next = new Map<string, LazyTool>()
     for (const mcpTool of definitions) {
@@ -140,6 +156,7 @@ export namespace LazyToolRegistry {
         category: categorize(keywords),
         source: "mcp",
         mcpServer: serverName,
+        inputSchemaFingerprint: fingerprintInputSchema(mcpTool.inputSchema),
       })
     }
 
@@ -153,6 +170,7 @@ export namespace LazyToolRegistry {
         existing.name === updated.name &&
         existing.summary === updated.summary &&
         existing.category === updated.category &&
+        existing.inputSchemaFingerprint === updated.inputSchemaFingerprint &&
         existing.keywords.length === updated.keywords.length &&
         existing.keywords.every((keyword, index) => keyword === updated.keywords[index])
       if (unchanged) {
