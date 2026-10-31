@@ -647,6 +647,7 @@ test("groups one canonical endpoint with isolated method contracts and traffic-o
     queryParameters: [],
     bodyParameters: ["userId", "email"],
     headerNames: ["content-type", "authorization"],
+    contentTypes: ["application/json"],
     authSignals: ["bearer-token"],
   }
   const requests = [
@@ -674,6 +675,8 @@ test("groups one canonical endpoint with isolated method contracts and traffic-o
   expect(postOperation.bodyParameters).toEqual(["userId", "email"])
   expect(postOperation.queryParameters).toEqual([])
   expect(postOperation.headerNames).toEqual(["content-type", "authorization"])
+  expect(postOperation.contentTypes).toEqual(["application/json"])
+  expect(getOperation.contentTypes).toEqual([])
   expect(postOperation.authSignals).toEqual(["bearer-token"])
   expect(postOperation.sourceFiles).toEqual(["javascript/post.js"])
   expect(postOperation.observedRequestIDs).toContain("req-post")
