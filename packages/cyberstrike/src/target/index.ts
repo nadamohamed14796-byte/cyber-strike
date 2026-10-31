@@ -3103,6 +3103,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     authSignals?: string[]
     cookieSignals?: string[]
     contentTypes?: string[]
+    operationIds?: string[]
+    operationSummaries?: string[]
+    responseStatuses?: number[]
+    responseContentTypes?: string[]
+    responseFields?: string[]
+    behaviorSignals?: string[]
     sourceFiles?: string[]
     requestIDs?: string[]
     confidence?: "candidate" | "observed" | "confirmed" | "refuted" | "inconclusive" | "blocked"
@@ -3133,6 +3139,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     authSignals: string[]
     cookieSignals: string[]
     contentTypes: string[]
+    operationIds: string[]
+    operationSummaries: string[]
+    responseStatuses: number[]
+    responseContentTypes: string[]
+    responseFields: string[]
+    behaviorSignals: string[]
     sourceFiles: string[]
     requestIDs: string[]
     confidence: NonNullable<EndpointOperationInput["confidence"]>
@@ -3148,6 +3160,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     authSignals: string[]
     cookieSignals: string[]
     contentTypes: string[]
+    operationIds: string[]
+    operationSummaries: string[]
+    responseStatuses: number[]
+    responseContentTypes: string[]
+    responseFields: string[]
+    behaviorSignals: string[]
     sourceFiles: string[]
     requestIDs: string[]
     evidence: StoredEndpointEvidence[]
@@ -3246,6 +3264,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         authSignals: [] as string[],
         cookieSignals: [] as string[],
         contentTypes: [] as string[],
+        operationIds: [] as string[],
+        operationSummaries: [] as string[],
+        responseStatuses: [] as number[],
+        responseContentTypes: [] as string[],
+        responseFields: [] as string[],
+        behaviorSignals: [] as string[],
         sourceFiles: [] as string[],
         requestIDs: [] as string[],
       })
@@ -3264,7 +3288,8 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       state.unattributed ??= emptyFields()
       for (const field of [
         "pathParameters", "queryParameters", "bodyParameters", "headerNames",
-        "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
+        "authSignals", "cookieSignals", "contentTypes", "operationIds", "operationSummaries",
+        "responseContentTypes", "responseFields", "behaviorSignals", "sourceFiles", "requestIDs",
       ] as const) {
         state.unattributed[field] ??= []
       }
@@ -3278,6 +3303,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         operation.authSignals ??= []
         operation.cookieSignals ??= []
         operation.contentTypes ??= []
+        operation.operationIds ??= []
+        operation.operationSummaries ??= []
+        operation.responseStatuses ??= []
+        operation.responseContentTypes ??= []
+        operation.responseFields ??= []
+        operation.behaviorSignals ??= []
         operation.sourceFiles ??= []
         operation.requestIDs ??= []
         if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
@@ -3295,6 +3326,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             authSignals: operation.authSignals,
             cookieSignals: operation.cookieSignals,
             contentTypes: operation.contentTypes,
+            operationIds: operation.operationIds,
+            operationSummaries: operation.operationSummaries,
+            responseStatuses: operation.responseStatuses,
+            responseContentTypes: operation.responseContentTypes,
+            responseFields: operation.responseFields,
+            behaviorSignals: operation.behaviorSignals,
             sourceFiles: operation.sourceFiles,
           }
           const hasLegacyFields = Object.values(legacyFields).some((values) => values.length > 0)
@@ -3367,10 +3404,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         }
         for (const field of [
           "pathParameters", "queryParameters", "bodyParameters", "headerNames",
-          "authSignals", "cookieSignals", "contentTypes", "sourceFiles",
+          "authSignals", "cookieSignals", "contentTypes", "operationIds", "operationSummaries",
+          "responseContentTypes", "responseFields", "behaviorSignals", "sourceFiles",
         ] as const) {
           operation[field] = unique([...operation[field], ...(incoming[field] ?? [])])
         }
+        operation.responseStatuses = [...new Set([...operation.responseStatuses, ...(incoming.responseStatuses ?? [])])]
         // Keep the first representative request link in this human-readable note.
         // The canonical request store and endpoint inventory retain the complete traffic history.
         if (operation.requestIDs.length === 0 && (incoming.requestIDs?.length ?? 0) > 0) {
@@ -3389,6 +3428,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
           authSignals: incoming.authSignals ?? [],
           cookieSignals: incoming.cookieSignals ?? [],
           contentTypes: incoming.contentTypes ?? [],
+          operationIds: incoming.operationIds ?? [],
+          operationSummaries: incoming.operationSummaries ?? [],
+          responseStatuses: incoming.responseStatuses ?? [],
+          responseContentTypes: incoming.responseContentTypes ?? [],
+          responseFields: incoming.responseFields ?? [],
+          behaviorSignals: incoming.behaviorSignals ?? [],
           sourceFiles: incoming.sourceFiles ?? [],
           requestIDs: incoming.requestIDs ?? [],
         }
@@ -3435,10 +3480,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
           }
           for (const source of [
             "pathParameters", "queryParameters", "bodyParameters", "headerNames",
-            "authSignals", "cookieSignals", "contentTypes", "sourceFiles",
+            "authSignals", "cookieSignals", "contentTypes", "operationIds", "operationSummaries",
+            "responseContentTypes", "responseFields", "behaviorSignals", "sourceFiles",
           ] as const) {
             evidence[source] = unique([...evidence[source], ...(evidenceInput[source] ?? [])])
           }
+          evidence.responseStatuses = [...new Set([...evidence.responseStatuses, ...(evidenceInput.responseStatuses ?? [])])]
           if (evidence.requestIDs.length === 0 && (evidenceInput.requestIDs?.length ?? 0) > 0) {
             evidence.requestIDs = unique(evidenceInput.requestIDs ?? [])
           }
