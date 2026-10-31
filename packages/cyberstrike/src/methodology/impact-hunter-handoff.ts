@@ -178,16 +178,7 @@ async function dispatch(
   }
 }
 
-const runImpactHunterHandoff = createModeAwareFlightRegistry<string, ImpactHunterMode, ImpactHunterHandoffResult>(
-  (key, mode) => {
-    // key is rootSessionID:findingID; ctx/finding are captured by the call below.
-    const [rootSessionID, findingID] = key.split(":")
-    if (rootSessionID !== Session.root(ctx.sessionID) || findingID !== finding.id) {
-      return Promise.resolve({ started: false, mode, reason: "Impact Hunter handoff identity changed while queued" })
-    }
-    return dispatch(ctx, finding, mode)
-  },
-)
+const runImpactHunterHandoff = createModeAwareFlightRegistry<string, ImpactHunterMode, ImpactHunterHandoffResult>()
 
 export function startImpactHunterHandoff(
   ctx: Tool.Context,
@@ -199,5 +190,5 @@ export function startImpactHunterHandoff(
   }
 
   const key = Session.root(ctx.sessionID) + ":" + finding.id
-  return runImpactHunterHandoff(key, mode)
+  return runImpactHunterHandoff(key, mode, () => dispatch(ctx, finding, mode))
 }}
