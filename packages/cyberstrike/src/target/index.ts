@@ -3091,4 +3091,218 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     if (context.length <= contextLimit) return context
     return context.slice(0, contextLimit - 500) + "\n\n[PARTIAL TARGET CONTEXT: this is a preview, not the complete note or asset inventory. Do not infer that omitted notes/assets do not exist. Use target_notes_read to search and page through saved notes, open the selected workspace notes.md/artifacts for full details, and continue asset inventory from the workspace database.]"
   }
+
+  export type EndpointEvidenceSource = "javascript" | "traffic" | "contract" | "crawl" | "active-test" | "other"
+
+  export interface EndpointOperationInput {
+    method: string
+    methodEvidenceSources?: EndpointEvidenceSource[]
+    pathParameters?: string[]
+    queryParameters?: string[]
+    bodyParameters?: string[]
+    headerNames?: string[]
+    authSignals?: string[]
+    cookieSignals?: string[]
+    contentTypes?: string[]
+    sourceFiles?: string[]
+    requestIDs?: string[]
+    observedInTraffic?: boolean
+    confidence?: "candidate" | "observed" | "confirmed" | "refuted" | "inconclusive" | "blocked"
+  }
+
+  export interface EndpointRecordInput {
+    targetURL: string
+    origin: string | null
+    path: string
+    sourceFiles?: string[]
+    operations: EndpointOperationInput[]
+    unattributed?: Omit<EndpointOperationInput, "method" | "methodEvidenceSources" | "observedInTraffic" | "confidence">
+  }
+
+  interface StoredEndpointOperation extends EndpointOperationInput {
+    method: string
+    methodEvidenceSources: EndpointEvidenceSource[]
+    pathParameters: string[]
+    queryParameters: string[]
+    bodyParameters: string[]
+    headerNames: string[]
+    authSignals: string[]
+    cookieSignals: string[]
+    contentTypes: string[]
+    sourceFiles: string[]
+    requestIDs: string[]
+    observedInTraffic: boolean
+    confidence: NonNullable<EndpointOperationInput["confidence"]>
+  }
+
+  interface StoredEndpointRecord {
+    schemaVersion: 1
+    id: string
+    origin: string
+    path: string
+    sourceFiles: string[]
+    operations: StoredEndpointOperation[]
+    unattributed: Required<NonNullable<EndpointRecordInput["unattributed"]>>
+  }
+
+  const ENDPOINT_RECORD_BEGIN = "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->"
+  const ENDPOINT_RECORD_END = "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->"
+
+  /**
+   * Merge JavaScript, contract, crawl, and captured-traffic observations into one
+   * target note per origin + normalized route template. Methods remain separate
+   * operations, and methodless clues stay unattributed rather than contaminating
+   * every operation. The captured-request store remains the source of raw traffic.
+   */
+  export async function mergeCanonicalEndpointRecord(
+    input: EndpointRecordInput,
+  ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
+    const targetKey = normalizeTarget(input.targetURL).targetKey
+    return withTargetNoteWriteLock(targetKey, async () => {
+      const workspace = await ensure(input.targetURL, { reconcileNotes: false })
+      const origin = input.origin ? new URL(input.origin).origin.toLowerCase() : "*"
+      const cleanPath = (input.path.split(/[?#]/, 1)[0] ?? "/").replace(/\\/{2,}/g, "/").replace(/\\/+$/, "") || "/"
+      const identityShape = cleanPath.split("/").map((segment) =>
+        /^\\{[^}]+\\}$/.test(segment) ? "{}" : segment,
+      ).join("/")
+      const identityHash = createHash("sha256")
+        .update([origin, identityShape].join("\\0"))
+        .digest("hex")
+        .slice(0, 32)
+      const identityKey = "endpoint:" + identityHash
+      const identityMarker = "<!-- cyberstrike-note-identity:" + identityKey + " -->"
+      const unique = (values: string[] = []) => [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))]
+      const normalizeOperation = (method: string) => {
+        const normalized = method.trim().toUpperCase()
+        if (!/^[!#$%&'*+.^_`|~0-9A-Z-]+$/.test(normalized)) {
+          throw new Error("Endpoint operation contains an invalid HTTP method token.")
+        }
+        return normalized
+      }
+
+      const existingRows = Database.use((db) => db.select().from(TargetNoteTable).where(and(
+        eq(TargetNoteTable.target_id, workspace.id),
+        eq(TargetNoteTable.kind, "endpoint"),
+      )).all())
+      const existing = existingRows.find((row) => row.content.includes(identityMarker))
+      let state: StoredEndpointRecord | undefined
+      if (existing) {
+        const begin = existing.content.indexOf(ENDPOINT_RECORD_BEGIN)
+        const end = existing.content.indexOf(ENDPOINT_RECORD_END, begin + ENDPOINT_RECORD_BEGIN.length)
+        if (begin >= 0 && end > begin) {
+          try {
+            const parsed: unknown = JSON.parse(existing.content.slice(begin + ENDPOINT_RECORD_BEGIN.length, end).trim())
+            if (parsed && typeof parsed === "object" && (parsed as { schemaVersion?: unknown }).schemaVersion === 1) {
+              state = parsed as StoredEndpointRecord
+            }
+          } catch {
+            // A malformed older block is not trusted; rebuild the structured state from current evidence.
+          }
+        }
+      }
+
+      const emptyFields = () => ({
+        pathParameters: [] as string[],
+        queryParameters: [] as string[],
+        bodyParameters: [] as string[],
+        headerNames: [] as string[],
+        authSignals: [] as string[],
+        cookieSignals: [] as string[],
+        contentTypes: [] as string[],
+        sourceFiles: [] as string[],
+        requestIDs: [] as string[],
+      })
+      state ??= {
+        schemaVersion: 1,
+        id: "endpoint:" + identityHash,
+        origin,
+        path: cleanPath,
+        sourceFiles: [],
+        operations: [],
+        unattributed: emptyFields(),
+      }
+
+      const confidenceRank: Record<NonNullable<EndpointOperationInput["confidence"]>, number> = {
+        candidate: 0,
+        inconclusive: 1,
+        blocked: 1,
+        refuted: 2,
+        observed: 3,
+        confirmed: 4,
+      }
+      for (const incoming of input.operations) {
+        const method = normalizeOperation(incoming.method)
+        let operation = state.operations.find((item) => normalizeOperation(item.method) === method)
+        if (!operation) {
+          operation = {
+            method,
+            methodEvidenceSources: [],
+            ...emptyFields(),
+            observedInTraffic: false,
+            confidence: "candidate",
+          }
+          state.operations.push(operation)
+        }
+        for (const source of incoming.methodEvidenceSources ?? []) {
+          if (!operation.methodEvidenceSources.includes(source)) operation.methodEvidenceSources.push(source)
+        }
+        for (const field of [
+          "pathParameters", "queryParameters", "bodyParameters", "headerNames",
+          "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
+        ] as const) {
+          operation[field] = unique([...operation[field], ...(incoming[field] ?? [])])
+        }
+        operation.observedInTraffic ||= incoming.observedInTraffic === true || (incoming.requestIDs?.length ?? 0) > 0
+        if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
+          operation.methodEvidenceSources.push("traffic")
+        }
+        const incomingConfidence = incoming.confidence ?? (operation.observedInTraffic ? "observed" : "candidate")
+        if (confidenceRank[incomingConfidence] > confidenceRank[operation.confidence]) {
+          operation.confidence = incomingConfidence
+        }
+      }
+
+      state.sourceFiles = unique([...state.sourceFiles, ...(input.sourceFiles ?? [])])
+      const unattributed = input.unattributed
+      if (unattributed) {
+        for (const field of [
+          "pathParameters", "queryParameters", "bodyParameters", "headerNames",
+          "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
+        ] as const) {
+          state.unattributed[field] = unique([...state.unattributed[field], ...(unattributed[field] ?? [])])
+        }
+      }
+      state.operations.sort((a, b) => a.method.localeCompare(b.method))
+      state.origin = origin
+      state.path = cleanPath
+
+      const structured = JSON.stringify(state, null, 2)
+      const content = [
+        "# Canonical endpoint: " + cleanPath,
+        "",
+        "- Origin: " + origin,
+        "- Identity: " + state.id,
+        "- Operations: " + state.operations.length,
+        "- Evidence model: one endpoint record with independent method-specific operations.",
+        "- Raw requests and responses remain in the canonical captured-request store; IDs below are links, not copied payloads.",
+        "",
+        ENDPOINT_RECORD_BEGIN,
+        structured,
+        ENDPOINT_RECORD_END,
+      ].join("\\n")
+      const hasTraffic = state.operations.some((operation) => operation.observedInTraffic)
+      return addNoteUnlocked(input.targetURL, {
+        kind: "endpoint",
+        title: ("Endpoint " + cleanPath).slice(0, 180),
+        content,
+        source: "canonical-endpoint-merge",
+        sourceURL: origin === "*" ? undefined : origin + cleanPath,
+        status: hasTraffic ? "observed" : "unverified",
+        tags: ["endpoint", "canonical-endpoint", "method-operations"],
+        upsertByIdentity: true,
+        identityKey,
+      })
+    })
+  }
+
 }
