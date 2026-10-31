@@ -47,9 +47,9 @@ test("discovers static imports, dynamic imports, workers, importScripts, and lit
     "https://app.example.test/assets/compat/module.js",
     "https://app.example.test/assets/features/lazy.js",
     "https://app.example.test/assets/modules/helper.js",
+    "https://app.example.test/assets/workers/export.js",
     "https://app.example.test/shared/load.js",
     "https://app.example.test/vendor/legacy.cjs",
-    "https://app.example.test/assets/workers/export.js",
     "https://app.example.test/workers/runtime.js",
   ])
 })
