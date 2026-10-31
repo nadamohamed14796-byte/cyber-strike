@@ -574,3 +574,37 @@ test("builds actionable email-verification, token, and SQL/data-operation traces
   expect(verifyRequest?.path).toBe("/api/auth/email/verify")
   expect(verifyRequest?.bodyParameters).toContain("token")
 })
+
+test("uses syntax-aware function boundaries and extracts nested destructured parameters", () => {
+  const source = [
+    'const misleading = "function fake() { return 1 }"',
+    "class ProfileClient {",
+    "  async loadProfile({ profileId, tenant: { tenantId } }) {",
+    '    return fetch("/api/tenants/" + tenantId + "/profiles/" + profileId)',
+    "  }",
+    "}",
+    "const handlers = {",
+    "  updateProfile({ displayName, locale }) {",
+    '    return axios.patch("/api/profile", { displayName, locale })',
+    "  }",
+    "}",
+    '// function commentedOut() { return fetch("/not-executable") }',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+
+  const loadProfile = result.functions.find((item) => item.name === "loadProfile")
+  const updateProfile = result.functions.find((item) => item.name === "updateProfile")
+  expect(loadProfile?.parameters).toEqual(["profileId", "tenantId"])
+  expect(updateProfile?.parameters).toEqual(["displayName", "locale"])
+  expect(result.functions.some((item) => item.name === "fake" || item.name === "commentedOut")).toBe(false)
+
+  const profileRequest = result.requests.find((item) =>
+    item.path === "/api/tenants/{tenantId}/profiles/{profileId}",
+  )
+  const updateRequest = result.requests.find((item) => item.path === "/api/profile")
+  expect(profileRequest?.sourceFunction).toBe("loadProfile")
+  expect(profileRequest?.method).toBe("GET")
+  expect(updateRequest?.sourceFunction).toBe("updateProfile")
+  expect(updateRequest?.method).toBe("PATCH")
+  expect(updateRequest?.bodyParameters).toEqual(["displayName", "locale"])
+})

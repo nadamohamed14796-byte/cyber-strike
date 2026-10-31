@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import * as ts from "typescript"
 
 export interface JavaScriptCallSiteCandidate {
   line: number
@@ -218,7 +219,121 @@ function bodyVariableNames(text: string): string[] {
 }
 
 /** Resolve function body spans, so a later top-level request is not assigned to an earlier function. */
-function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandidate[], offsets: Map<string, number>): Array<{ name: string; start: number; end: number }> {
+/**
+ * Prefer the TypeScript compiler parser for lexical function boundaries and parameter
+ * bindings. This keeps nested blocks, comments, template literals, JSX, and destructured
+ * parameters from confusing brace/regex-based attribution. The legacy scanner remains a
+ * fallback for malformed or unsupported source that yields no named AST function.
+ */
+function staticFunctionRanges(
+  source: string,
+  functions: JavaScriptFunctionCandidate[],
+  offsets: Map<string, number>,
+): Array<{ name: string; start: number; end: number }> {
+  try {
+    const sourceFile = ts.createSourceFile(
+      "javascript-asset.tsx",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    )
+    const astFunctions = new Map<string, JavaScriptFunctionCandidate>()
+    const astOffsets = new Map<string, number>()
+    const astRanges: Array<{ name: string; start: number; end: number }> = []
+
+    const propertyNameText = (name: ts.PropertyName | undefined): string | undefined => {
+      if (!name) return undefined
+      if (
+        ts.isIdentifier(name) ||
+        ts.isPrivateIdentifier(name) ||
+        ts.isStringLiteral(name) ||
+        ts.isNumericLiteral(name) ||
+        ts.isNoSubstitutionTemplateLiteral(name)
+      ) return name.text
+      if (ts.isComputedPropertyName(name)) {
+        const expression = name.expression
+        if (
+          ts.isStringLiteral(expression) ||
+          ts.isNumericLiteral(expression) ||
+          ts.isNoSubstitutionTemplateLiteral(expression)
+        ) return expression.text
+      }
+      return undefined
+    }
+
+    const bindingNames = (binding: ts.BindingName): string[] => {
+      if (ts.isIdentifier(binding)) return [binding.text]
+      return binding.elements.flatMap((element) =>
+        ts.isOmittedExpression(element) ? [] : bindingNames(element.name),
+      )
+    }
+
+    const assignedFunctionName = (node: ts.FunctionLikeDeclaration): string | undefined => {
+      let parent = node.parent
+      while (
+        ts.isParenthesizedExpression(parent) ||
+        ts.isAsExpression(parent) ||
+        ts.isTypeAssertionExpression(parent) ||
+        ts.isNonNullExpression(parent) ||
+        ts.isSatisfiesExpression(parent)
+      ) {
+        parent = parent.parent
+      }
+      if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.name.text
+      if (ts.isPropertyAssignment(parent)) return propertyNameText(parent.name)
+      if (ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent)) return propertyNameText(parent.name)
+      return undefined
+    }
+
+    const visit = (node: ts.Node) => {
+      if (ts.isFunctionLike(node)) {
+        const declaration = node as ts.FunctionLikeDeclaration
+        const body = declaration.body
+        if (body) {
+          const ownName = "name" in declaration
+            ? propertyNameText(declaration.name as ts.PropertyName | undefined)
+            : undefined
+          const name = assignedFunctionName(declaration) ??
+            ownName ??
+            (ts.isConstructorDeclaration(node) ? "constructor" : undefined)
+          if (name) {
+            const declarationOffset = node.getStart(sourceFile)
+            const line = sourceFile.getLineAndCharacterOfPosition(declarationOffset).line + 1
+            const key = line + ":" + name
+            const parameters = cleanUnique(declaration.parameters.flatMap((parameter) => bindingNames(parameter.name))
+              .filter((parameter) => parameter !== "this"))
+            const previous = astFunctions.get(key)
+            if (previous) {
+              previous.parameters = cleanUnique([...previous.parameters, ...parameters])
+            } else {
+              astFunctions.set(key, { name, line, parameters })
+              astOffsets.set(key, declarationOffset)
+              astRanges.push({
+                name,
+                start: body.getStart(sourceFile),
+                end: body.end,
+              })
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+    if (astRanges.length > 0) {
+      functions.splice(0, functions.length, ...[...astFunctions.values()].sort((a, b) =>
+        a.line - b.line || a.name.localeCompare(b.name),
+      ))
+      offsets.clear()
+      for (const [key, value] of astOffsets) offsets.set(key, value)
+      return astRanges
+    }
+  } catch {
+    // Keep the bounded legacy heuristic below as a recovery path for malformed assets.
+  }
+
   const ranges: Array<{ name: string; start: number; end: number }> = []
   for (const fn of functions) {
     const offset = offsets.get(fn.line + ":" + fn.name)
