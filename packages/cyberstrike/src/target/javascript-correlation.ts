@@ -231,7 +231,7 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const calls = /\\b(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\\w$]*\\.(?:get|post|put|patch|delete|head|options|request|open))\\s*\\(/gi
   for (const call of content.matchAll(calls)) {
     const start = (call.index ?? 0) + call[0].length
-    const tail = content.slice(start, Math.min(content.length, start + 12000))
+    const tail = content.slice(start)
     const callText = "(" + tail
     const close = findCallEnd(callText, 0)
     if (close < 0) continue
