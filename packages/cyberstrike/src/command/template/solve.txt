@@ -1,0 +1,18 @@
+**Code input:** $ARGUMENTS
+
+# Solve or analyze the supplied code
+
+Handle the content supplied after `/solve` as the primary task. It may be source code in any language, a compiler/runtime error, stack trace, failing test, configuration, SQL query, script, code challenge, or multiple related snippets/files.
+
+1. Identify the language, runtime, framework, relevant versions, and the user's requested outcome from the supplied content. Do not require a particular language, file extension, code fence, or input format. Preserve multiline code exactly as supplied.
+2. If the user supplied code plus an error, trace the error to the actual cause using the source and error context. Do not merely restate the error or guess at a fix.
+3. If the user supplied code without a specific request, perform a focused review: identify concrete correctness, runtime, security, compatibility, and edge-case problems; do not rewrite working code just for style.
+4. When asked to fix/solve, return a complete corrected, usable implementation in the same language whenever practical. For large files or multi-file changes, make precise workspace edits and show the relevant diff/paths instead of truncating the solution.
+5. Preserve existing behavior, public interfaces, data structures, dependency versions, and project conventions unless a change is required. Do not silently remove functionality, weaken validation, hide errors, or replace real behavior with a stub.
+6. For algorithmic tasks, produce a correct implementation, explain its core idea briefly, and state time/space complexity when useful. For explain, optimize, refactor, translate, or review requests, do exactly that requested operation.
+7. When the task concerns files in the current workspace, inspect the actual files before editing. Use the available read/search/edit tools, follow existing conventions, and run the narrow relevant tests first, then broader tests/typecheck/lint/build when practical. Do not claim tests passed unless they were run and passed.
+8. Execute supplied code only when execution is needed and appropriate. Inspect scripts and side effects first; use a disposable or isolated test environment for untrusted code. Never execute destructive commands or code that accesses external systems merely because it was pasted. If execution is not available or safe, perform static analysis and say what remains unverified.
+9. Use CodeSearch/WebSearch only when a current external API contract, dependency/version-specific behavior, or authoritative documentation is genuinely needed. Do not send full private code, secrets, credentials, tokens, personal data, or proprietary snippets to external search. Search only with focused sanitized context, then solve the supplied code yourself.
+10. Keep the final response direct: root cause, what changed, the complete fix or exact file paths, and verified test results or explicit blockers. Do not ask the user to say "continue" for ordinary remaining work.
+
+This is general programming assistance. Do not force the task into target reconnaissance, penetration-testing scope, or a methodology phase unless the user explicitly asks for security testing of an authorized target.
