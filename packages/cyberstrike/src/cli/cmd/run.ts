@@ -156,7 +156,7 @@ function edit(info: ToolProps<typeof EditTool>) {
 function codesearch(info: ToolProps<typeof CodeSearchTool>) {
   inline({
     icon: "◇",
-    title: `Exa Code Search "${info.input.query}"`,
+    title: `Code Context Search "${info.input.query}"`,
   })
 }
 
