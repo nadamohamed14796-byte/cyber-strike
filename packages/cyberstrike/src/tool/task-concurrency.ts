@@ -1,6 +1,11 @@
 export type TaskSchedulerOptions = {
   maxConcurrent: number
   maxPerLane: number
+  /**
+   * Lane names (or suffixes such as "impact") that retain dedicated global
+   * capacity. Non-reserved work cannot consume these slots.
+   */
+  reservedLaneSuffixes?: string[]
 }
 
 type ScheduledEntry = {
@@ -15,6 +20,11 @@ type ScheduledEntry = {
 export function createTaskScheduler(options: TaskSchedulerOptions) {
   const maxConcurrent = Math.max(1, Math.floor(options.maxConcurrent))
   const maxPerLane = Math.max(1, Math.floor(options.maxPerLane))
+  const reservedLaneSuffixes = [...new Set((options.reservedLaneSuffixes ?? []).map((value) => value.trim()).filter(Boolean))]
+  const isReservedLane = (lane: string) => reservedLaneSuffixes.some((suffix) =>
+    lane === suffix || lane.endsWith(":" + suffix),
+  )
+  const reservedCapacity = Math.min(maxConcurrent, reservedLaneSuffixes.length)
   const pending: ScheduledEntry[] = []
   const activeByLane = new Map<string, number>()
   let active = 0
@@ -34,7 +44,13 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
 
   function drain() {
     while (active < maxConcurrent) {
-      const index = pending.findIndex((entry) => (activeByLane.get(entry.lane) ?? 0) < maxPerLane)
+      const nonReservedActive = [...activeByLane.entries()]
+        .filter(([lane]) => !isReservedLane(lane))
+        .reduce((total, [, count]) => total + count, 0)
+      const index = pending.findIndex((entry) =>
+        (activeByLane.get(entry.lane) ?? 0) < maxPerLane &&
+        (isReservedLane(entry.lane) || nonReservedActive < maxConcurrent - reservedCapacity),
+      )
       if (index < 0) return
       const [entry] = pending.splice(index, 1)
       if (!entry) return
@@ -109,4 +125,5 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
 export const AgentTaskConcurrency = createTaskScheduler({
   maxConcurrent: 4,
   maxPerLane: 2,
+  reservedLaneSuffixes: ["impact"],
 })
