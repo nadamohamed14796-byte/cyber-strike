@@ -419,6 +419,57 @@ function sanitizeJavaScriptSourceAnalysisForPersistence(analysis: JavaScriptSour
   }
 }
 
+/** Return a URL identity without query/fragment values that may contain signatures or tokens. */
+function canonicalSourceURLIdentity(value?: string | null): string {
+  if (!value) return ""
+  const url = safeURL(value)
+  return url ? url.origin + url.pathname : value.split(/[?#]/, 1)[0]!
+}
+
+/**
+ * Link virtual sourcesContent records to the real, query-free source-map URL.
+ * The original local:// URL is read from the map record itself, not reconstructed
+ * from its generated virtual filename (which is intentionally different).
+ */
+export function linkLocalSourceMapSources(
+  sourceFiles: JavaScriptSourceFile[],
+  mapRecord: JavaScriptSourceFile,
+  canonicalMapURL: string,
+): void {
+  const localMapURL = mapRecord.sourceMapURL
+  mapRecord.sourceMapURL = canonicalMapURL
+  mapRecord.sourceURL = canonicalMapURL
+  if (!localMapURL) return
+  for (const source of sourceFiles) {
+    if (source === mapRecord || source.sourceMapURL !== localMapURL) continue
+    source.sourceMapURL = canonicalMapURL
+    source.sourceURL = canonicalMapURL
+  }
+}
+
+/**
+ * Prefer request-linked capture records when the same source bytes/URL were
+ * already present in the local asset inventory. The path is not part of the
+ * identity because ingestion and capture persistence deliberately use separate
+ * directories. Keep distinct source-map sources and distinct origins intact.
+ */
+export function mergeCapturedAndLocalJavaScriptSources(
+  localFiles: JavaScriptSourceFile[],
+  capturedFiles: JavaScriptSourceFile[],
+): JavaScriptSourceFile[] {
+  const identity = (file: JavaScriptSourceFile) => [
+    file.sha256,
+    canonicalSourceURLIdentity(file.sourceURL),
+    canonicalSourceURLIdentity(file.sourceMapURL),
+    file.sourceMapSource ?? "",
+  ].join("\\0")
+  const capturedIdentities = new Set(capturedFiles.map(identity))
+  return [
+    ...localFiles.filter((file) => !capturedIdentities.has(identity(file))),
+    ...capturedFiles,
+  ]
+}
+
 /** Persist summaries and fingerprints only; never save source-map source text or raw secret-like values. */
 export function sanitizeJavaScriptSourceFileForPersistence(file: JavaScriptSourceFile): JavaScriptSourceFile {
   if (!file.analysis) return file
@@ -2461,13 +2512,11 @@ export namespace JavaScriptCorrelation {
       // Restore the exact manifest-backed URL so the original JS sourceMappingURL can match it,
       // including signed query parameters without exposing those values in the rendered summary.
       if (file.sourceMapStatus) {
-        const localMapURL = "local://" + file.relativePath
-        file.sourceMapURL = sourceURL.href
-        for (const embeddedSource of sourceFiles) {
-          if (embeddedSource.sourceMapURL !== localMapURL) continue
-          embeddedSource.sourceMapURL = sourceURL.href
-          embeddedSource.sourceURL = sourceURL.origin + sourceURL.pathname
-        }
+        linkLocalSourceMapSources(
+          sourceFiles,
+          file,
+          sourceURL.origin + sourceURL.pathname,
+        )
       }
     }
 
@@ -2812,32 +2861,9 @@ export namespace JavaScriptCorrelation {
     // Keep every distinct source location/URL for provenance. analysisCache is keyed by
     // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
     // source records; this matters when the same bundle is served from different hosts.
-    const capturedAssetByPath = new Map(capturedAssetIndex.map((asset) => [asset.file, asset]))
-    const localSourceIsPersistedCapture = (file: JavaScriptSourceFile): boolean => {
-      let relativeCapturePath: string | undefined
-      if (file.relativePath.startsWith("javascript/captured/")) {
-        relativeCapturePath = file.relativePath
-      } else if (file.sourceMapURL?.startsWith("local://javascript/captured/")) {
-        const localMapURL = safeURL(file.sourceMapURL)
-        if (localMapURL) relativeCapturePath = "javascript" + localMapURL.pathname
-      }
-      if (!relativeCapturePath) return false
-      const indexedAsset = capturedAssetByPath.get(relativeCapturePath)
-      if (!indexedAsset) return false
-      const indexedURL = safeURL(indexedAsset.url)
-      const canonicalURL = indexedURL ? indexedURL.origin + indexedURL.pathname : indexedAsset.url
-      // Prefer the request-linked record when the exact local raw asset and captured
-      // response have the same content hash and URL. Keep local-only files as fallback.
-      return capturedSources.some((source) =>
-        source.sha256 === file.sha256 &&
-        (source.sourceURL === canonicalURL || source.sourceMapURL === canonicalURL) &&
-        source.sourceMapSource === file.sourceMapSource
-      )
-    }
-    const mergedSourceFiles = [
-      ...sourceFiles.filter((file) => !localSourceIsPersistedCapture(file)),
-      ...capturedSources,
-    ]
+    // Merge by content and canonical source identity, not the storage directory:
+    // ingestion writes javascript/assets/, while request captures write javascript/captured/.
+    const mergedSourceFiles = mergeCapturedAndLocalJavaScriptSources(sourceFiles, capturedSources)
     const sourceMapIdentity = (value: string) => {
       const url = safeURL(value)
       return url ? url.origin + url.pathname : value.split(/[?#]/, 1)[0]!
