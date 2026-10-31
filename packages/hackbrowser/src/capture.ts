@@ -8,6 +8,25 @@ import type { UIField, UIContext } from "./types.ts"
  */
 export const MAX_CAPTURED_RESPONSE_BODY_BYTES = 500 * 1024
 
+
+const SKIP_CAPTURE_EXTENSIONS = [
+  ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+  ".css", ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".mp3",
+  ".pdf", ".zip", ".gz",
+]
+
+/** Static browser assets are excluded, but scripts and source maps remain first-class captures. */
+export function shouldSkipCapturedURL(input: string): boolean {
+  try {
+    const url = new URL(input)
+    const pathname = url.pathname.toLowerCase()
+    if (pathname.startsWith("/socket.io/")) return true
+    return SKIP_CAPTURE_EXTENSIONS.some((extension) => pathname.endsWith(extension))
+  } catch {
+    return true
+  }
+}
+
 export function captureResponseBody(input: {
   url: string
   headers: Record<string, string>

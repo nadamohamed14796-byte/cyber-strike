@@ -17,7 +17,7 @@ import type {
   CrawlResult,
   CrawlUsage,
 } from "./types.ts"
-import { buildRawRequest, captureResponseBody, correlateWithUI, parseRequestParams } from "./capture.ts"
+import { buildRawRequest, captureResponseBody, correlateWithUI, parseRequestParams, shouldSkipCapturedURL } from "./capture.ts"
 import {
   sendIngest,
   initSession,
@@ -429,41 +429,9 @@ function createDryRunHandler(): CaptureFn {
 // URL filtering — skip static assets
 // ============================================================
 
-const SKIP_EXTENSIONS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".svg",
-  ".ico",
-  ".webp",
-  ".css",
-  ".js",
-  ".mjs",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".eot",
-  ".map",
-  ".mp4",
-  ".mp3",
-  ".pdf",
-  ".zip",
-  ".gz",
-]
-
 function shouldSkipUrl(url: string): boolean {
-  try {
-    const u = new URL(url)
-    const path = u.pathname.toLowerCase()
-    if (SKIP_EXTENSIONS.some((ext) => path.endsWith(ext))) return true
-    if (path.startsWith("/socket.io/")) return true
-    return false
-  } catch {
-    return true
-  }
+  return shouldSkipCapturedURL(url)
 }
-
 // ============================================================
 // Browser dialog handler
 // ============================================================

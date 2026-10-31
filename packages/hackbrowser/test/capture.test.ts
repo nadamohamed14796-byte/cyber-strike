@@ -1,7 +1,7 @@
 import { test, expect, beforeAll, afterAll } from "bun:test"
 import { chromium, type Browser, type Page } from "playwright"
 import { readFileSync } from "fs"
-import { captureResponseBody, MAX_CAPTURED_RESPONSE_BODY_BYTES, snapshotPageUI } from "../src/capture.ts"
+import { captureResponseBody, MAX_CAPTURED_RESPONSE_BODY_BYTES, shouldSkipCapturedURL, snapshotPageUI } from "../src/capture.ts"
 
 let browser: Browser
 
@@ -365,4 +365,24 @@ test("retains the legacy cap for oversized ordinary JSON responses and marks tru
   expect(result.truncated).toBe(true)
   expect(result.body).toEndWith("\n[TRUNCATED]")
   expect(Buffer.byteLength(result.body, "utf8")).toBeLessThanOrEqual(MAX_CAPTURED_RESPONSE_BODY_BYTES + Buffer.byteLength("\n[TRUNCATED]", "utf8"))
+})
+
+
+test("captures JavaScript, CommonJS, module bundles, and source maps instead of filtering them as static assets", () => {
+  for (const url of [
+    "https://app.example.test/assets/app.js",
+    "https://app.example.test/assets/app.mjs?v=42",
+    "https://app.example.test/assets/legacy.cjs",
+    "https://app.example.test/assets/app.js.map?version=3",
+  ]) {
+    expect(shouldSkipCapturedURL(url)).toBe(false)
+  }
+  for (const url of [
+    "https://app.example.test/assets/logo.svg",
+    "https://app.example.test/assets/site.css",
+    "https://app.example.test/assets/font.woff2",
+    "https://app.example.test/socket.io/?EIO=4",
+  ]) {
+    expect(shouldSkipCapturedURL(url)).toBe(true)
+  }
 })
