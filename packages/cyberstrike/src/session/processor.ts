@@ -26,10 +26,8 @@ export namespace SessionProcessor {
   export type Result = Awaited<ReturnType<Info["process"]>>
 
   /** Only completed tool-call events or non-empty text count as model output. */
-  export function hasProducedOutput(parts: MessageV2.Part[], observedToolCalls: number): boolean {
-    return observedToolCalls > 0 || parts.some(
-      (part) => part.type === "text" && part.text.trim().length > 0,
-    )
+  export function hasProducedOutput(textOutput: string, observedToolCalls: number): boolean {
+    return observedToolCalls > 0 || textOutput.trim().length > 0
   }
 
   export function create(input: {
@@ -75,6 +73,7 @@ export namespace SessionProcessor {
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
             const stream = await LLM.stream(streamInput)
             let observedToolCalls = 0
+            let producedText = ""
 
             for await (const value of stream.fullStream) {
               if (value.type !== "text-delta") await flushTextDelta()
@@ -354,6 +353,7 @@ export namespace SessionProcessor {
                 case "text-delta":
                   if (currentText) {
                     currentText.text += value.text
+                    producedText += value.text
                     pendingTextDelta += value.text
                     pendingTextChunks++
                     if (value.providerMetadata) currentText.metadata = value.providerMetadata
@@ -400,8 +400,7 @@ export namespace SessionProcessor {
             // yielding neither user-facing text nor a tool call. Treat that as
             // a failed turn instead of marking the session complete with no reply.
             if (!needsCompaction && !input.assistantMessage.error) {
-              const completedParts = await MessageV2.parts(input.assistantMessage.id)
-              const producedOutput = hasProducedOutput(completedParts, observedToolCalls)
+              const producedOutput = hasProducedOutput(producedText, observedToolCalls)
               if (!producedOutput) {
                 throw new Error("The model returned an empty response (no text or tool calls).")
               }
