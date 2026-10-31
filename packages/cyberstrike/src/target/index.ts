@@ -3530,7 +3530,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       state.path ||= cleanPath
 
       const structured = JSON.stringify(state, null, 2)
-      const inline = (value: string) => value.replace(/[\\r\\n|]/g, " ").trim()
+      const inline = (value: string) => value.replace(/[\r\n|]/g, " ").trim()
       const readableOperations = state.operations.flatMap((operation) => [
         "## " + operation.method,
         "- Method evidence: " + (operation.methodEvidenceSources.join(", ") || "unspecified") +
