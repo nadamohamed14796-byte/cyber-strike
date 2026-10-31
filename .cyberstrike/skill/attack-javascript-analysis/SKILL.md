@@ -82,6 +82,10 @@ Keep the workspace organized around two canonical human-readable outputs and reu
 ### High-signal JS-to-request correlation
 For every extracted route, retain bundle URL/hash, line/offset, first-party confidence, method/parameter template, auth/tenant hints, sink/source pair, and whether an actual browser request corroborates it. Search results and token-like strings remain metadata, never copy a value into a request. Prioritize admin/tenant flows, export/import, billing, file transfer, URL-fetch inputs, account recovery, and versioned APIs. A route string without traffic or docs may be dead code; a client-side role check does not establish server authorization. Chain to IDOR/property authorization only after correlating a real request and controlled fixture, to SSRF only on a confirmed server fetch path, and to DOM XSS only after reachability from an untrusted source is shown.
 
+## Endpoint extraction quality gate
+
+The canonical helper at `.cyberstrike/skill/scripts/js_endpoint_inventory.py` and the built-in correlation extractor must not treat arbitrary absolute URL strings as API endpoints. Absolute URLs require a recognizable request-call context (fetch, axios, XHR, or an equivalent client call); arbitrary documentation links, XML/SVG namespaces, static assets, and placeholder/development URLs are separate link/asset intelligence, not endpoint records. Keep conventional relative API routes as static candidates, and preserve their source file/line. Do not infer request body fields from nearby response objects: only fields tied to the actual request payload qualify. When the request shape is ambiguous, leave the parameter list empty and record the uncertainty.
+
 ## Repeatable inventory script (local assets only)
 
 This helper inventories URL-like strings from files already collected for an authorized target. It prints normalized URL/path candidates and source locations, not surrounding source lines or token-like values. It does not fetch URLs, execute JavaScript, or prove that a route is live.
