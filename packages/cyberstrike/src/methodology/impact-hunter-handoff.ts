@@ -116,8 +116,15 @@ async function dispatch(
           "A low, informational, or medium rating is a reason to assess realistic impact paths, not a promise that escalation exists. Never chase the largest number or report a hypothetical chain as fact.",
         ]
 
+    const isInformational = (finding.candidate ?? finding.severity) === "info"
+    const informationalChainInstructions = isInformational ? [
+      "SPECIAL POLICY — INFORMATIONAL IS NEVER A STANDALONE REPORT: treat this finding as a chain precursor/evidence note, not a reportable vulnerability by itself. Do not approve it, do not create a standalone report for it, and do not raise its severity merely because another observation exists.",
+      "Actively inspect the existing session findings, target notes, request/response evidence, JavaScript routes/call graph, role and workflow differences, and chain candidates. Use methodology_status to find existing chain hypotheses; pair this informational signal with other complementary, independently evidenced signals. Propose one concrete next hop at a time, call relevant specialist testers in background when independent work can proceed safely, and continue your own investigation without waiting for unrelated agents.",
+      "Use chain_link only to connect existing findings when the relationship and prerequisite are supported by evidence. Test each hop with its own baseline and negative control. If the combined path demonstrates a real security consequence, create/report a distinct combined finding describing the terminal impact, then run the full ten-check validation and explicit triage on that combined finding. Only the combined finding may become reportable; retain this informational item as supporting evidence. If no chain is demonstrated, keep this item as an informational note/candidate and explicitly say no standalone report is warranted.",
+    ] : []
     const prompt = [
       "You are the dedicated Impact Hunter for one persisted finding. Follow the handoff mode exactly; never treat a candidate as confirmed merely because you were started.",
+      ...informationalChainInstructions,
       ...common,
       "",
       ...modeInstructions,
