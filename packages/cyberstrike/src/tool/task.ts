@@ -246,7 +246,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           // agent under the SAME root session, but only when its title embeds
           // the exact finding ID carried by the independently checked handoff.
           const promptFindingID = params.prompt
-            .split("\\n")
+            .split("\n")
             .map((line) => line.trim())
             .find((line) => line.startsWith("finding_id:"))
             ?.slice("finding_id:".length)
