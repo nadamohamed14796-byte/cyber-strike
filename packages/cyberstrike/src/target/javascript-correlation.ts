@@ -3594,6 +3594,24 @@ export namespace JavaScriptCorrelation {
           requestIDs: operation.observedRequestIDs ?? [],
           observedInTraffic: operation.observedInTraffic,
           confidence: operation.confidence,
+          evidence: operation.methodEvidenceSources?.length ? [
+            ...(operation.methodEvidenceSources.includes("javascript") ? [{
+              source: "javascript" as const,
+              pathParameters: operation.pathParameters ?? [],
+              queryParameters: operation.queryParameters ?? [],
+              bodyParameters: operation.bodyParameters ?? [],
+              headerNames: operation.headerNames ?? [],
+              authSignals: operation.authSignals ?? [],
+              cookieSignals: operation.cookieSignals ?? [],
+              sourceFiles: operation.sourceFiles ?? [],
+              confidence: operation.confidence,
+            }] : []),
+            ...(operation.methodEvidenceSources.includes("traffic") ? [{
+              source: "traffic" as const,
+              requestIDs: operation.observedRequestIDs ?? [],
+              confidence: operation.observedInTraffic ? "observed" as const : "candidate" as const,
+            }] : []),
+          ] : undefined,
         })),
         unattributed: endpoint.unattributed,
       })
