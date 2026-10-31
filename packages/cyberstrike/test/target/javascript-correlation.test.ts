@@ -98,6 +98,10 @@ test("builds source-linked additional scenarios and connects workflow, endpoint,
   expect(identity.recommendedChecks.some((check) => check.includes("two controlled accounts"))).toBe(true)
 
   expect(scenarios.some((item) => item.category === "file-transfer")).toBe(true)
+  const tenantScenario = scenarios.find((item) => item.category === "multi-tenant-authorization")!
+  expect(tenantScenario.relatedRequestCandidateIDs).toEqual([])
+  expect(tenantScenario.relatedEndpointIDs).toEqual([])
+  expect(tenantScenario.observedRequestIDs).toEqual([])
   expect(scenarios.some((item) => item.category === "multi-tenant-authorization")).toBe(true)
   expect(scenarios.some((item) => item.category === "dom-xss-review" && item.riskSignalIDs.includes("risk-dom-1"))).toBe(true)
   const dataScenario = scenarios.find((item) => item.category === "sensitive-data-exposure")!

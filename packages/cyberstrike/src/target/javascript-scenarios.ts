@@ -357,11 +357,11 @@ export function createJavaScriptScenarioCandidates(input: {
   for (const item of input.applicationHints) {
     const category = categoryForApplicationHint(item)
     if (!category) continue
-    add(item.sourceFile, category, { evidenceType: "application", kind: item.kind, value: item.value, line: item.line, sourceFunction: null }, null)
+    add(item.sourceFile, category, { evidenceType: "application", kind: item.kind, value: item.value, line: item.line, sourceFunction: item.functionName ?? null }, item.functionName ?? null)
   }
   for (const item of input.roleHints) {
     const category = /debug|internal/.test(item.kind) ? "debug-feature-exposure" : "multi-tenant-authorization"
-    add(item.sourceFile, category, { evidenceType: "role", kind: item.kind, value: item.value, line: item.line, sourceFunction: null }, null)
+    add(item.sourceFile, category, { evidenceType: "role", kind: item.kind, value: item.value, line: item.line, sourceFunction: item.functionName ?? null }, item.functionName ?? null)
   }
   for (const item of input.riskSignals) {
     const category = riskCategories[item.kind]
@@ -389,15 +389,16 @@ export function createJavaScriptScenarioCandidates(input: {
 
   const output: JavaScriptScenarioCandidate[] = []
   for (const group of groups.values()) {
-    const requestCandidates = input.requestCandidates.filter((request) =>
-      request.sourceFile === group.sourceFile && (!group.sourceFunction || request.sourceFunction === group.sourceFunction),
-    )
+    // Do not attach every request from a large bundle to a top-level hint.
+    // Only function-attributed signals can inherit that function's request candidates.
+    const requestCandidates = group.sourceFunction ? input.requestCandidates.filter((request) =>
+      request.sourceFile === group.sourceFile && request.sourceFunction === group.sourceFunction,
+    ) : []
     const endpoints = input.endpoints.filter((endpoint) =>
-      endpoint.sourceFiles.includes(group.sourceFile) &&
-      (!group.sourceFunction || requestCandidates.some((request) =>
+      endpoint.sourceFiles.includes(group.sourceFile) && requestCandidates.some((request) =>
         pathShape(request.path) === pathShape(endpoint.path) &&
         (!endpoint.method || !request.method || endpoint.method.toUpperCase() === request.method.toUpperCase()),
-      )),
+      ),
     )
     const source = input.sourceFiles.find((file) => file.relativePath === group.sourceFile)
     const plan = plans[group.category] ?? plans["business-workflow-review"]!
