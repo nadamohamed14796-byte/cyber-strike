@@ -128,7 +128,7 @@ export function evaluateImpactHunterGate(input: {
     // The candidate marker is class-agnostic: it records that the reporter has
     // not supplied a complete, reviewable PoC. Never infer completeness from
     // baseline/request/response notes alone.
-    const informationalLead = (finding.candidate ?? finding.severity) === "info"
+    const informationalLead = finding.candidate === "info" || finding.severity === "info"
     if (!informationalLead && finding.candidate == null && finding.poc?.trim() && finding.steps_to_reproduce?.trim()) {
       return { allowed: false, mode, reason: "finding already contains a complete-looking PoC and is not marked execution-unconfirmed", requestIDs }
     }
