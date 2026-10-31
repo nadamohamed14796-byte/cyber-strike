@@ -1,5 +1,4 @@
 import z from "zod"
-import { Session } from "../session"
 import { TargetMemory } from "../target"
 import { Tool } from "./tool"
 
@@ -105,39 +104,22 @@ export const TargetEndpointTool = Tool.define<typeof Parameters, Tool.Metadata>(
     "Endpoint identity is normalized origin + route template + API version (normally encoded in the path). HTTP methods are nested operations, not separate endpoint notes. Send one operation object per method and keep that method's parameters, headers, auth/cookie clues, Content-Type, source files, request IDs, and confidence inside it.",
     "Use evidence[] when the same operation has multiple sources. Each evidence item identifies its source (javascript, traffic, contract, crawl, active-test, or other) and carries only the fields supported by that source. Never label a traffic-only method as JavaScript-declared. Keep route-level clues with unknown method in unattributed; do not copy them to all methods.",
     "This tool merges incrementally and is idempotent: new fields enrich the existing endpoint/operation; duplicates do not create another note. The original requests and responses remain in the canonical request store; pass request_ids as references and never copy raw tokens, cookies, authorization values, or request bodies into endpoint evidence.",
-    "The target workspace must already exist and be observed in this session. This tool only records evidence; it does not test the endpoint or confirm a vulnerability.",
+    "The canonical target workspace and persisted scope must already exist; no same-session request or methodology phase is required. Both the requested target and the concrete endpoint origin/path are checked against saved scope before writing. This tool only records evidence; it does not test the endpoint or confirm a vulnerability.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
     try {
-      const sessionID = Session.root(ctx.sessionID)
       const requestedTarget = params.target_url
-      let workspace = await TargetMemory.get(requestedTarget)
-      const observedRequestedTarget = TargetMemory.isObservedInSession(sessionID, requestedTarget)
-      if (!workspace && observedRequestedTarget) {
-        try {
-          const decision = await TargetMemory.checkURLScope(requestedTarget)
-          if (decision.allowed && decision.workspace) workspace = decision.workspace
-        } catch {
-          // Keep the safe failure below when scope cannot be established.
-        }
-      }
-      if (!workspace) {
+      const targetScope = await TargetMemory.checkURLScope(requestedTarget)
+      if (!targetScope.allowed || !targetScope.workspace) {
         return {
           title: "Canonical endpoint not saved",
-          output: "No existing workspace matches this target, and no observed in-scope workspace could be resolved.",
-          metadata: { saved: false, reason: "workspace_missing" },
-        }
-      }
-      if (!observedRequestedTarget && !TargetMemory.isObservedInSession(sessionID, workspace.targetURL)) {
-        return {
-          title: "Canonical endpoint not saved",
-          output: "The requested target and its canonical workspace were not observed in this session tree's requests or Intel. No endpoint record was written.",
-          metadata: { saved: false, reason: "target_not_observed" },
+          output: "No existing persisted-scope workspace matches this target. No endpoint record was written. Reason: " + targetScope.reason,
+          metadata: { saved: false, reason: targetScope.reason ?? "workspace_missing" },
         }
       }
 
-      const endpointURL = new URL(params.path, params.origin ?? workspace.targetURL)
+      const endpointURL = new URL(params.path, params.origin ?? targetScope.workspace.targetURL)
       const endpointScope = await TargetMemory.checkURLScope(endpointURL.href)
       if (!endpointScope.allowed || !endpointScope.workspace) {
         return {
@@ -146,7 +128,7 @@ export const TargetEndpointTool = Tool.define<typeof Parameters, Tool.Metadata>(
           metadata: { saved: false, reason: endpointScope.reason ?? "endpoint_out_of_scope" },
         }
       }
-      workspace = endpointScope.workspace
+      const workspace = endpointScope.workspace
 
       const saved = await TargetMemory.mergeCanonicalEndpointRecord({
         targetURL: workspace.targetURL,
