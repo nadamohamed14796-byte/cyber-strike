@@ -448,6 +448,38 @@ export function linkLocalSourceMapSources(
 }
 
 /**
+ * Restore exact URL provenance to files persisted from captured HTTP responses.
+ * Raw capture assets are inventoried from javascript/captured/ on later runs;
+ * source-map records use virtual filenames and retain their original local://
+ * map path in sourceMapURL, so resolve them through that URL instead.
+ */
+export function attachPersistedCaptureSourceURLs(
+  sourceFiles: JavaScriptSourceFile[],
+  assets: Array<{ url: string; file: string }>,
+): void {
+  const byFile = new Map(assets.map((asset) => [asset.file, asset]))
+  for (const file of sourceFiles) {
+    let relativeCapturePath: string | undefined
+    if (file.relativePath.startsWith("javascript/captured/")) {
+      relativeCapturePath = file.relativePath.split("#inline-", 1)[0]
+    } else if (file.sourceMapURL?.startsWith("local://javascript/captured/")) {
+      relativeCapturePath = file.sourceMapURL.slice("local://".length).split(/[?#]/, 1)[0]
+    }
+    if (!relativeCapturePath) continue
+    const asset = byFile.get(relativeCapturePath)
+    if (!asset) continue
+    const url = safeURL(asset.url)
+    if (!url) continue
+    const canonicalURL = url.origin + url.pathname
+    if (file.sourceMapStatus) {
+      linkLocalSourceMapSources(sourceFiles, file, canonicalURL)
+    } else {
+      file.sourceURL = canonicalURL
+    }
+  }
+}
+
+/**
  * Prefer request-linked capture records when the same source bytes/URL were
  * already present in the local asset inventory. The path is not part of the
  * identity because ingestion and capture persistence deliberately use separate
@@ -2871,6 +2903,7 @@ export namespace JavaScriptCorrelation {
       note: "Raw assets are retained only for responses that passed the persisted target scope/session checks. Treat source contents as sensitive local evidence; never publish raw values in reports.",
     }, null, 2) + "\n")
 
+    attachPersistedCaptureSourceURLs(sourceFiles, capturedAssetIndex)
     const capturedSources = extractCapturedJavaScriptSources(
       capturedAssetInputs,
       analysisCache,
