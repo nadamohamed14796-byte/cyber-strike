@@ -5,6 +5,7 @@ import { Vulnerability } from "../session/vulnerability"
 import { VerificationLedger } from "../session/verification-ledger"
 import { TargetMemory } from "../target"
 import { persistTargetFindingLink } from "../methodology/finding-reference"
+import { evaluateImpactHunterGate } from "../methodology/impact-hunter-gate"
 import { redactTargetNoteSecrets } from "../target/redact"
 
 export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", {
@@ -55,6 +56,19 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
         title: "Finding evidence update blocked",
         output: "This candidate already has a PoC. Do not overwrite it; validate the current PoC or create a materially distinct hypothesis.",
         metadata: { updated: false, reason: "poc_already_present" },
+      }
+    }
+
+    const gate = evaluateImpactHunterGate({
+      finding,
+      sessionID,
+      mode: "proof_gap",
+    })
+    if (!gate.allowed) {
+      return {
+        title: "Finding evidence update blocked",
+        output: "This record no longer satisfies the proof-gap evidence gate: " + (gate.reason ?? "unknown gate failure") + ". No PoC was saved.",
+        metadata: { updated: false, reason: "proof_gap_gate_failed", gateReason: gate.reason },
       }
     }
 
