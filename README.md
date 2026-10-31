@@ -169,6 +169,8 @@ Your security tools don't have to run on your laptop. Deploy Bolt on one or many
 
 Switch between agents with `Tab`. Each one is a domain specialist.
 
+**Impact Hunter can run independently.** Select `impact-hunter` with `Tab` (or `/agents`), then start a new session with `/new` and provide the exact finding ID plus any context you want investigated. This creates a separate session; it does not replace or pause the original session. When CyberStrike dispatches a Hunter automatically, its session appears in the parent session's **Impact Hunter** sidebar card with an **Open** action.
+
 | Agent                  | Focus   | What It Does                                                        |
 | ---------------------- | ------- | ------------------------------------------------------------------- |
 | **cyberstrike**        | General | Full-access primary agent — reconnaissance, exploitation, reporting |
@@ -176,6 +178,7 @@ Switch between agents with `Tab`. Each one is a domain specialist.
 | **mobile-application** | Mobile  | Android/iOS, Frida/Objection, MASTG/MASVS compliance                |
 | **cloud-security**     | Cloud   | AWS, Azure, GCP — IAM misconfigs, CIS benchmarks, exposed resources |
 | **internal-network**   | Network | Active Directory, Kerberos attacks, lateral movement, pivoting      |
+| **impact-hunter**      | Impact  | Independent finding validation, evidence-backed impact analysis, and chain investigation |
 
 Plus **8 specialized proxy testers** that run automatically on intercepted traffic:
 
