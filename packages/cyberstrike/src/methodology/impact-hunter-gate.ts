@@ -145,7 +145,7 @@ export function evaluateImpactHunterGate(input: {
     return { allowed: true, mode, requestIDs }
   }
 
-  if ((finding.candidate ?? finding.severity) === "info") {
+  if (finding.candidate === "info" || finding.severity === "info") {
     return { allowed: false, mode, reason: "informational observations are chain precursors and can never enter standalone approved-impact escalation", requestIDs }
   }
   if (finding.status !== "approved") {
