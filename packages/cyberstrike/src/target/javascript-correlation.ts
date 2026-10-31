@@ -1880,8 +1880,9 @@ function renderCanonicalJavaScriptAnalysis(
     "- Source maps analyzed completely: " + sourceMapReferences.filter((item) => item.status === "analyzed").length,
     "- Source maps unresolved/incomplete: " + incompleteMaps.length,
     "- Embedded source entries analyzed: " + localFiles.filter((file) => Boolean(file.sourceMapSource)).length,
-    "- Static endpoint candidates (method-aware): " + graph.endpointCandidates.length,
-    "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((item) => item.observedInTraffic).length,
+    "- Canonical endpoint records: " + groupCanonicalJavaScriptEndpoints(graphs).length,
+    "- Method-specific endpoint operations: " + graph.endpointCandidates.filter((item) => Boolean(item.method)).length,
+    "- Operations overlapping captured traffic: " + graph.endpointCandidates.filter((item) => item.observedInTraffic && Boolean(item.method)).length,
     "- JavaScript function candidates: " + functions.length,
     "- Structured request candidates: " + requestCandidates.length,
     "- Secret-like assignments (fingerprints only): " + secretCandidates.length,
@@ -1947,6 +1948,7 @@ function renderCanonicalJavaScriptAnalysis(
       " — source: " + item.sourceFile + ":" + item.sourceLine +
       " — parameters: path=[" + item.pathParameters.join(", ") + "]; query=[" + item.queryParameters.join(", ") +
       "]; body=[" + item.bodyParameters.join(", ") + "]; headers=[" + item.headerNames.join(", ") + "]" +
+      " — content types: [" + (item.contentTypes ?? []).join(", ") + "]" +
       " — auth signals: [" + item.authSignals.join(", ") + "] — cookies: [" + item.cookieSignals.join(", ") + "]" +
       " — captured request IDs: [" + item.observedRequestIDs.join(", ") + "]",
     ) : ["- No structured request-call candidates were extracted."]),
@@ -3514,7 +3516,7 @@ export namespace JavaScriptCorrelation {
       ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) => "- " + fn.name + "(" + fn.parameters.join(", ") + ") — " + fn.sourceFile + ":" + fn.line) : ["No named function candidates extracted."]),
       "",
       "## Structured request candidates",
-      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — function: " + (request.sourceFunction ?? "unknown") + " — source: " + request.sourceFile + ":" + request.sourceLine + (mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)?.sourceRequestID ? " — source request: " + mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)!.sourceRequestID : "") + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth[" + request.authSignals.join(", ") + "] — cookies[" + request.cookieSignals.join(", ") + "] — captured requests[" + request.observedRequestIDs.join(", ") + "] — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
+      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — function: " + (request.sourceFunction ?? "unknown") + " — source: " + request.sourceFile + ":" + request.sourceLine + (mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)?.sourceRequestID ? " — source request: " + mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)!.sourceRequestID : "") + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — content types[" + (request.contentTypes ?? []).join(", ") + "] — auth[" + request.authSignals.join(", ") + "] — cookies[" + request.cookieSignals.join(", ") + "] — captured requests[" + request.observedRequestIDs.join(", ") + "] — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
       "",
       "## Secret-like assignments (fingerprints only; candidates, not verified)",
       ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — raw value omitted — source: " + item.sourceFile + ":" + item.line + " — fingerprint sha256:" + item.fingerprint + " — status: candidate (verify independently)") : ["No secret-like assignments matched the static heuristics."]),
