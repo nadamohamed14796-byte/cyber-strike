@@ -16,6 +16,30 @@ export interface ImpactHunterHandoffResult {
 }
 
 /**
+ * Find this finding's Hunter task anywhere beneath the same root session.
+ * A single finding can be reported first by a proxy and later triaged by the
+ * orchestrator; looking only at direct children would create duplicate Hunters.
+ */
+async function findImpactHunterTask(
+  rootSessionID: string,
+  title: string,
+): Promise<{ id: string; parentID: string } | undefined> {
+  const queue = [rootSessionID]
+  const visited = new Set<string>()
+  while (queue.length) {
+    const parentID = queue.shift()!
+    if (visited.has(parentID)) continue
+    visited.add(parentID)
+    const children = await Session.children(parentID)
+    for (const child of children) {
+      if (child.title === title) return { id: child.id, parentID }
+      queue.push(child.id)
+    }
+  }
+  return undefined
+}
+
+/**
  * Dispatch one finding-specific Impact Hunter task.
  *
  * proof_gap is only for an actionable NEW candidate that lacks a reproducible PoC (or has only baseline/reflection notes with an execution-unconfirmed marker) and has
@@ -55,7 +79,7 @@ async function dispatch(
 
     const description = "Impact Hunter finding " + finding.id
     const childTitle = description + " (@impact-hunter subagent)"
-    const existing = (await Session.children(ctx.sessionID)).find((child) => child.title === childTitle)
+    const existing = await findImpactHunterTask(Session.root(ctx.sessionID), childTitle)
     const requestID = gate.requestIDs[0]
 
     const common = [
