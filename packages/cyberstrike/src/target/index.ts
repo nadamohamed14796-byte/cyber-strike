@@ -3248,9 +3248,14 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         }
         for (const field of [
           "pathParameters", "queryParameters", "bodyParameters", "headerNames",
-          "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
+          "authSignals", "cookieSignals", "contentTypes", "sourceFiles",
         ] as const) {
           operation[field] = unique([...operation[field], ...(incoming[field] ?? [])])
+        }
+        // Keep the first representative request link in this human-readable note.
+        // The canonical request store and endpoint inventory retain the complete traffic history.
+        if (operation.requestIDs.length === 0 && (incoming.requestIDs?.length ?? 0) > 0) {
+          operation.requestIDs = unique(incoming.requestIDs ?? [])
         }
         operation.observedInTraffic ||= incoming.observedInTraffic === true || (incoming.requestIDs?.length ?? 0) > 0
         if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
