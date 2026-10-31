@@ -181,6 +181,9 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
       expect(agent?.hidden).toBe(true)
       expect(agent?.prompt).toContain("chain_link")
       expect(agent?.prompt).toContain("validate_chain")
+      expect(agent?.prompt).toContain("Impact escalation objective — inspect the strongest realistic path")
+      expect(agent?.prompt).toContain("Every approved finding enters this review regardless of its starting rating")
+      expect(agent?.prompt).toContain("The goal is the highest *proven* impact, never the highest imagined severity")
       expect(evalPerm(agent, "task")).toBe("allow")
       // Impact Hunter must be able to discover reference skills and read their
       // companion files; starting the subagent is not enough if either tool is denied.
