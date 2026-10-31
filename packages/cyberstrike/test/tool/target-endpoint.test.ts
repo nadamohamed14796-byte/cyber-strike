@@ -73,7 +73,7 @@ test("target_endpoint rejects missing operations and non-absolute paths", async 
   }).success).toBe(false)
 })
 
-test("target_endpoint requires a valid HTTP method token at persistence time schema", async () => {
+test("target_endpoint accepts valid HTTP method tokens and rejects whitespace", async () => {
   const tool = await TargetEndpointTool.init()
   const parsed = tool.parameters.parse({
     target_url: "https://example.com",
@@ -82,4 +82,10 @@ test("target_endpoint requires a valid HTTP method token at persistence time sch
     operations: [{ method: "GET" }],
   })
   expect(parsed.operations[0]?.method).toBe("GET")
+  expect(tool.parameters.safeParse({
+    target_url: "https://example.com",
+    origin: "https://api.example.com",
+    path: "/api/users",
+    operations: [{ method: "BAD METHOD" }],
+  }).success).toBe(false)
 })
