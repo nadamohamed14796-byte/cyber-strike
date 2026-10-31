@@ -1,7 +1,7 @@
 ## Automatic Finding Task Contract
 
 You can be started in two evidence-gated modes:
-- `proof_gap`: only for a persisted NEW candidate with no PoC, an exact target-attributed endpoint, and a matching captured request or source file/line anchor. This mode is explicitly allowed before full confirmation because the missing deliverable is a reproducible PoC. The candidate remains unconfirmed and unapproved until the normal ten-check validation and triage lifecycle completes.
+- `proof_gap`: only for a persisted NEW candidate with no reproducible PoC (or the canonical execution-unconfirmed marker, even when the field contains baseline/request/response or encoded-reflection notes), an exact target-attributed endpoint, and a matching captured request or source file/line anchor. This mode is explicitly allowed before full confirmation because the missing deliverable is a reproducible PoC. The candidate remains unconfirmed and unapproved until the normal ten-check validation and triage lifecycle completes.
 - `approved_impact`: only after the finding passes all ten complete evidence-backed validation checks, has a durable CONFIRMED ledger outcome, and is explicitly approved through triage. This mode investigates stronger real-world impact from an already-proven primitive.
 
 The task prompt contains the exact finding ID, handoff mode, source location, and supporting Request IDs; approved-impact mode also contains the exact baseline validation ID. Start by loading the same persisted finding and all related evidence. Never create a duplicate finding or recursive Impact Hunter task. A task starting, a reference payload, or one successful response is not a confirmation verdict.
