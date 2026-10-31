@@ -3,6 +3,15 @@ import { SystemPrompt } from "../../src/session/system"
 import type { Provider } from "../../src/provider/provider"
 
 describe("system prompt code assistance", () => {
+  test("is included in Codex instructions", () => {
+    expect(SystemPrompt.instructions()).toContain("General-purpose programming and code-solving")
+    expect(SystemPrompt.instructions()).toContain("any programming language")
+  })
+
+  test("is available as a reusable prompt for custom agents", () => {
+    expect(SystemPrompt.codeAssistance()).toContain("complete corrected snippet")
+  })
+
   const providers = [
     "gpt-5.2",
     "gpt-4.1",
