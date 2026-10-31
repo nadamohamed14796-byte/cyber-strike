@@ -39,7 +39,7 @@ export const CodeSearchTool = Tool.define("codesearch", {
     query: z
       .string()
       .describe(
-        "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering', 'Express.js middleware', 'Next js partial prerendering configuration'",
+        "Focused programming research query for any language: a documentation question, library/API symbol, version-specific behavior, compiler/runtime error, or short sanitized code excerpt. This retrieves references only; it does not solve or execute code. Never include secrets or full private source files.",
       ),
     tokensNum: z
       .number()
