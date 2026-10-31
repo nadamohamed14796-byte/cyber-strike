@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { LazyToolRegistry } from "../../src/tool/lazy-registry"
 import { MCP } from "../../src/mcp"
 
@@ -28,6 +28,83 @@ describe("lazy tool registry snapshot reconciliation", () => {
     expect(LazyToolRegistry.search("updated capability")).toContainEqual(
       expect.objectContaining({ mcpServer: "test.server", name: "keep_tool" }),
     )
+  })
+
+  test("invalidates a loaded tool when only its input schema changes", async () => {
+    const name = "schema_sensitive_tool"
+    const id = MCP.toolID("test.server", name)
+    const firstSchema = {
+      type: "object",
+      properties: { query: { type: "string" } },
+    }
+    const updatedSchema = {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    }
+
+    LazyToolRegistry.reconcileServerTools("test.server", [
+      { name, description: "same description", inputSchema: firstSchema },
+    ])
+
+    const mockedTool = {
+      description: "same description",
+      inputSchema: firstSchema,
+      execute: async () => ({ content: [] }),
+    }
+    const toolsSpy = spyOn(MCP, "tools").mockResolvedValue({ [id]: mockedTool } as any)
+    try {
+      await LazyToolRegistry.load([id])
+      expect(LazyToolRegistry.isLoaded(id)).toBe(true)
+
+      // Name and description are unchanged; the new required input must still
+      // invalidate the previously loaded executable definition.
+      LazyToolRegistry.reconcileServerTools("test.server", [
+        { name, description: "same description", inputSchema: updatedSchema },
+      ])
+      expect(LazyToolRegistry.isLoaded(id)).toBe(false)
+      expect(LazyToolRegistry.getLoaded().some((tool) => tool.id === id)).toBe(false)
+    } finally {
+      toolsSpy.mockRestore()
+      LazyToolRegistry.unload([id])
+    }
+  })
+
+  test("preserves a loaded tool when its schema is structurally unchanged", async () => {
+    const name = "stable_schema_tool"
+    const id = MCP.toolID("test.server", name)
+    const schema = {
+      type: "object",
+      properties: { limit: { type: "integer" }, query: { type: "string" } },
+    }
+    LazyToolRegistry.reconcileServerTools("test.server", [
+      { name, description: "same description", inputSchema: schema },
+    ])
+    const toolsSpy = spyOn(MCP, "tools").mockResolvedValue({
+      [id]: { description: "same description", inputSchema: schema, execute: async () => ({ content: [] }) },
+    } as any)
+    try {
+      await LazyToolRegistry.load([id])
+      const before = LazyToolRegistry.getLoaded().find((tool) => tool.id === id)
+      expect(before).toBeDefined()
+
+      // Object key order is irrelevant to the schema fingerprint.
+      LazyToolRegistry.reconcileServerTools("test.server", [
+        {
+          name,
+          description: "same description",
+          inputSchema: {
+            properties: { query: { type: "string" }, limit: { type: "integer" } },
+            type: "object",
+          },
+        },
+      ])
+      expect(LazyToolRegistry.isLoaded(id)).toBe(true)
+      expect(LazyToolRegistry.getLoaded().find((tool) => tool.id === id)).toBe(before)
+    } finally {
+      toolsSpy.mockRestore()
+      LazyToolRegistry.unload([id])
+    }
   })
 
   test("disambiguates tool names that normalize to the same readable ID", () => {
