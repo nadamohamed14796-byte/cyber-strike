@@ -21,7 +21,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
   description: [
     "Update the SAME approved finding after Impact Hunter has independently demonstrated a stronger security impact.",
     "This tool is restricted to the impact-hunter agent. It never creates a new finding.",
-    "The latest ten-check validation must be confirmed, security_impact must be pass with concrete evidence, and the durable verification ledger for finding:<id> must contain a valid evidence-backed CONFIRMED result.",
+    "The latest ten-check validation must be confirmed, security_impact must be pass with concrete evidence, and a separate impact hypothesis under finding:<id>:impact:<slug> must have a valid evidence-backed CONFIRMED outcome in the durable verification ledger.",
     "Every supplied evidence_ref must exactly match a valid CONFIRMED durable verification ledger entry under a new finding:<id>:impact:<slug> hypothesis key, and that evidence must be newer than the baseline validation ID supplied at handoff. New severity must be strictly higher than the existing severity. Hypothetical chains, possible impact, response status alone, or a proposed attack path are not evidence.",
     "The tool appends the impact rationale and evidence references to the existing finding and synchronizes its target reference. It does not replace validation or triage; run validate_finding after the new impact test before using this tool.",
   ].join("\n"),
