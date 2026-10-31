@@ -3285,6 +3285,17 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         sourceFiles: [] as string[],
         requestIDs: [] as string[],
       })
+      const emptyUnattributedFields = () => ({
+        pathParameters: [] as string[],
+        queryParameters: [] as string[],
+        bodyParameters: [] as string[],
+        headerNames: [] as string[],
+        authSignals: [] as string[],
+        cookieSignals: [] as string[],
+        contentTypes: [] as string[],
+        sourceFiles: [] as string[],
+        requestIDs: [] as string[],
+      })
       state ??= {
         schemaVersion: 1,
         id: "endpoint:" + identityHash,
@@ -3292,12 +3303,12 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         path: cleanPath,
         sourceFiles: [],
         operations: [],
-        unattributed: emptyFields(),
+        unattributed: emptyUnattributedFields(),
       }
 
       state.sourceFiles ??= []
       state.operations ??= []
-      state.unattributed ??= emptyFields()
+      state.unattributed ??= emptyUnattributedFields()
       for (const field of [
         "pathParameters", "queryParameters", "bodyParameters", "headerNames",
         "authSignals", "cookieSignals", "contentTypes", "sourceFiles", "requestIDs",
