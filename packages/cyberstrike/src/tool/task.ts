@@ -15,6 +15,9 @@ import { Request } from "../session/request"
 import { CoverageNote } from "../session/coverage-note"
 import { WebCredential } from "../session/web/web-credential"
 import { Observation } from "../session/observation"
+import { Vulnerability } from "../session/vulnerability"
+import { FindingValidation } from "../methodology/finding-validation"
+import { VerificationLedger } from "../session/verification-ledger"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
@@ -101,6 +104,45 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         caller: callerID,
         callerMode: caller?.mode,
       })
+
+      // The background bypass is not authorization to investigate arbitrary
+      // candidates. Bind the exact finding ID in the internal task prompt to the
+      // persisted approved finding, its latest ten-check validation, and its
+      // evidence-backed durable CONFIRMED ledger outcome.
+      if (impactHandoff) {
+        const findingID = /^finding_id:\s*([^\s]+)\s*$/m.exec(params.prompt)?.[1]
+        if (!findingID) {
+          throw new Error("Impact Hunter dispatch requires an exact finding_id in the internal handoff prompt.")
+        }
+        const rootSessionID = Session.root(ctx.sessionID)
+        const finding = Vulnerability.get(rootSessionID).find((item) => item.id === findingID)
+        if (!finding || finding.status !== "approved") {
+          throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " is not explicitly triage-approved in the current session.")
+        }
+        const latestValidation = FindingValidation.history({
+          sessionID: rootSessionID,
+          vulnerabilityID: findingID,
+          limit: 1,
+        })[0]
+        if (
+          latestValidation?.verdict !== "confirmed" ||
+          latestValidation.checks.length !== 10 ||
+          latestValidation.checks.some((check) => check.status === "unknown" || check.status === "fail")
+        ) {
+          throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " does not have a latest confirmed ten-check validation.")
+        }
+        const durableConfirmed = VerificationLedger.list({
+          sessionID: rootSessionID,
+          hypothesisKey: "finding:" + findingID,
+        }).some((attempt) =>
+          attempt.outcome === "confirmed" &&
+          attempt.validConditions &&
+          Boolean(attempt.evidenceRef?.trim()),
+        )
+        if (!durableConfirmed) {
+          throw new Error("Impact Hunter dispatch is blocked: the durable verification ledger has no evidence-backed CONFIRMED outcome for finding:" + findingID + ".")
+        }
+      }
 
       // Skip permission check when user explicitly invoked via @ or command subtask,
       // or for the narrowly-scoped internal Impact Hunter handoff above.
