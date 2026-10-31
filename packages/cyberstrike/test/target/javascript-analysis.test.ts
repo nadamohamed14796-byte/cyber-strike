@@ -60,7 +60,7 @@ test("preserves repeated token occurrences across distinct functions", () => {
     "function refreshCredential() {",
     '  const config = { value: "' + sharedKey + '" }',
     "}",
-  ].join("\\n")
+  ].join("\n")
   const result = analyzeJavaScriptSource(source)
   const occurrences = result.secretCandidates.filter((item) => item.kind === "aws-access-key-id")
   expect(occurrences).toHaveLength(2)
