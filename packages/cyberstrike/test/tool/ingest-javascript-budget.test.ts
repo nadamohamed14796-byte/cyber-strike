@@ -23,7 +23,7 @@ test("discovers HTML modulepreload and script preload assets using the resolved 
     '<link as="script" rel="preload" href="/static/legacy.js">',
     '<link rel="preload" as="style" href="/static/site.css">',
     '<link rel="preload" as="script" href="data:text/javascript,ignored">',
-  ].join("\\n")
+  ].join("\n")
   expect(extractHTMLScriptURLs(html, pageURL).sort()).toEqual([
     "https://app.example.test/app/chunks/shared.js",
     "https://app.example.test/app/main.js",
@@ -42,7 +42,7 @@ test("discovers static imports, dynamic imports, workers, importScripts, and lit
     'require("../vendor/legacy.cjs");',
     'System.import("./compat/module.js");',
     'require("react");',
-  ].join("\\n")
+  ].join("\n")
   expect(extractJavaScriptImportURLs(source, assetURL).sort()).toEqual([
     "https://app.example.test/assets/compat/module.js",
     "https://app.example.test/assets/features/lazy.js",
