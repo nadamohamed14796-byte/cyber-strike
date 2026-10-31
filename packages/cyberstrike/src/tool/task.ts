@@ -94,10 +94,10 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
-      // Impact Hunter is a designated internal escalation path. Any subagent may
-      // hand off an evidence-backed finding to it in background mode without
-      // gaining general task-spawning privileges. Scope and request tools remain
-      // enforced inside Impact Hunter.
+      // Impact Hunter is a designated escalation path. A task handoff is
+      // permitted only for an existing finding that passes the independent
+      // approval/validation/ledger gate below; ordinary task-spawning privileges
+      // and scope/request enforcement remain separate.
       const impactHandoff = isInternalImpactHandoff({
         subagentType: params.subagent_type,
         background: params.background,
