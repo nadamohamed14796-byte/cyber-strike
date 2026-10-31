@@ -11,7 +11,7 @@ import { redactTargetNoteSecrets } from "../target/redact"
 export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", {
   description: [
     "Persist a reproducible PoC and its evidence onto the SAME NEW candidate after Impact Hunter closes a proof gap.",
-    "This tool is restricted to Impact Hunter. It never creates a second finding and cannot approve the candidate or change its severity.",
+    "This tool is restricted to Impact Hunter. It never creates a second finding or approves the candidate. When a verified PoC resolves an execution-unconfirmed cap, it may restore the reporter-stored claimed severity while the record remains NEW; this is provisional, not an accepted/reportable severity.",
     "The supplied proof_hypothesis_key must be finding:<id>:poc:<slug>, and every evidence_ref must exactly match a valid, evidence-backed CONFIRMED record in the durable verification ledger for that hypothesis.",
     "Use only after executing a safe, in-scope test with valid prerequisites and preserving the actual request/response or source/artifact evidence. A reference payload or a claimed result is not proof.",
     "After this update, run the full ten-check validate_finding workflow; only an evidence-backed CONFIRMED result plus explicit triage approval makes the finding reportable.",
@@ -105,6 +105,7 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       "",
       "[Impact Hunter — PoC gap closed; pending full validation]",
       "Demonstrated impact: " + redactTargetNoteSecrets(params.demonstrated_impact.trim()),
+      finding.candidate != null ? "Original claimed severity restored after execution proof: " + finding.candidate + " (still provisional until validation and triage)." : "",
       "PoC proof hypothesis: " + proofHypothesisKey,
       "Durable evidence references: " + params.evidence_refs.join(", "),
       params.description_addendum ? "Additional root-cause detail: " + redactTargetNoteSecrets(params.description_addendum.trim()) : "",
@@ -122,6 +123,8 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       sessionID,
       id: finding.id,
       description: descriptionCore + evidenceBlock + validationTail,
+      severity: finding.candidate ?? finding.severity,
+      candidate: null,
       poc: [
         finding.poc?.trim()
           ? "[Prior candidate evidence / unverified baseline notes]\n" + redactTargetNoteSecrets(finding.poc.trim())
@@ -164,6 +167,9 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
       output: [
         "Updated the existing candidate in place; no duplicate was created.",
         "Lifecycle remains NEW / unapproved. The PoC is evidence for validation, not automatic confirmation.",
+        finding.candidate != null
+          ? "The execution-unconfirmed candidate cap was cleared and its original claimed severity restored provisionally; validation and triage are still mandatory."
+          : "",
         "PoC proof hypothesis: " + proofHypothesisKey,
         "Evidence references: " + params.evidence_refs.join(", "),
         targetReference ? "Target reference synchronized: " + targetReference.targetURL + "/" + targetReference.filePath : "",
@@ -174,6 +180,9 @@ export const UpdateFindingEvidenceTool = Tool.define("update_finding_evidence", 
         updated: true,
         findingID: finding.id,
         status: "new",
+        previousClaimedSeverity: finding.candidate ?? null,
+        severity: finding.candidate ?? finding.severity,
+        candidate: null,
         poc_saved: true,
         proof_hypothesis_key: proofHypothesisKey,
         evidence_refs: params.evidence_refs,
