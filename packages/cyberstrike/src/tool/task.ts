@@ -473,7 +473,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Each lane may run two sibling specialists; the process-wide scheduler
       // admits at most four agent loops. Background Impact Hunter work never blocks
       // the parent, and queued work starts automatically when a global slot opens.
-      const taskLane = `${Session.root(ctx.sessionID)}:${params.subagent_type === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
+      const taskLane = `${Session.root(ctx.sessionID)}:${params.subagent_type === "impact-hunter" || callerID === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
 
       if (params.background) {
         // Persist the child prompt immediately, then queue its detached loop through
