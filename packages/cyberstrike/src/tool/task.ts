@@ -470,9 +470,9 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       }
 
       // Keep Main Recon, Extension Proxy, and Impact Hunter in independent lanes.
-      // Each lane may run two sibling specialists; the process-wide scheduler
-      // admits at most four agent loops. Background Impact Hunter work never blocks
-      // the parent, and queued work starts automatically when a global slot opens.
+      // Each lane may run two sibling specialists. One of four global slots is
+      // reserved for Impact Hunter so main/extension fan-out cannot starve it.
+      // Background Hunter work never blocks the parent; additional Hunter work queues.
       const taskLane = `${Session.root(ctx.sessionID)}:${params.subagent_type === "impact-hunter" || callerID === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
 
       if (params.background) {
