@@ -38,6 +38,41 @@ function canonicalSourceURL(value: string): string {
   }
 }
 
+
+type PersistedJavaScriptSource = {
+  sourceURL: string
+  content: string
+  contentType: string
+  contentHash: string
+  responseSize: number
+}
+
+function persistedJavaScriptSources(
+  processed: ReturnType<typeof processResponse>,
+  responseURL: string,
+): PersistedJavaScriptSource[] {
+  const baseURL = canonicalSourceURL(responseURL)
+  const sources: PersistedJavaScriptSource[] = []
+  const add = (sourceURL: string, content: string, contentType: string) => {
+    const contentHash = createHash("sha256").update(content).digest("hex")
+    sources.push({
+      sourceURL,
+      content,
+      contentType,
+      contentHash,
+      responseSize: Buffer.byteLength(content, "utf-8"),
+    })
+  }
+
+  if (processed.javascriptSource) {
+    add(baseURL, processed.javascriptSource, processed.contentType || "application/javascript")
+  }
+  for (const [index, source] of (processed.inlineJavaScriptSources ?? []).entries()) {
+    add(baseURL + "#inline-script-" + (index + 1), source, "application/javascript")
+  }
+  return sources
+}
+
 const Status = z.enum(["queued", "processing", "processed", "failed"])
 const Method = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 const NormSource = z.enum(["tier1", "tier2", "tier3", "failed"])
@@ -207,20 +242,20 @@ export namespace Request {
         .returning({ id: RequestTable.id })
         .all()
       const linkedRequestID = created[0]?.id
-      if (processed?.javascriptSource && linkedRequestID) {
-        const sourceURL = canonicalSourceURL(responseURL)
-        const contentHash = createHash("sha256").update(processed.javascriptSource).digest("hex")
-        db.insert(RequestJavaScriptCaptureTable).values({
-          id: Identifier.ascending("request_javascript_capture"),
-          session_id: input.sessionID,
-          request_id: linkedRequestID,
-          source_url: sourceURL,
-          content_hash: contentHash,
-          source_content: processed.javascriptSource,
-          content_type: processed.contentType,
-          response_size: processed.originalSize,
-          time_created: now,
-        }).onConflictDoNothing().run()
+      if (processed && linkedRequestID) {
+        for (const source of persistedJavaScriptSources(processed, responseURL)) {
+          db.insert(RequestJavaScriptCaptureTable).values({
+            id: Identifier.ascending("request_javascript_capture"),
+            session_id: input.sessionID,
+            request_id: linkedRequestID,
+            source_url: source.sourceURL,
+            content_hash: source.contentHash,
+            source_content: source.content,
+            content_type: source.contentType,
+            response_size: source.responseSize,
+            time_created: now,
+          }).onConflictDoNothing().run()
+        }
       }
       return created
     })
@@ -286,7 +321,8 @@ export namespace Request {
     if (!input.response) return undefined
     const responseURL = requestResponseURL(input)
     const processed = processResponse({ ...input.response, url: responseURL })
-    if (!processed.javascriptSource) return undefined
+    const sources = persistedJavaScriptSources(processed, responseURL)
+    if (sources.length === 0) return undefined
 
     const request = Database.use((db) => {
       if (input.keyHash) {
@@ -314,21 +350,23 @@ export namespace Request {
     })
     if (!request) return undefined
 
-    const contentHash = createHash("sha256").update(processed.javascriptSource).digest("hex")
+    const timeCreated = Date.now()
     const inserted = Database.transaction((db) =>
-      db.insert(RequestJavaScriptCaptureTable).values({
-        id: Identifier.ascending("request_javascript_capture"),
-        session_id: input.sessionID,
-        request_id: request.id,
-        source_url: canonicalSourceURL(responseURL),
-        content_hash: contentHash,
-        source_content: processed.javascriptSource!,
-        content_type: processed.contentType,
-        response_size: processed.originalSize,
-        time_created: Date.now(),
-      }).onConflictDoNothing().returning({ id: RequestJavaScriptCaptureTable.id }).all(),
+      sources.flatMap((source) =>
+        db.insert(RequestJavaScriptCaptureTable).values({
+          id: Identifier.ascending("request_javascript_capture"),
+          session_id: input.sessionID,
+          request_id: request.id,
+          source_url: source.sourceURL,
+          content_hash: source.contentHash,
+          source_content: source.content,
+          content_type: source.contentType,
+          response_size: source.responseSize,
+          time_created: timeCreated,
+        }).onConflictDoNothing().returning({ id: RequestJavaScriptCaptureTable.id }).all(),
+      ),
     )
-    return { requestID: request.id, captured: inserted.length > 0, contentHash }
+    return { requestID: request.id, captured: inserted.length > 0, contentHash: sources[0]?.contentHash }
   }
 
   function rowToInfo(row: typeof RequestTable.$inferSelect): Info {

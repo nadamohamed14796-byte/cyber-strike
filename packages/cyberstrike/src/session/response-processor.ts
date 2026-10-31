@@ -37,6 +37,8 @@ export interface ProcessedResponse {
   javascriptSource?: string
   /** Full HTML body for deterministic preflight; never copied into the LLM preview. */
   htmlSource?: string
+  /** Executable inline script bodies extracted from HTML as inert source text. */
+  inlineJavaScriptSources?: string[]
 }
 
 export function processResponse(input: ResponseInput): ProcessedResponse {
@@ -81,7 +83,7 @@ export function processResponse(input: ResponseInput): ProcessedResponse {
     originalSize,
     content,
     ...(isJavaScriptOrSourceMap(contentType, input.url) ? { javascriptSource: input.body } : {}),
-    ...(isHtml(contentType) ? { htmlSource: input.body } : {}),
+    ...(isHtml(contentType) ? { htmlSource: input.body, inlineJavaScriptSources: extractInlineJavaScriptSources(input.body) } : {}),
   }
 }
 
@@ -119,7 +121,30 @@ function isBinary(contentType: string): boolean {
 }
 
 function isHtml(contentType: string): boolean {
-  return contentType.toLowerCase().includes("text/html")
+  const type = contentType.toLowerCase()
+  return type.includes("text/html") || type.includes("application/xhtml+xml")
+}
+
+/** Extract inline executable scripts; JSON-LD, import maps, and data blocks are not JavaScript. */
+export function extractInlineJavaScriptSources(html: string): string[] {
+  const output: string[] = []
+  const pattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
+  for (const match of html.matchAll(pattern)) {
+    const attributes = match[1] ?? ""
+    const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").split(";", 1)[0]!.trim().toLowerCase()
+    if (mime && ![
+      "module",
+      "text/javascript",
+      "application/javascript",
+      "text/ecmascript",
+      "application/ecmascript",
+      "application/x-javascript",
+    ].includes(mime)) continue
+    const source = (match[2] ?? "").trim()
+    if (source) output.push(source)
+  }
+  return output
 }
 
 function isJson(contentType: string): boolean {

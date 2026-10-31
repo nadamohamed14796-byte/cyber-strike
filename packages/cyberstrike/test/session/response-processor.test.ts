@@ -69,3 +69,35 @@ test("recognizes source-map MIME types when the URL has no .map suffix", () => {
   })
   expect(processed.javascriptSource).toBe(body)
 })
+
+ 
+test("extracts executable inline HTML scripts for independent static analysis", () => {
+  const html = [
+    '<script>fetch("/api/inline-one")</script>',
+    '<script type="module">fetch("/api/inline-two")</script>',
+    '<script type="application/ld+json">{"name":"not executable"}</script>',
+    '<script type="importmap">{"imports":{"react":"/react.js"}}</script>',
+  ].join("")
+  const processed = processResponse({
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+    url: "https://app.example.test/account",
+    body: html,
+  })
+
+  expect(processed.inlineJavaScriptSources).toHaveLength(2)
+  expect(processed.inlineJavaScriptSources?.[0]).toContain("/api/inline-one")
+  expect(processed.inlineJavaScriptSources?.[1]).toContain("/api/inline-two")
+  expect(JSON.stringify(processed.inlineJavaScriptSources)).not.toContain("not executable")
+})
+
+test("extracts inline scripts from XHTML responses as well", () => {
+  const processed = processResponse({
+    status: 200,
+    headers: { "content-type": "application/xhtml+xml" },
+    url: "https://app.example.test/page.xhtml",
+    body: '<html><script>fetch("/api/xhtml")</script></html>',
+  })
+  expect(processed.inlineJavaScriptSources).toEqual(['fetch("/api/xhtml")'])
+  expect(processed.htmlSource).toContain("/api/xhtml")
+})
