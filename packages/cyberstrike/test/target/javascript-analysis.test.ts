@@ -5,7 +5,7 @@ test("flags sensitive data fields and embedded email literals without retaining 
   const source = [
     'const profile = { email: "private.person@example.test", phoneNumber: "+15555550123", dateOfBirth: "1990-01-01" }',
     'function renderProfile(data) { return data.email + data.phoneNumber }',
-  ].join("\\n")
+  ].join("\n")
   const result = analyzeJavaScriptSource(source)
   expect(result.dataExposureSignals?.map((item) => item.kind)).toContain("sensitive-field")
   expect(result.dataExposureSignals?.some((item) => item.kind === "sensitive-field" && item.field === "dateofbirth")).toBe(true)

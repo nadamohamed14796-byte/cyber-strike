@@ -3089,9 +3089,14 @@ export namespace JavaScriptCorrelation {
         })
       }
       for (const candidateID of scenario.relatedRequestCandidateIDs) {
+        const candidate = graph.javascriptAnalysis.requestCandidates.find((item) => item.id === candidateID)
+        if (!candidate) continue
+        const requestNode = "javascript-request-candidate:" + createHash("sha256")
+          .update([candidate.sourceFile, candidate.sourceLine, candidate.method ?? "", candidate.urlTemplate].join("\\0"))
+          .digest("hex").slice(0, 16)
         graph.edges.push({
           from: scenarioNode,
-          to: "javascript-request-candidate:" + candidateID,
+          to: requestNode,
           relation: "scenario-reviews-request-candidate",
           confidence: "candidate",
           evidence: "The scenario and structured request candidate share source/function context; the candidate may be static-only and is not proof of a transmitted request.",
