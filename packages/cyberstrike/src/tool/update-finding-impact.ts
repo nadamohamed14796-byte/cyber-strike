@@ -131,7 +131,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     // block on the next validation run. Keep all Impact Hunter history BEFORE that
     // replaceable tail so subsequent ten-check validations cannot erase escalation
     // evidence or earlier severity transitions.
-    const validationMarker = "\\n\\n[Latest finding validation]"
+    const validationMarker = "\n\n[Latest finding validation]"
     const validationIndex = finding.description.lastIndexOf(validationMarker)
     const descriptionCore = validationIndex >= 0
       ? finding.description.slice(0, validationIndex)
