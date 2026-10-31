@@ -313,7 +313,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       if (params.subagent_type !== "impact-hunter") {
         prompt =
           "## Automatic Impact Hunter dispatch\n" +
-          "Only a finding that has passed all ten evidence-based validation checks, has a durable CONFIRMED ledger outcome, and is explicitly approved with triage_vulnerability(status=\"approved\") starts or resumes one dedicated background Impact Hunter task. report_vulnerability alone NEVER dispatches the Hunter. The triage result returns its task_id and status. Do NOT manually start a second Hunter task for the same finding. The Hunter investigates stronger evidence-backed impact; a started task is not a verdict.\n\n" +
+          "report_vulnerability automatically starts one dedicated background Impact Hunter in proof_gap mode only when the persisted NEW candidate has no PoC, an exact target-attributed endpoint, and a matching captured request or source file/line evidence anchor. This is the controlled pre-confirmation exception: it investigates the missing PoC only; the finding remains NEW/unapproved. If the candidate already has a PoC, complete all ten evidence-backed validation checks, record a durable CONFIRMED finding:<id> ledger outcome, compare the full similarity set, and call triage_vulnerability(status=\"approved\"). Only successful approval starts or resumes the same finding-specific Hunter in approved_impact mode. Do not manually create duplicate Hunter tasks. The Hunter may call other relevant specialist testers but must never dispatch another Impact Hunter. A started task is not a PoC, confirmation, triage, or impact verdict.\n\n" +
           prompt
       }
       if (agent.prependRequestContext) {
