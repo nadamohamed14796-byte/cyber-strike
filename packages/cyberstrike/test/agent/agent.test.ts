@@ -150,7 +150,7 @@ test("returns default native agents when no config", async () => {
   })
 })
 
-test("direct captured-request analyzer persists candidates but does not dispatch Impact Hunter", async () => {
+test("direct captured-request analyzer persists candidates through the canonical Hunter handoff", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -159,7 +159,7 @@ test("direct captured-request analyzer persists candidates but does not dispatch
       expect(agent).toBeDefined()
       expect(agent?.prompt).toContain("## Impact Hunter Escalation")
       expect(agent?.prompt).toContain("report_vulnerability")
-      expect(agent?.prompt).toContain("records a candidate only; it does not start Impact Hunter")
+      expect(agent?.prompt).toContain("reporting automatically starts one background Hunter in `proof_gap` mode")
       expect(agent?.prompt).toContain("triage_vulnerability(status=\"approved\")")
       expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
       expect(agent?.prompt).not.toContain("start a separate impact-hunter")
@@ -182,7 +182,7 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
       expect(agent?.prompt).toContain("chain_link")
       expect(agent?.prompt).toContain("validate_chain")
       expect(agent?.prompt).toContain("Impact escalation objective — inspect the strongest realistic path")
-      expect(agent?.prompt).toContain("Every approved finding enters this review regardless of its starting rating")
+      expect(agent?.prompt).toContain("Every approved, reportable finding enters this review regardless of its accepted rating")
       expect(agent?.prompt).toContain("The goal is the highest *proven* impact, never the highest imagined severity")
       expect(agent?.prompt).toContain("proof_gap")
       expect(agent?.prompt).toContain("approved_impact")

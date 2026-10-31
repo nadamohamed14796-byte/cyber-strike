@@ -151,6 +151,7 @@ test("proof-gap gate rejects PoC-bearing or non-NEW records", async () => {
           sessionID: session.id,
           id: finding.id,
           poc: "Existing reproducible proof from a prior controlled test; this record no longer has a proof gap.",
+          steps_to_reproduce: "1. Use the controlled test account. 2. Send the captured request. 3. Verify the observed outcome against the negative control.",
           expectedStatus: "new",
         })).toBe(true)
         const withPoC = Vulnerability.get(session.id).find((row) => row.id === finding.id)!
@@ -160,7 +161,7 @@ test("proof-gap gate rejects PoC-bearing or non-NEW records", async () => {
           mode: "proof_gap",
         })
         expect(poCResult.allowed).toBe(false)
-        expect(poCResult.reason).toContain("already contains a PoC")
+        expect(poCResult.reason).toContain("already contains a complete-looking PoC")
 
         expect(Vulnerability.update({
           sessionID: session.id,

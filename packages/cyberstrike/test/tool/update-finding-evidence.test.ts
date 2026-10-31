@@ -160,7 +160,7 @@ test("PoC evidence update rejects references not present in the durable proof le
   })
 })
 
-test("PoC evidence update is restricted to Impact Hunter and cannot overwrite an existing PoC", async () => {
+test("PoC evidence update is restricted to Impact Hunter and preserves prior candidate evidence", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -189,8 +189,12 @@ test("PoC evidence update is restricted to Impact Hunter and cannot overwrite an
           demonstrated_impact: "An existing PoC should be preserved and is not eligible for a proof-gap update.",
           evidence_refs: [proof.evidenceRef],
         }, mockCtx(session.id))
-        expect((hunter.metadata as any).reason).toBe("poc_already_present")
-        expect(Vulnerability.get(session.id).find((row) => row.id === existing.id)?.poc).toContain("Existing proof")
+        expect((hunter.metadata as any).updated).toBe(true)
+        expect((hunter.metadata as any).poc_saved).toBe(true)
+        const updated = Vulnerability.get(session.id).find((row) => row.id === existing.id)
+        expect(updated?.poc).toContain("Existing proof with a complete baseline")
+        expect(updated?.poc).toContain("[Impact Hunter — reproducible PoC backed by durable evidence]")
+        expect(updated?.poc).toContain("A second proof must not overwrite the original existing PoC")
       } finally {
         await Session.remove(session.id)
       }

@@ -50,6 +50,7 @@ test("target-scoped reports include authorized descendants but not unrelated wor
             description: "An issue on the main application.",
             endpoint: "https://example.com/account",
             target_id: root.workspace.id,
+            status: "approved",
           },
         })
         Vulnerability.add({
@@ -60,6 +61,7 @@ test("target-scoped reports include authorized descendants but not unrelated wor
             description: "An issue on the authorized API asset.",
             endpoint: "https://api.example.com/v1/users/123",
             target_id: api!.id,
+            status: "approved",
           },
         })
         Vulnerability.add({
@@ -70,6 +72,7 @@ test("target-scoped reports include authorized descendants but not unrelated wor
             description: "This must not leak into the example.com report.",
             endpoint: "https://outside.example.test/admin",
             target_id: outside.workspace.id,
+            status: "approved",
           },
         })
 
@@ -159,6 +162,7 @@ test("generate_report defaults to the only observed root target and saves a work
             description: "A finding attributed to one authorized program.",
             endpoint: "https://api.single-program.example.test/v1/users",
             target_id: child!.id,
+            status: "approved",
           },
         })
         const tool = await GenerateReportTool.init()
@@ -207,6 +211,7 @@ test("generate_report refuses to silently mix multiple observed root programs", 
               description: "Finding from a different root target.",
               endpoint: root.workspace.targetURL + "/account",
               target_id: root.workspace.id,
+              status: "approved",
             },
           })
         }
