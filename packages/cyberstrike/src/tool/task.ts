@@ -16,7 +16,7 @@ import { CoverageNote } from "../session/coverage-note"
 import { WebCredential } from "../session/web/web-credential"
 import { Observation } from "../session/observation"
 import { Vulnerability } from "../session/vulnerability"
-import { FindingValidation } from "../methodology/finding-validation"
+import { FindingValidation, hasCompleteConfirmedValidation } from "../methodology/finding-validation"
 import { VerificationLedger } from "../session/verification-ledger"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
@@ -123,11 +123,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           vulnerabilityID: findingID,
           limit: 1,
         })[0]
-        if (
-          latestValidation?.verdict !== "confirmed" ||
-          latestValidation.checks.length !== 10 ||
-          latestValidation.checks.some((check) => check.status === "unknown" || check.status === "fail")
-        ) {
+        if (!hasCompleteConfirmedValidation(latestValidation)) {
           throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " does not have a latest confirmed ten-check validation.")
         }
         const durableConfirmed = VerificationLedger.list({
