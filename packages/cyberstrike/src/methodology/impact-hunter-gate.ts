@@ -160,7 +160,8 @@ export function evaluateImpactHunterGate(input: {
   }).some((attempt) =>
     attempt.outcome === "confirmed" &&
     attempt.validConditions &&
-    Boolean(attempt.evidenceRef?.trim()),
+    Boolean(attempt.evidenceRef?.trim()) &&
+    attempt.timeCreated <= latestValidation!.time_created,
   )
   if (!durableConfirmed) {
     return { allowed: false, mode, reason: "durable verification ledger has no evidence-backed CONFIRMED result for finding:" + finding.id, requestIDs }
