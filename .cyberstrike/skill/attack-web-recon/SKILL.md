@@ -129,7 +129,7 @@ A phase can be complete with zero findings if the evidence supports that conclus
 ## Normalization and deduplication contract
 
 - Host identity: canonical lowercase hostname with trailing dot removed, while preserving scheme/port and source provenance where those change the service boundary.
-- Endpoint identity: normalized origin + route template + API version. Operation identity: endpoint ID + HTTP method + operation semantics. Keep GET and POST as separate operations beneath the same endpoint; preserve content type, parameter shape, auth context, and nested object relationships as operation/evidence attributes rather than splitting the endpoint root.
+- Endpoint identity: normalized origin + route template + API version. Persist endpoint/method evidence through `target_endpoint`, not individual notes. HTTP methods remain separate operations under the same endpoint root. Operation identity: endpoint ID + HTTP method + operation semantics. Keep GET and POST as separate operations beneath the same endpoint; preserve content type, parameter shape, auth context, and nested object relationships as operation/evidence attributes rather than splitting the endpoint root.
 - Endpoint parameters: one endpoint record may carry many parameter observations. Never create duplicate endpoint records solely because several IDs/parameters exist.
 - Asset attribution: keep CNAME target, hosting provider, certificate evidence, and first-party confidence separate from scope eligibility.
 - Time: preserve first_seen, last_seen, source timestamp, and last_checked so stale archive results are not presented as live.
