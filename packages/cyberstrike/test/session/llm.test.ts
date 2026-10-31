@@ -114,6 +114,33 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+describe("session.llm.shouldRequireInitialToolCall", () => {
+  const base = {
+    modelSupportsToolCalls: true,
+    activeToolCount: 2,
+    actionableRequest: true,
+  }
+
+  test("requires a tool for the first actionable request", () => {
+    expect(LLM.shouldRequireInitialToolCall(base)).toBe(true)
+  })
+
+  test("does not require another tool after a call was attempted in this user turn", () => {
+    expect(LLM.shouldRequireInitialToolCall({ ...base, requireToolCallThisTurn: false })).toBe(false)
+  })
+
+  test("preserves explicit tool-choice overrides", () => {
+    expect(LLM.shouldRequireInitialToolCall({ ...base, toolChoice: "auto" })).toBe(false)
+    expect(LLM.shouldRequireInitialToolCall({ ...base, toolChoice: "required" })).toBe(false)
+  })
+
+  test("does not require a call when tools or tool-call capability are unavailable", () => {
+    expect(LLM.shouldRequireInitialToolCall({ ...base, activeToolCount: 0 })).toBe(false)
+    expect(LLM.shouldRequireInitialToolCall({ ...base, modelSupportsToolCalls: false })).toBe(false)
+    expect(LLM.shouldRequireInitialToolCall({ ...base, actionableRequest: false })).toBe(false)
+  })
+})
+
 describe("session.llm.isActionableRequest", () => {
   test("recognizes English and Arabic requests to inspect, organize, and continue work", () => {
     for (const request of [
