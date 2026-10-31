@@ -17,7 +17,7 @@ import type {
   CrawlResult,
   CrawlUsage,
 } from "./types.ts"
-import { buildRawRequest, correlateWithUI, parseRequestParams } from "./capture.ts"
+import { buildRawRequest, captureResponseBody, correlateWithUI, parseRequestParams } from "./capture.ts"
 import {
   sendIngest,
   initSession,
@@ -585,8 +585,13 @@ function setupRequestInterceptor(
         const respHeaders = await pwResponse.allHeaders()
         let body = ""
         try {
-          body = await pwResponse.text()
-          if (body.length > 500 * 1024) body = body.slice(0, 500 * 1024) + "\n[TRUNCATED]"
+          const fullBody = await pwResponse.text()
+          body = captureResponseBody({
+            url,
+            headers: respHeaders,
+            body: fullBody,
+            resourceType: request.resourceType(),
+          }).body
         } catch {}
         response = { status, headers: respHeaders, body }
       }
