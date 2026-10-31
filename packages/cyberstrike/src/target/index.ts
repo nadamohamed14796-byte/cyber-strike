@@ -3283,7 +3283,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
 
       const structured = JSON.stringify(state, null, 2)
       const content = [
-        "# Canonical endpoint: " + cleanPath,
+        "# Canonical endpoint: " + state.path,
         "",
         "- Origin: " + origin,
         "- Identity: " + state.id,
@@ -3298,10 +3298,10 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       const hasTraffic = state.operations.some((operation) => operation.observedInTraffic)
       return addNoteUnlocked(input.targetURL, {
         kind: "endpoint",
-        title: ("Endpoint " + cleanPath).slice(0, 180),
+        title: ("Endpoint " + state.path).slice(0, 180),
         content,
         source: "canonical-endpoint-merge",
-        sourceURL: origin === "*" ? undefined : origin + cleanPath,
+        sourceURL: origin === "*" ? undefined : origin + state.path,
         status: hasTraffic ? "observed" : "unverified",
         tags: ["endpoint", "canonical-endpoint", "method-operations"],
         upsertByIdentity: true,
