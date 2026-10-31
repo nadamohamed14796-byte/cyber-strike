@@ -4,6 +4,7 @@ import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Vulnerability } from "../../src/session/vulnerability"
 import { VerificationLedger } from "../../src/session/verification-ledger"
+import { TargetMemory } from "../../src/target"
 import { UpdateFindingEvidenceTool } from "../../src/tool/update-finding-evidence"
 
 function mockCtx(sessionID: string, agent = "impact-hunter"): any {
@@ -18,7 +19,13 @@ function mockCtx(sessionID: string, agent = "impact-hunter"): any {
   }
 }
 
-function makeCandidate(sessionID: string, withPoc = false) {
+async function makeCandidate(sessionID: string, withPoc = false) {
+  await TargetMemory.configureScope("https://evidence-test.example.test", {
+    include: ["evidence-test.example.test"],
+    authorizationSource: "Impact Hunter PoC evidence fixture",
+    authorizationReference: "https://evidence-test.example.test/security",
+  })
+  const workspace = await TargetMemory.ensure("https://evidence-test.example.test")
   return Vulnerability.add({
     sessionID,
     data: {
@@ -26,6 +33,10 @@ function makeCandidate(sessionID: string, withPoc = false) {
       title: "Potential reflected HTML injection in search output",
       description: "A submitted marker appears in the HTML response, but safe encoding or browser execution has not yet been resolved.",
       endpoint: "GET https://evidence-test.example.test/api/search",
+      target_id: workspace.id,
+      file: "javascript/assets/search.js",
+      line_start: 184,
+      line_end: 202,
       ...(withPoc ? { poc: "Existing proof with a complete baseline and controlled result; this should not be overwritten." } : {}),
     },
   })
@@ -60,7 +71,7 @@ test("Impact Hunter persists a verified PoC onto the same candidate without appr
     async fn() {
       const session = await Session.create({})
       try {
-        const finding = makeCandidate(session.id)
+        const finding = await makeCandidate(session.id)
         const proof = recordConfirmedProof(session.id, finding, "attribute-context")
         const tool = await UpdateFindingEvidenceTool.init()
         const result = await tool.execute({
@@ -142,7 +153,7 @@ test("PoC evidence update is restricted to Impact Hunter and cannot overwrite an
     async fn() {
       const session = await Session.create({})
       try {
-        const pending = makeCandidate(session.id)
+        const pending = await makeCandidate(session.id)
         const tool = await UpdateFindingEvidenceTool.init()
         const nonHunter = await tool.execute({
           id: pending.id,
@@ -154,7 +165,7 @@ test("PoC evidence update is restricted to Impact Hunter and cannot overwrite an
         }, mockCtx(session.id, "cyberstrike"))
         expect((nonHunter.metadata as any).reason).toBe("impact_hunter_only")
 
-        const existing = makeCandidate(session.id, true)
+        const existing = await makeCandidate(session.id, true)
         const proof = recordConfirmedProof(session.id, existing, "already-has-proof")
         const hunter = await tool.execute({
           id: existing.id,
