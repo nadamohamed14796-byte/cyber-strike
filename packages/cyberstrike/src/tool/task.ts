@@ -304,7 +304,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       if (params.subagent_type !== "impact-hunter") {
         prompt =
           "## Automatic Impact Hunter dispatch\n" +
-          "Only a finding that has passed all ten evidence-based validation checks, has a durable CONFIRMED ledger outcome, and is explicitly approved through triage starts or resumes one dedicated background Impact Hunter task. report_vulnerability alone NEVER dispatches the Hunter. The triage result returns its task_id and status. Do NOT manually start a second Hunter task for the same finding. The Hunter investigates stronger evidence-backed impact; a started task is not a verdict.\n\n" +
+          "Only a finding that has passed all ten evidence-based validation checks, has a durable CONFIRMED ledger outcome, and is explicitly approved with triage_vulnerability(status="approved") starts or resumes one dedicated background Impact Hunter task. report_vulnerability alone NEVER dispatches the Hunter. The triage result returns its task_id and status. Do NOT manually start a second Hunter task for the same finding. The Hunter investigates stronger evidence-backed impact; a started task is not a verdict.\n\n" +
           prompt
       }
       if (agent.prependRequestContext) {
