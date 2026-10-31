@@ -3155,6 +3155,18 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     confidence: NonNullable<EndpointOperationInput["confidence"]>
   }
 
+  interface StoredEndpointUnattributed {
+    pathParameters: string[]
+    queryParameters: string[]
+    bodyParameters: string[]
+    headerNames: string[]
+    authSignals: string[]
+    cookieSignals: string[]
+    contentTypes: string[]
+    sourceFiles: string[]
+    requestIDs: string[]
+  }
+
   interface StoredEndpointRecord {
     schemaVersion: 1
     id: string
@@ -3162,7 +3174,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     path: string
     sourceFiles: string[]
     operations: StoredEndpointOperation[]
-    unattributed: Required<NonNullable<EndpointRecordInput["unattributed"]>>
+    unattributed: StoredEndpointUnattributed
   }
 
   const ENDPOINT_RECORD_BEGIN = "<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->"
