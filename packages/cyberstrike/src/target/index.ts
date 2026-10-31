@@ -3121,13 +3121,25 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     observedInTraffic?: boolean
   }
 
+  export interface EndpointUnattributedEvidenceInput {
+    pathParameters?: string[]
+    queryParameters?: string[]
+    bodyParameters?: string[]
+    headerNames?: string[]
+    authSignals?: string[]
+    cookieSignals?: string[]
+    contentTypes?: string[]
+    sourceFiles?: string[]
+    requestIDs?: string[]
+  }
+
   export interface EndpointRecordInput {
     targetURL: string
     origin: string | null
     path: string
     sourceFiles?: string[]
     operations: EndpointOperationInput[]
-    unattributed?: Omit<EndpointOperationEvidenceInput, "source">
+    unattributed?: EndpointUnattributedEvidenceInput
   }
 
   interface StoredEndpointEvidence extends EndpointOperationEvidenceInput {
@@ -3518,6 +3530,49 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       state.path ||= cleanPath
 
       const structured = JSON.stringify(state, null, 2)
+      const inline = (value: string) => value.replace(/[\\r\\n|]/g, " ").trim()
+      const readableOperations = state.operations.flatMap((operation) => [
+        "## " + operation.method,
+        "- Method evidence: " + (operation.methodEvidenceSources.join(", ") || "unspecified") +
+          " | Confidence: " + operation.confidence +
+          " | Traffic observed: " + (operation.observedInTraffic ? "yes" : "no"),
+        ...(operation.operationIds.length ? ["- Operation IDs: " + operation.operationIds.map(inline).join(", ")] : []),
+        ...(operation.operationSummaries.length ? ["- What it does: " + operation.operationSummaries.map(inline).join(" | ")] : []),
+        "- Path parameters: " + operation.pathParameters.map(inline).join(", "),
+        "- Query parameters: " + operation.queryParameters.map(inline).join(", "),
+        "- Body parameters: " + operation.bodyParameters.map(inline).join(", "),
+        "- Headers: " + operation.headerNames.map(inline).join(", "),
+        "- Request Content-Types: " + operation.contentTypes.map(inline).join(", "),
+        "- Authentication signals: " + operation.authSignals.map(inline).join(", "),
+        "- Cookie signals: " + operation.cookieSignals.map(inline).join(", "),
+        "- Response statuses: " + operation.responseStatuses.join(", "),
+        "- Response Content-Types: " + operation.responseContentTypes.map(inline).join(", "),
+        "- Response fields: " + operation.responseFields.map(inline).join(", "),
+        "- Behavior signals: " + operation.behaviorSignals.map(inline).join(", "),
+        "- Sources: " + operation.sourceFiles.map(inline).join(", "),
+        "- Request IDs: " + operation.requestIDs.join(", "),
+        "- Evidence by source:",
+        ...(operation.evidence.length ? operation.evidence.map((item) =>
+          "  - " + item.source + " (" + item.confidence + "): " +
+          [
+            item.operationSummaries.length ? "behavior=" + item.operationSummaries.map(inline).join("|") : "",
+            item.bodyParameters.length ? "body=" + item.bodyParameters.map(inline).join(",") : "",
+            item.headerNames.length ? "headers=" + item.headerNames.map(inline).join(",") : "",
+            item.contentTypes.length ? "requestContentTypes=" + item.contentTypes.map(inline).join(",") : "",
+            item.responseStatuses.length ? "responseStatuses=" + item.responseStatuses.join(",") : "",
+            item.responseContentTypes.length ? "responseContentTypes=" + item.responseContentTypes.map(inline).join(",") : "",
+            item.responseFields.length ? "responseFields=" + item.responseFields.map(inline).join(",") : "",
+            item.requestIDs.length ? "requests=" + item.requestIDs.join(",") : "",
+            item.sourceFiles.length ? "files=" + item.sourceFiles.map(inline).join(",") : "",
+          ].filter(Boolean).join("; "),
+        ) : ["  - No source-specific evidence attached yet."],
+        "",
+      ])
+      const hasUnattributed = state.unattributed.pathParameters.length ||
+        state.unattributed.queryParameters.length || state.unattributed.bodyParameters.length ||
+        state.unattributed.headerNames.length || state.unattributed.authSignals.length ||
+        state.unattributed.cookieSignals.length || state.unattributed.contentTypes.length ||
+        state.unattributed.sourceFiles.length || state.unattributed.requestIDs.length
       const content = [
         "# Canonical endpoint: " + state.path,
         "",
@@ -3527,6 +3582,19 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         "- Evidence model: one endpoint record with independent method-specific operations.",
         "- Raw requests and responses remain in the canonical captured-request store; IDs below are links, not copied payloads.",
         "",
+        ...readableOperations,
+        ...(hasUnattributed ? [
+          "## Method-unattributed route evidence",
+          "- Path parameters: " + state.unattributed.pathParameters.map(inline).join(", "),
+          "- Query parameters: " + state.unattributed.queryParameters.map(inline).join(", "),
+          "- Body parameters: " + state.unattributed.bodyParameters.map(inline).join(", "),
+          "- Headers: " + state.unattributed.headerNames.map(inline).join(", "),
+          "- Request Content-Types: " + state.unattributed.contentTypes.map(inline).join(", "),
+          "- Authentication signals: " + state.unattributed.authSignals.map(inline).join(", "),
+          "- Cookie signals: " + state.unattributed.cookieSignals.map(inline).join(", "),
+          "- Sources: " + state.unattributed.sourceFiles.map(inline).join(", "),
+          "",
+        ] : []),
         ENDPOINT_RECORD_BEGIN,
         structured,
         ENDPOINT_RECORD_END,
