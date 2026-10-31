@@ -110,6 +110,17 @@ export const TargetEndpointTool = Tool.define<typeof Parameters, Tool.Metadata>(
         }
       }
 
+      const endpointURL = new URL(params.path, params.origin ?? workspace.targetURL)
+      const endpointScope = await TargetMemory.checkURLScope(endpointURL.href)
+      if (!endpointScope.allowed || !endpointScope.workspace) {
+        return {
+          title: "Canonical endpoint not saved",
+          output: "The endpoint origin/path is outside the persisted scope or has no matching canonical workspace. No endpoint record was written. Reason: " + endpointScope.reason,
+          metadata: { saved: false, reason: endpointScope.reason ?? "endpoint_out_of_scope" },
+        }
+      }
+      workspace = endpointScope.workspace
+
       const saved = await TargetMemory.mergeCanonicalEndpointRecord({
         targetURL: workspace.targetURL,
         origin: params.origin,
