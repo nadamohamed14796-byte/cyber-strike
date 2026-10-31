@@ -103,7 +103,7 @@ export function supportingRequestIDs(
 /**
  * Evaluate the exact same durable prerequisites whenever an agent or tool
  * launches Impact Hunter. proof_gap is deliberately narrower than arbitrary
- * candidate dispatch: the record must be NEW, have no PoC, be target-attributed,
+ * candidate dispatch: the record must be NEW, lack a reproducible PoC (or carry the execution-unconfirmed marker), be target-attributed,
  * and include an observed request or source file/line anchor.
  */
 export function evaluateImpactHunterGate(input: {
