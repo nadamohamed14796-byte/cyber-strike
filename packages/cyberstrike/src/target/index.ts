@@ -3094,9 +3094,8 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
 
   export type EndpointEvidenceSource = "javascript" | "traffic" | "contract" | "crawl" | "active-test" | "other"
 
-  export interface EndpointOperationInput {
-    method: string
-    methodEvidenceSources?: EndpointEvidenceSource[]
+  export interface EndpointOperationEvidenceInput {
+    source: EndpointEvidenceSource
     pathParameters?: string[]
     queryParameters?: string[]
     bodyParameters?: string[]
@@ -3106,8 +3105,14 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     contentTypes?: string[]
     sourceFiles?: string[]
     requestIDs?: string[]
-    observedInTraffic?: boolean
     confidence?: "candidate" | "observed" | "confirmed" | "refuted" | "inconclusive" | "blocked"
+  }
+
+  export interface EndpointOperationInput extends Omit<EndpointOperationEvidenceInput, "source"> {
+    method: string
+    methodEvidenceSources?: EndpointEvidenceSource[]
+    evidence?: EndpointOperationEvidenceInput[]
+    observedInTraffic?: boolean
   }
 
   export interface EndpointRecordInput {
@@ -3119,7 +3124,21 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     unattributed?: Omit<EndpointOperationInput, "method" | "methodEvidenceSources" | "observedInTraffic" | "confidence">
   }
 
-  interface StoredEndpointOperation extends EndpointOperationInput {
+  interface StoredEndpointEvidence extends EndpointOperationEvidenceInput {
+    source: EndpointEvidenceSource
+    pathParameters: string[]
+    queryParameters: string[]
+    bodyParameters: string[]
+    headerNames: string[]
+    authSignals: string[]
+    cookieSignals: string[]
+    contentTypes: string[]
+    sourceFiles: string[]
+    requestIDs: string[]
+    confidence: NonNullable<EndpointOperationInput["confidence"]>
+  }
+
+  interface StoredEndpointOperation extends Omit<EndpointOperationInput, "evidence"> {
     method: string
     methodEvidenceSources: EndpointEvidenceSource[]
     pathParameters: string[]
@@ -3131,6 +3150,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
     contentTypes: string[]
     sourceFiles: string[]
     requestIDs: string[]
+    evidence: StoredEndpointEvidence[]
     observedInTraffic: boolean
     confidence: NonNullable<EndpointOperationInput["confidence"]>
   }
@@ -3238,6 +3258,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
             method,
             methodEvidenceSources: [],
             ...emptyFields(),
+            evidence: [],
             observedInTraffic: false,
             confidence: "candidate",
           }
@@ -3261,6 +3282,71 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
         if (operation.observedInTraffic && !operation.methodEvidenceSources.includes("traffic")) {
           operation.methodEvidenceSources.push("traffic")
         }
+
+        const operationFields = {
+          pathParameters: incoming.pathParameters ?? [],
+          queryParameters: incoming.queryParameters ?? [],
+          bodyParameters: incoming.bodyParameters ?? [],
+          headerNames: incoming.headerNames ?? [],
+          authSignals: incoming.authSignals ?? [],
+          cookieSignals: incoming.cookieSignals ?? [],
+          contentTypes: incoming.contentTypes ?? [],
+          sourceFiles: incoming.sourceFiles ?? [],
+          requestIDs: incoming.requestIDs ?? [],
+        }
+        const evidenceInputs = incoming.evidence ?? (() => {
+          const sources = incoming.methodEvidenceSources?.length
+            ? incoming.methodEvidenceSources
+            : [operation.observedInTraffic ? "traffic" as const : "other" as const]
+          if (sources.includes("javascript") && sources.includes("traffic")) {
+            return [
+              {
+                source: "javascript" as const,
+                ...operationFields,
+                requestIDs: [],
+                confidence: incoming.confidence ?? "candidate" as const,
+              },
+              {
+                source: "traffic" as const,
+                requestIDs: operationFields.requestIDs,
+                confidence: incoming.observedInTraffic ? "observed" as const : "candidate" as const,
+              },
+            ]
+          }
+          return sources.map((source) => ({
+            source,
+            ...operationFields,
+            confidence: incoming.confidence ?? (source === "traffic" ? "observed" as const : "candidate" as const),
+          }))
+        })()
+        for (const evidenceInput of evidenceInputs) {
+          let evidence = operation.evidence.find((item) => item.source === evidenceInput.source)
+          if (!evidence) {
+            evidence = {
+              source: evidenceInput.source,
+              ...emptyFields(),
+              confidence: evidenceInput.confidence ?? "candidate",
+            }
+            operation.evidence.push(evidence)
+          }
+          for (const source of [
+            "pathParameters", "queryParameters", "bodyParameters", "headerNames",
+            "authSignals", "cookieSignals", "contentTypes", "sourceFiles",
+          ] as const) {
+            evidence[source] = unique([...evidence[source], ...(evidenceInput[source] ?? [])])
+          }
+          if (evidence.requestIDs.length === 0 && (evidenceInput.requestIDs?.length ?? 0) > 0) {
+            evidence.requestIDs = unique(evidenceInput.requestIDs ?? [])
+          }
+          if (!operation.methodEvidenceSources.includes(evidenceInput.source)) {
+            operation.methodEvidenceSources.push(evidenceInput.source)
+          }
+          const evidenceConfidence = evidenceInput.confidence ?? "candidate"
+          if (confidenceRank[evidenceConfidence] > confidenceRank[evidence.confidence]) {
+            evidence.confidence = evidenceConfidence
+          }
+        }
+
         const incomingConfidence = incoming.confidence ?? (operation.observedInTraffic ? "observed" : "candidate")
         if (confidenceRank[incomingConfidence] > confidenceRank[operation.confidence]) {
           operation.confidence = incomingConfidence
