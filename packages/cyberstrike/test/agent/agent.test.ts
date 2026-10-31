@@ -215,6 +215,7 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
         "web_get_vuln_detail",
         "correlate_javascript",
         "ingest_javascript_urls",
+        "target_endpoint",
         "validate_finding",
         "chain_link",
         "validate_chain",
@@ -318,7 +319,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       const analyzer = await Agent.get("proxy-analyzer")
       const impactHunter = await Agent.get("impact-hunter")
       const registeredTools = new Set(await ToolRegistry.ids())
-      const sharedContextTools = ["skill", "read", "target_note", "target_notes_read", "target_artifact"] as const
+      const sharedContextTools = ["skill", "read", "target_note", "target_notes_read", "target_artifact", "target_endpoint"] as const
       for (const tool of [...sharedContextTools, "target_workspace"] as const) {
         expect(registeredTools.has(tool), "shared context tool " + tool + " must be registered").toBe(true)
       }
@@ -333,7 +334,9 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       }
       expect(evalPerm(orchestrator, "target_workspace")).toBe("allow")
       expect(evalPerm(analyzer, "target_workspace")).toBe("deny")
+      expect(evalPerm(analyzer, "target_endpoint")).toBe("allow")
       expect(evalPerm(impactHunter, "target_workspace")).toBe("deny")
+      expect(evalPerm(impactHunter, "target_endpoint")).toBe("allow")
       for (const tester of testers) expect(evalPerm(tester, "target_workspace")).toBe("deny")
       expect(orchestrator).toBeDefined()
       expect(analyzer).toBeDefined()
@@ -354,6 +357,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
       expect(evalPerm(orchestrator, "web_get_request_detail")).toBe("allow")
       expect(evalPerm(orchestrator, "correlate_javascript")).toBe("allow")
+      expect(evalPerm(orchestrator, "target_endpoint")).toBe("allow")
       expect(evalPerm(orchestrator, "ingest_javascript_urls")).toBe("allow")
       expect(orchestrator?.prompt).toContain("JavaScript asset coverage is a hard gate")
       expect(analyzer?.prompt).toContain("attack-javascript-analysis")

@@ -390,6 +390,7 @@ export namespace Agent {
             triage_vulnerability: "allow",
             validate_finding: "allow",
             correlate_javascript: "allow",
+            target_endpoint: "allow",
             research_knowledge: "allow",
             target_note: "allow",
             add_intel: "allow",
@@ -567,8 +568,8 @@ export namespace Agent {
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
-            // Pure orchestrator: deny active testing and finding/architecture writes,
-            // while allowing delegation, read-only context, and safe JavaScript correlation.
+            // Pure orchestrator: deny active testing and finding writes, while allowing
+            // endpoint-inventory persistence, delegation, read-only context, and JS correlation.
             // These are the exact tools named by the orchestrator prompt; if omitted here,
             // the model attempts calls that permission enforcement rejects.
             // `task` MUST be allowed explicitly or delegation breaks.
@@ -582,6 +583,7 @@ export namespace Agent {
             target_workspace: "allow",
             target_notes_read: "allow",
             target_artifact: "allow",
+            target_endpoint: "allow",
             web_get_session_context: "allow",
             web_get_detail: "allow",
             web_get_request_detail: "allow",
@@ -631,6 +633,7 @@ export namespace Agent {
             target_notes_read: "allow",
             target_artifact: "allow",
             target_note: "allow",
+            target_endpoint: "allow",
             correlate_javascript: "allow",
             ingest_javascript_urls: "allow",
             web_write_role: "allow",
@@ -695,6 +698,7 @@ export namespace Agent {
             target_notes_read: "allow",
             target_artifact: "allow",
             target_note: "allow",
+            target_endpoint: "allow",
             add_intel: "allow",
             get_coverage_notes: "allow",
             methodology_status: "allow",
