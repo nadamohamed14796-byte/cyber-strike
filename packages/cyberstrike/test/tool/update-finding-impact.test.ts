@@ -221,7 +221,7 @@ test("Impact Hunter severity update rejects non-approved findings and non-Hunter
   })
 })
 
-test("Impact Hunter cannot lower or repeat the current severity through the escalation tool", async () => {
+test("Impact Hunter cannot lower the current severity through the escalation tool", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -232,14 +232,45 @@ test("Impact Hunter cannot lower or repeat the current severity through the esca
         const tool = await UpdateFindingImpactTool.init()
         const result = await tool.execute({
           id: finding.id,
-          severity: "low",
-          demonstratedImpact: "The new test evidence is deliberately insufficient to justify a higher severity classification for this record.",
-          severityRationale: "No higher impact has been demonstrated beyond the currently accepted low-severity confidentiality boundary.",
+          severity: "info",
+          demonstratedImpact: "The proposed lower classification is not allowed even when a caller supplies a descriptive impact statement of sufficient length.",
+          severityRationale: "This attempted downgrade is not supported because the accepted low-severity confidentiality boundary must remain unchanged unless the record is explicitly re-triaged by its authorized workflow.",
           baseline_validation_id: baselineValidationID,
           impact_hypothesis_key: "finding:" + finding.id + ":impact:cross-account-read",
           evidence_refs: ["not-reached-before-severity-check"],
         }, mockCtx(session.id))
-        expect((result.metadata as any).reason).toBe("severity_not_higher")
+        expect((result.metadata as any).reason).toBe("severity_downgrade")
+        expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.severity).toBe("low")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
+
+test("Impact Hunter may record additional proven impact while keeping the same severity band", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const session = await Session.create({})
+      try {
+        const { finding, baselineValidationID } = await makeApprovedConfirmedFinding(session.id)
+        const impactProof = await recordImpactProof(session.id, finding, "broader-owned-fixture")
+        const tool = await UpdateFindingImpactTool.init()
+        const result = await tool.execute({
+          id: finding.id,
+          severity: "low",
+          demonstratedImpact: "A separate controlled replay confirms an additional owned-fixture disclosure, but the scope and sensitivity remain within the same low-severity program band.",
+          severityRationale: "The additional consequence improves the demonstrated impact and report quality, but its limited owned-fixture scope does not justify moving above the existing low severity band.",
+          baseline_validation_id: baselineValidationID,
+          impact_hypothesis_key: impactProof.hypothesisKey,
+          evidence_refs: [impactProof.evidenceRef],
+        }, mockCtx(session.id))
+        expect((result.metadata as any).updated).toBe(true)
+        expect((result.metadata as any).severityChanged).toBe(false)
+        expect(result.output).toContain("Severity unchanged: low")
         expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.severity).toBe("low")
       } finally {
         await Session.remove(session.id)
