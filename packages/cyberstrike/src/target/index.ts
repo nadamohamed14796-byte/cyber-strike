@@ -3279,7 +3279,7 @@ export function isObservedOrAncestorInSession(sessionID: string, targetURL: stri
       }
       state.operations.sort((a, b) => a.method.localeCompare(b.method))
       state.origin = origin
-      state.path = cleanPath
+      state.path ||= cleanPath
 
       const structured = JSON.stringify(state, null, 2)
       const content = [
