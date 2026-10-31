@@ -304,9 +304,9 @@ The ledger is session-persistent and is the source of truth for attempt count an
 
 
 ## Automatic Impact Hunter handoff (single source of truth)
-Do not call the `task` tool to start Impact Hunter manually. When a concrete evidence-backed vulnerability candidate is ready to record, call `report_vulnerability` with the finding, exact endpoint, reproduction evidence, and the relevant request/evidence IDs. The reporting tool persists the finding first, then automatically starts or resumes exactly one finding-specific background Impact Hunter task and returns its `task_id` plus dispatch status.
+Do not call the `task` tool to start Impact Hunter manually. `report_vulnerability` only records a candidate and NEVER dispatches the Hunter. Complete the ten-check `validate_finding` workflow and obtain a durable evidence-backed CONFIRMED ledger outcome first. Then perform fresh duplicate comparison and call `triage_vulnerability(status="approved")`. Only a successful approval dispatches or resumes exactly one finding-specific background Impact Hunter task and returns its `task_id` plus dispatch status.
 
-Carry the returned finding ID and Hunter `task_id` into your final summary. If the tool reports that the Hunter did not start, preserve and explain its exact reason; do not create a second task as a workaround. Continue your own assigned analysis without waiting for the Hunter. A started task is not a confirmed vulnerability: only the Hunter's completed validation and evidence-backed triage can establish that result. Impact Hunter is the terminal investigator and must never dispatch another Hunter.
+Carry the approved finding ID and returned Hunter `task_id` into your final summary. If triage reports that the Hunter did not start, preserve its exact reason; do not create a second task as a workaround. Continue your own assigned analysis independently. Impact Hunter's task is specifically to investigate realistic, evidence-supported paths to stronger impact; a started task is not an impact escalation verdict. The Hunter must never dispatch another Hunter.
 
 ### Mandatory on-demand src-hunter playbook reads
 
