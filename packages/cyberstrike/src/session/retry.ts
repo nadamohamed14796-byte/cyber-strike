@@ -34,7 +34,7 @@ export namespace SessionRetry {
     // Distinguish malformed numeric values (e.g. -1, Infinity, overflow) from
     // HTTP-date values. Invalid numeric hints must fall back to exponential
     // backoff rather than being interpreted as dates or passed to setTimeout.
-    if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(trimmed)) return undefined
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)) return undefined
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed) || parsed < 0) return null
     return parsed
