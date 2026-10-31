@@ -102,9 +102,9 @@ export function supportingRequestIDs(
 
 /**
  * Evaluate the exact same durable prerequisites whenever an agent or tool
- * launches Impact Hunter. proof_gap is deliberately narrower than arbitrary
- * candidate dispatch: the record must be NEW, lack a reproducible PoC (or carry the execution-unconfirmed marker), be target-attributed,
- * and include an observed request or source file/line anchor.
+ * launches Impact Hunter. proof_gap accepts any NEW, untriaged vulnerability
+ * candidate regardless of weakness class, but requires an exact scoped endpoint,
+ * target attribution, and a matching request or source file/line evidence anchor.
  */
 export function evaluateImpactHunterGate(input: {
   finding: Vulnerability.Info
@@ -124,9 +124,9 @@ export function evaluateImpactHunterGate(input: {
     if (finding.status !== "new") {
       return { allowed: false, mode, reason: "proof-gap investigation accepts only a NEW, untriaged candidate", requestIDs }
     }
-    // candidate != null is the canonical execution-unconfirmed marker. Its
-    // poc field may contain only a baseline request/response or an encoded
-    // reflection note; do not mistake that material for a reproducible PoC.
+    // The candidate marker is class-agnostic: it records that the reporter has
+    // not supplied a complete, reviewable PoC. Never infer completeness from
+    // baseline/request/response notes alone.
     if (finding.candidate == null && finding.poc?.trim()) {
       return { allowed: false, mode, reason: "finding already contains a PoC and is not marked execution-unconfirmed", requestIDs }
     }
