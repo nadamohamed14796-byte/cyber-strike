@@ -4,7 +4,7 @@ import { TaskTool } from "../tool/task"
 import type { Tool } from "../tool/tool"
 import { requestIDFromRecentPromptTexts } from "../tool/task-resume"
 import { Vulnerability } from "../session/vulnerability"
-import { FindingValidation } from "./finding-validation"
+import { FindingValidation, hasCompleteConfirmedValidation } from "./finding-validation"
 import { redactTargetNoteSecrets } from "../target/redact"
 
 export interface ImpactHunterHandoffResult {
@@ -39,8 +39,8 @@ async function dispatch(
       vulnerabilityID: finding.id!,
       limit: 1,
     })[0]
-    if (!baselineValidation || baselineValidation.verdict !== "confirmed") {
-      return { started: false, reason: "latest ten-check validation is not confirmed; Impact Hunter dispatch is blocked" }
+    if (!hasCompleteConfirmedValidation(baselineValidation)) {
+      return { started: false, reason: "latest validation does not contain ten complete evidence-backed checks; Impact Hunter dispatch is blocked" }
     }
 
     const description = `Impact Hunter finding ${finding.id}`
