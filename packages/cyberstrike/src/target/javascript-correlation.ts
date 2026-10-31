@@ -232,9 +232,10 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
   for (const call of content.matchAll(calls)) {
     const start = (call.index ?? 0) + call[0].length
     const tail = content.slice(start, Math.min(content.length, start + 12000))
-    const close = findCallEnd(tail, 0)
+    const callText = "(" + tail
+    const close = findCallEnd(callText, 0)
     if (close < 0) continue
-    const args = splitTopLevelArguments(tail.slice(0, close))
+    const args = splitTopLevelArguments(callText.slice(1, close))
     const first = call[0].toLowerCase().endsWith(".open(") ? args[1] : args[0]
     const literal = first?.match(/^\\s*['"\\x60]([^'"\\x60]+)['"\\x60]/)?.[1]
     if (!literal) continue
