@@ -123,7 +123,7 @@ async function dispatch(
           "baseline_validation_id: " + (gate.baselineValidationID ?? "not available"),
           "Investigate whether the proven primitive can safely reach a stronger real-world security consequence. Do not restart initial validation from zero or create a duplicate finding.",
           "For every new impact hypothesis, use a separate durable key shaped finding:<finding_id>:impact:<short-slug>, preserve exact evidence references, run all ten validation checks again, and use update_finding_impact to update the SAME finding. Severity may remain unchanged when stronger impact is in the same program band; raise it only when the new demonstrated consequence crosses a real severity threshold.",
-          "A low, informational, or medium rating is a reason to assess realistic impact paths, not a promise that escalation exists. Never chase the largest number or report a hypothetical chain as fact.",
+          "A low or medium rating is a reason to assess realistic impact paths, not a promise that escalation exists. Never chase the largest number or report a hypothetical chain as fact.",
         ]
 
     const informationalChainInstructions = isInformational ? [
