@@ -46,14 +46,15 @@ Normalize host case, default ports, URL fragments, path templates, parameter nam
 | Record kind | Candidate identity key | Must remain separate when |
 |---|---|---|
 | Asset | normalized hostname + asset type | ownership, scope decision, or service boundary differs |
-| Endpoint | origin + method + normalized route template + API version | method, auth boundary, tenant, content type, or operation semantics differ |
+| Endpoint | normalized origin + route template + API version | service origin, route template, or API version differs |
+| Operation | endpoint ID + HTTP method + operation semantics | auth boundary, tenant, content type, input contract, or business semantics differ |
 | Parameter observation | endpoint ID + parameter name + location + source context | query/body/header/path/cookie locations differ |
 | JS asset | canonical final URL + content hash | bytes differ; preserve aliases and all discovery sources |
 | Hypothesis | root-cause fingerprint + affected boundary + operation | tested principal/object/tenant/state or violated invariant differs |
 | Finding | root-cause fingerprint + affected control + demonstrated impact boundary | remediation, security boundary, or material impact differs |
 | Evidence | immutable evidence ID/hash + capture context | time, identity, request variation, or control differs |
 
-Treat these as starting keys, not automatic merge commands. When records collide, compare semantic fields and preserve conflicting observations as linked variants. Merge source lists and parameter observations into the canonical endpoint record instead of creating duplicate endpoint rows for every parameter or discovery tool.
+Treat these as starting keys, not automatic merge commands. When records collide, compare semantic fields and preserve conflicting observations as linked variants. Merge source lists at the canonical endpoint root, and merge parameters, headers, authentication, content types, and request/response observations into the matching method operation. Never mix one method's contract with another. A method observed only in traffic remains a traffic-sourced operation; preserve methodless clues as unattributed endpoint-level evidence instead of copying them to every operation.
 
 One underlying root cause affecting many routes should normally be one grouped finding with a route/instance list if remediation and impact are the same. Split findings only when the control, remediation, or material impact genuinely differs. Never merge merely because titles, response codes, or paths look alike.
 
