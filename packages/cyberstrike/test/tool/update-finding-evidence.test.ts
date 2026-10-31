@@ -109,6 +109,7 @@ test("Impact Hunter persists a verified PoC onto the same candidate without appr
         expect(saved?.status).toBe("new")
         expect(saved?.severity).toBe("high")
         expect(saved?.candidate ?? null).toBeNull()
+        expect(saved?.title).not.toContain("[UNCONFIRMED CANDIDATE]")
         expect(saved?.poc).toContain("Prior candidate evidence / unverified baseline notes")
         expect(saved?.poc).toContain(baselineNotes)
         expect(saved?.poc).toContain("Proof request:")
