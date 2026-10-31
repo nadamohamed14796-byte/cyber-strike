@@ -1020,12 +1020,18 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       expect(get.requestIDs).toEqual(["req-get-1"])
       expect(get.methodEvidenceSources).toContain("traffic")
       expect(get.methodEvidenceSources).not.toContain("javascript")
+      expect(get.evidence).toHaveLength(1)
+      expect(get.evidence[0]?.source).toBe("traffic")
+      expect(get.evidence[0]?.queryParameters).toEqual(["include"])
 
       expect(post.bodyParameters).toEqual(["userId", "email"])
       expect(post.queryParameters).toEqual([])
       expect(post.headerNames).toEqual(["content-type", "authorization"])
       expect(post.authSignals).toEqual(["bearer-token"])
       expect(post.methodEvidenceSources).toContain("javascript")
+      expect(post.evidence).toHaveLength(1)
+      expect(post.evidence[0]?.source).toBe("javascript")
+      expect(post.evidence[0]?.bodyParameters).toEqual(["userId", "email"])
 
       expect(record.unattributed.queryParameters).toEqual(["route-level-clue"])
       expect(record.unattributed.queryParameters).not.toContain("include")
