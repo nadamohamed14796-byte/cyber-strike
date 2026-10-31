@@ -37,7 +37,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   // the UI only and does not pause or cancel the root session.
   const impactHunterSessions = createMemo(() =>
     sync.data.session
-      .filter((item) => item.parentID === props.sessionID && item.title.startsWith("Impact Hunter finding "))
+      .filter((item) => item.parentID === props.sessionID && item.title.startsWith("Impact Hunter"))
       .sort((left, right) => right.time.updated - left.time.updated),
   )
   const isExtensionTreeSession = createMemo(() => {
