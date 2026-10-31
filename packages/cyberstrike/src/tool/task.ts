@@ -531,7 +531,8 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // through TaskTool, so its sibling specialists must acquire scheduler slots.
       // Other subagents already occupy a parent slot; their nested foreground
       // delegation stays re-entrant to avoid parent/child pool deadlocks.
-      const isManagedSubagent = caller?.mode === "subagent" && callerID !== "proxy-agent"
+      const isManagedSubagent =
+        (caller?.mode === "subagent" || callerID === "impact-hunter") && callerID !== "proxy-agent"
       const result = isManagedSubagent
         ? await SessionPrompt.prompt(promptInput)
         : await AgentTaskConcurrency.run(taskLane, () => SessionPrompt.prompt(promptInput))
