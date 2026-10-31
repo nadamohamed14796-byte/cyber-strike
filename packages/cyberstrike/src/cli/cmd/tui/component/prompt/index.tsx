@@ -708,7 +708,6 @@ export function Prompt(props: PromptProps) {
         if (!created.data?.id) throw new Error("The server did not return an Impact Hunter session ID.")
         await sdk.client.session.promptAsync({
           sessionID: created.data.id,
-          ...selectedModel,
           messageID,
           agent: "impact-hunter",
           model: selectedModel,
