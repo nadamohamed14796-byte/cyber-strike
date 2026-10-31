@@ -177,7 +177,16 @@ async function dispatch(
   }
 }
 
-const impactHunterHandoffFlights = new Map<string, Promise<ImpactHunterHandoffResult>>()
+type ImpactHunterHandoffFlight = {
+  mode: ImpactHunterMode
+  promise: Promise<ImpactHunterHandoffResult>
+}
+
+// Serialize handoffs by root + finding, not by mode. Otherwise a proof_gap
+// dispatch racing an approval event can both observe "no child" and create two
+// Hunters for the same finding. A mode transition is queued behind the first
+// handoff and then resumes the same finding-specific child session.
+const impactHunterHandoffFlights = new Map<string, ImpactHunterHandoffFlight>()
 
 export function startImpactHunterHandoff(
   ctx: Tool.Context,
@@ -188,14 +197,19 @@ export function startImpactHunterHandoff(
     return Promise.resolve({ started: false, mode, reason: "recursive Impact Hunter dispatch is disabled" })
   }
 
-  const key = Session.root(ctx.sessionID) + ":" + finding.id + ":" + mode
+  const key = Session.root(ctx.sessionID) + ":" + finding.id
   const active = impactHunterHandoffFlights.get(key)
-  if (active) return active
+  if (active?.mode === mode) return active.promise
 
-  const pending = dispatch(ctx, finding, mode)
-  impactHunterHandoffFlights.set(key, pending)
+  // Different modes are meaningful state transitions (proof_gap → approved_impact),
+  // so don't discard the newer mode; serialize it after the current dispatch.
+  const pending = active
+    ? active.promise.then(() => dispatch(ctx, finding, mode), () => dispatch(ctx, finding, mode))
+    : dispatch(ctx, finding, mode)
+  const flight = { mode, promise: pending }
+  impactHunterHandoffFlights.set(key, flight)
   const cleanup = () => {
-    if (impactHunterHandoffFlights.get(key) === pending) {
+    if (impactHunterHandoffFlights.get(key) === flight) {
       impactHunterHandoffFlights.delete(key)
     }
   }
