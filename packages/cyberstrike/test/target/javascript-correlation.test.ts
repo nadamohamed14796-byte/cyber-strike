@@ -25,6 +25,26 @@ test("extracts and deduplicates static endpoint literals from common JavaScript 
   expect(new Set(endpoints).size).toBe(endpoints.length)
 })
 
+test("does not promote arbitrary links, namespaces, or static assets to API endpoints", () => {
+  const source = [
+    'const help = "https://help.example.com/";',
+    'const post = "https://post/";',
+    'const namespace = "http://www.w3.org/{id}/xlink";',
+    'const icon = "https://app.example.com/logo.svg";',
+    'const docs = "https://reactjs.org/docs/error-decoder.html";',
+    'fetch("https://api.example.com/v1/users");',
+    'axios.post("/auth/logout", payload);',
+  ].join("\\n")
+  const endpoints = extractStaticJavaScriptEndpoints(source)
+  expect(endpoints).toContain("https://api.example.com/v1/users")
+  expect(endpoints).toContain("/auth/logout")
+  expect(endpoints).not.toContain("https://help.example.com/")
+  expect(endpoints).not.toContain("https://post/")
+  expect(endpoints).not.toContain("http://www.w3.org/{id}/xlink")
+  expect(endpoints).not.toContain("https://app.example.com/logo.svg")
+  expect(endpoints).not.toContain("https://reactjs.org/docs/error-decoder.html")
+})
+
 test("normalizes numeric identifiers from relative and absolute JS endpoint literals", () => {
   const endpoints = extractStaticJavaScriptEndpoints([
     'fetch("/api/users/12345")',
