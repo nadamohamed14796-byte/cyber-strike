@@ -191,4 +191,4 @@ export function startImpactHunterHandoff(
 
   const key = Session.root(ctx.sessionID) + ":" + finding.id
   return runImpactHunterHandoff(key, mode, () => dispatch(ctx, finding, mode))
-}}
+}
