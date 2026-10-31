@@ -9,6 +9,7 @@ import PROMPT_GEMINI from "./prompt/gemini.txt"
 
 import PROMPT_CODEX from "./prompt/codex_header.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
+import PROMPT_CODE_ASSISTANCE from "./prompt/code-assistance.txt"
 import type { Provider } from "@/provider/provider"
 
 export namespace SystemPrompt {
@@ -17,13 +18,15 @@ export namespace SystemPrompt {
   }
 
   export function provider(model: Provider.Model) {
-    if (model.api.id.includes("gpt-5")) return [PROMPT_CODEX]
-    if (model.api.id.includes("gpt-") || model.api.id.includes("o1") || model.api.id.includes("o3"))
-      return [PROMPT_BEAST]
-    if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
-    if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
-    if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
-    return [PROMPT_ANTHROPIC_WITHOUT_TODO]
+    let prompt: string
+    if (model.api.id.includes("gpt-5")) prompt = PROMPT_CODEX
+    else if (model.api.id.includes("gpt-") || model.api.id.includes("o1") || model.api.id.includes("o3"))
+      prompt = PROMPT_BEAST
+    else if (model.api.id.includes("gemini-")) prompt = PROMPT_GEMINI
+    else if (model.api.id.includes("claude")) prompt = PROMPT_ANTHROPIC
+    else if (model.api.id.toLowerCase().includes("trinity")) prompt = PROMPT_TRINITY
+    else prompt = PROMPT_ANTHROPIC_WITHOUT_TODO
+    return [prompt, PROMPT_CODE_ASSISTANCE]
   }
 
   export async function environment(model: Provider.Model) {
