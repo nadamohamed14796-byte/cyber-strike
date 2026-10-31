@@ -68,6 +68,7 @@ export async function persistTargetFindingLink(input: {
         : "finding-candidate-reference"
   const validationState = input.validationState ??
     (v.status === "approved" ? "confirmed" : v.status === "false_positive" ? "false_positive" : v.status === "duplicate" ? "duplicate" : reportable ? "legacy" : "pending")
+  const claimedSeverity = v.candidate ?? v.severity
   const lifecycleDescription = reportable
     ? "This is an approved reportable finding."
     : v.status === "false_positive"
@@ -81,7 +82,7 @@ export async function persistTargetFindingLink(input: {
     title: "Finding " + v.id + ": " + v.title,
     content: [
       "Finding ID: " + v.id + ". Lifecycle: " + disposition + ". " + lifecycleDescription + " " +
-        (reportable ? "Accepted severity: " + v.severity + ". " : "Claimed severity: " + v.severity + " (unvalidated; not an accepted severity). ") +
+        (reportable ? "Accepted severity: " + v.severity + ". " : "Claimed severity: " + claimedSeverity + " (unvalidated; not an accepted severity). " + (v.candidate ? "The record is provisionally capped at " + v.severity + " until execution is demonstrated. " : "")) +
         "Endpoint: " + (endpoint ?? "not uniquely identified") + ". Workflow status: " + v.status + ".",
       localFindingText(v.description, 3500),
       v.steps_to_reproduce ? "The reporter's reproduction path (which still needs independent verification unless approved) is: " + localFindingText(v.steps_to_reproduce, 2500) : undefined,
@@ -112,7 +113,8 @@ export async function persistTargetFindingLink(input: {
     lifecycleState: disposition,
     reportable,
     severity: reportable ? v.severity : null,
-    claimedSeverity: v.severity,
+    claimedSeverity,
+    provisionalSeverity: reportable ? null : v.severity,
     severityState: reportable ? (v.status === "approved" ? "triaged" : "legacy") : "unvalidated",
     candidate: v.candidate ?? null,
     cweID: v.cwe_id ?? null,
