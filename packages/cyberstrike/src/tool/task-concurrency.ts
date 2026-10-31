@@ -24,7 +24,7 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
   const isReservedLane = (lane: string) => reservedLaneSuffixes.some((suffix) =>
     lane === suffix || lane.endsWith(":" + suffix),
   )
-  const reservedCapacity = Math.min(maxConcurrent, reservedLaneSuffixes.length)
+  const reservedCapacity = Math.min(Math.max(0, maxConcurrent - 1), reservedLaneSuffixes.length)
   const pending: ScheduledEntry[] = []
   const activeByLane = new Map<string, number>()
   let active = 0
