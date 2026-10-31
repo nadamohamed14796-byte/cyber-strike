@@ -35,6 +35,25 @@ const OperationInput = z.object({
   observed_in_traffic: z.boolean().optional(),
   confidence: Confidence.optional(),
   evidence: z.array(EvidenceInput).optional(),
+}).superRefine((operation, context) => {
+  const declaredSources = [...new Set(operation.method_evidence_sources ?? [])]
+  const evidenceSources = new Set(operation.evidence?.map((item) => item.source) ?? [])
+  if (declaredSources.length > 1 && !operation.evidence?.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["evidence"],
+      message: "Multiple method evidence sources require explicit per-source evidence entries.",
+    })
+  }
+  for (const source of declaredSources) {
+    if (declaredSources.length > 1 && !evidenceSources.has(source)) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidence"],
+        message: "Provide one evidence entry for each declared source: " + source,
+      })
+    }
+  }
 })
 
 const EndpointEvidenceFields = z.object({
@@ -51,8 +70,16 @@ const EndpointEvidenceFields = z.object({
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical target workspace URL; must already be observed and in scope in this session."),
-  origin: z.string().url().nullable().describe("Exact endpoint origin, including scheme and non-default port. Use null only when the origin genuinely cannot be established."),
-  path: z.string().min(1).refine((value) => value.startsWith("/"), "Endpoint path must be an absolute URL path."),
+  origin: z.string().url().refine((value) => {
+    const url = new URL(value)
+    return (url.protocol === "http:" || url.protocol === "https:") &&
+      url.pathname === "/" && !url.search && !url.hash && !url.username && !url.password
+  }, "Origin must be an HTTP(S) origin without credentials, path, query, or fragment.").nullable()
+    .describe("Exact endpoint origin, including scheme and non-default port. Use null only when the origin genuinely cannot be established."),
+  path: z.string().min(1).refine(
+    (value) => value.startsWith("/") && !value.includes("?") && !value.includes("#"),
+    "Endpoint path must be an absolute path without query or fragment; pass those as operation parameters.",
+  ),
   source_files: z.array(z.string().min(1)).optional(),
   operations: z.array(OperationInput).min(1).describe("One object per HTTP method. Keep each method's fields in its own operation."),
   unattributed: EndpointEvidenceFields.optional().describe("Route-level evidence for which no specific HTTP method is known. Never copy this data into every operation."),
