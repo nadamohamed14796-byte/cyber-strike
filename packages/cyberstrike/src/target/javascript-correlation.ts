@@ -2499,11 +2499,26 @@ export namespace JavaScriptCorrelation {
         )
     for (const file of sourceFiles) {
       const absoluteFile = path.resolve(workspace.workspacePath, file.relativePath)
-      const matchingRecord = ingestedAssetRecords.find((record) =>
+      let matchingRecord = ingestedAssetRecords.find((record) =>
         record.localPath &&
         record.contentHash === file.sha256 &&
         path.resolve(record.localPath) === absoluteFile,
       )
+      // Local inline scripts use a synthetic "#inline-N" path and their hash is
+      // the script body, not the containing HTML response. Recover provenance
+      // from the exact parent HTML asset so they deduplicate with captured inline
+      // scripts and retain the real page URL.
+      if (!matchingRecord) {
+        const inlineMarker = file.relativePath.lastIndexOf("#inline-")
+        if (inlineMarker > 0) {
+          const parentPath = path.resolve(workspace.workspacePath, file.relativePath.slice(0, inlineMarker))
+          matchingRecord = ingestedAssetRecords.find((record) =>
+            record.localPath &&
+            path.resolve(record.localPath) === parentPath &&
+            (record.assetKind === "html" || /text\\/html|application\\/xhtml\\+xml/i.test(record.contentType ?? "")),
+          )
+        }
+      }
       if (!matchingRecord) continue
       const sourceURL = safeURL(matchingRecord.finalURL ?? matchingRecord.url)
       if (!sourceURL) continue
