@@ -56,8 +56,8 @@ export interface JavaScriptDataExposureSignal {
   functionName: string | null
   confidence: "candidate"
 }
-export interface JavaScriptRoleHint { kind: string; value: string; line: number; functionName?: string | null }
-export interface JavaScriptApplicationHint { kind: string; value: string; line: number; functionName?: string | null; confidence: "candidate" }
+export interface JavaScriptRoleHint { kind: string; value: string; line: number }
+export interface JavaScriptApplicationHint { kind: string; value: string; line: number; confidence: "candidate" }
 export interface JavaScriptRiskSignal {
   id: string
   kind: string
@@ -654,11 +654,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const kind = /admin|superuser/.test(lower) ? "admin-role-hint" : /role|permission/.test(lower) ? "authorization-hint"
       : /feature.?flag/.test(lower) ? "feature-flag-hint" : /debug/.test(lower) ? "debug-path-hint"
       : /impersonat/.test(lower) ? "impersonation-hint" : "internal-feature-hint"
-    const index = match.index ?? 0
-    const functionName = functionRanges
-      .filter((range) => range.start <= index && index <= range.end)
-      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]?.name ?? null
-    const item = { kind, value, line: lineNumber(lineStarts, index), functionName }
+    const item = { kind, value, line: lineNumber(lineStarts, match.index ?? 0) }
     roles.set(kind + ":" + value + ":" + item.line, item)
       }
 
@@ -685,15 +681,10 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     for (const match of source.matchAll(rule.pattern)) {
       const value = (rule.capture ? match[rule.capture] : match[0])?.trim()
       if (!value || value.length > 160) continue
-      const index = match.index ?? 0
-      const functionName = functionRanges
-        .filter((range) => range.start <= index && index <= range.end)
-        .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]?.name ?? null
       const item: JavaScriptApplicationHint = {
         kind: rule.kind,
         value,
-        line: lineNumber(lineStarts, index),
-        functionName,
+        line: lineNumber(lineStarts, match.index ?? 0),
         confidence: "candidate",
       }
       applicationHints.set(item.kind + ":" + item.value + ":" + item.line, item)

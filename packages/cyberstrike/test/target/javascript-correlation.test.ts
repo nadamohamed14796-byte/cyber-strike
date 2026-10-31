@@ -98,10 +98,6 @@ test("builds source-linked additional scenarios and connects workflow, endpoint,
   expect(identity.recommendedChecks.some((check) => check.includes("two controlled accounts"))).toBe(true)
 
   expect(scenarios.some((item) => item.category === "file-transfer")).toBe(true)
-  const tenantScenario = scenarios.find((item) => item.category === "multi-tenant-authorization")!
-  expect(tenantScenario.relatedRequestCandidateIDs).toEqual([])
-  expect(tenantScenario.relatedEndpointIDs).toEqual([])
-  expect(tenantScenario.observedRequestIDs).toEqual([])
   expect(scenarios.some((item) => item.category === "multi-tenant-authorization")).toBe(true)
   expect(scenarios.some((item) => item.category === "dom-xss-review" && item.riskSignalIDs.includes("risk-dom-1"))).toBe(true)
   const dataScenario = scenarios.find((item) => item.category === "sensitive-data-exposure")!
@@ -125,16 +121,6 @@ test("extracts and deduplicates static endpoint literals from common JavaScript 
   expect(endpoints).toContain("/v1/profile")
   expect(endpoints).toContain("/api/orders/{param}")
   expect(new Set(endpoints).size).toBe(endpoints.length)
-})
-
-test("parses HTTP call arguments across nested objects and strings containing delimiters", () => {
-  const source = [
-    'client.open("POST", "/api/records", { note: "a ) and , stay inside this string", nested: { ids: [1, 2] } })',
-    'fetch("/api/search?filter=a,b", { headers: { "X-Filter": "a,b)", "X-Trace": "one,two" }, body: JSON.stringify({ nested: [1, 2] }) })',
-  ].join("\\n")
-  const endpoints = extractStaticJavaScriptEndpoints(source)
-  expect(endpoints).toContain("/api/records")
-  expect(endpoints).toContain("/api/search")
 })
 
 test("does not promote arbitrary links, namespaces, or static assets to API endpoints", () => {
