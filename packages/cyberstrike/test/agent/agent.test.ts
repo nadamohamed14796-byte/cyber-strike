@@ -150,7 +150,7 @@ test("returns default native agents when no config", async () => {
   })
 })
 
-test("direct captured-request analyzer uses the single automatic Impact Hunter handoff", async () => {
+test("direct captured-request analyzer persists candidates but does not dispatch Impact Hunter", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -159,10 +159,11 @@ test("direct captured-request analyzer uses the single automatic Impact Hunter h
       expect(agent).toBeDefined()
       expect(agent?.prompt).toContain("## Impact Hunter Escalation")
       expect(agent?.prompt).toContain("report_vulnerability")
-      expect(agent?.prompt).toContain("automatically starts or resumes")
+      expect(agent?.prompt).toContain("records a candidate only; it does not start Impact Hunter")
+      expect(agent?.prompt).toContain("triage_vulnerability(status=\"approved\")")
       expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
       expect(agent?.prompt).not.toContain("start a separate impact-hunter")
-      // Report_vulnerability owns automatic Hunter escalation; ordinary delegation remains available.
+      // report_vulnerability records a candidate; triage owns the post-validation Hunter handoff.
       expect(evalPerm(agent, "task")).toBe("allow")
       expect(evalPerm(agent, "report_vulnerability")).toBe("allow")
     },
@@ -199,6 +200,7 @@ test("Impact Hunter can delegate while retaining its finding-specific escalation
         "false_positive_memory",
         "report_vulnerability",
         "triage_vulnerability",
+        "update_finding_impact",
         "research_knowledge",
         "target_note",
         "add_intel",
@@ -378,8 +380,8 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(orchestrator?.prompt).not.toContain("path-confusion-prone routes → proxy-tester-ssrf")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
-      // Proxy Analyzer may persist a concrete finding; the report tool owns
-      // automatic Impact Hunter dispatch. It still cannot spawn tasks or triage.
+      // Proxy Analyzer may persist candidates, but dispatch waits for validation and triage.
+      // It may not approve or update finding severity itself.
       expect(evalPerm(analyzer, "report_vulnerability")).toBe("allow")
       expect(evalPerm(analyzer, "task")).toBe("allow")
       expect(evalPerm(analyzer, "validate_finding")).toBe("deny")
