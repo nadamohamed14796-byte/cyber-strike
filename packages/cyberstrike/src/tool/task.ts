@@ -105,11 +105,10 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         callerMode: caller?.mode,
       })
 
-      // The background bypass is not authorization to investigate arbitrary
-      // candidates. Bind the exact finding ID in the internal task prompt to the
-      // persisted approved finding, its latest ten-check validation, and its
-      // evidence-backed durable CONFIRMED ledger outcome.
-      if (impactHandoff) {
+      // Every Impact Hunter launch is evidence-gated, including an explicit
+      // @-invocation/foreground task that bypasses ordinary task permissions.
+      // Never let the task permission bypass skip finding approval/validation.
+      if (params.subagent_type === "impact-hunter") {
         const findingID = /^finding_id:\s*([^\s]+)\s*$/m.exec(params.prompt)?.[1]
         if (!findingID) {
           throw new Error("Impact Hunter dispatch requires an exact finding_id in the internal handoff prompt.")
