@@ -6,8 +6,6 @@ import { emitEndpoints } from "./emit.ts"
 
 const log = Log.create({ service: "hackbrowser:discovery" })
 
-const MAX_BODY_BYTES = 3_000_000
-
 export interface BundleMinerOptions {
   /** App origin — root-relative paths in a bundle resolve against this. */
   origin: string
@@ -37,17 +35,19 @@ async function mineResponse(response: Response, opts: BundleMinerOptions): Promi
       return
     }
     if (!opts.inScope(host)) return
-    // Skip oversized bodies by declared length before reading them.
-    const declared = Number(response.headers()["content-length"] ?? "0")
-    if (declared > MAX_BODY_BYTES) return
+    if (!response.ok()) {
+      log.debug("script response was not successful; not mining its error body", { url, status: response.status() })
+      return
+    }
     const text = await response.text()
-    if (!text || text.length > MAX_BODY_BYTES) return
+    if (!text) return
     const endpoints = mineEndpoints(text, opts.origin, opts.inScope)
     if (endpoints.length === 0) return
     const sent = await emitEndpoints(endpoints, opts.serverUrl, opts.sessionID, opts.credentialId, opts.seen)
     if (sent > 0) log.info("bundle-miner ingested endpoints", { url, endpoints: sent })
-  } catch {
-    // Body unavailable (redirect / aborted / page navigated) — ignore.
+  } catch (error) {
+    // A failed body read is observable, not an invisible successful omission.
+    log.warn("could not read captured JavaScript response body", { url: response.url(), error: String(error) })
   }
 }
 

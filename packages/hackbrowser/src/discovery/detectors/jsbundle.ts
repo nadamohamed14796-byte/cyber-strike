@@ -1,43 +1,43 @@
 import type { Page } from "playwright"
+import { Log } from "../../log.ts"
 import { register } from "../registry.ts"
 import { EMPTY_RESULT, type Detector, type DiscoveryContext, type DiscoveryResult, type Endpoint } from "../detector.ts"
 import { mineEndpoints } from "../mine.ts"
 
-// Bounds so a script-heavy SPA can't stall discovery or exhaust memory.
-const MAX_SCRIPTS = 30
-const MAX_BUNDLE_BYTES = 3_000_000
-const MAX_INLINE_BYTES = 500_000
+const log = Log.create({ service: "hackbrowser:discovery:jsbundle" })
 
 interface PageScripts {
-  external: string[] // absolute <script src> URLs
-  inline: string // concatenated inline <script> bodies
+  external: string[] // absolute <script src> and script preload URLs
+  inline: string[] // each inline <script> body, kept separate
 }
 
-/** External script URLs + inline script bodies on the current page. */
+/** External scripts, module preloads, script preloads, and inline bodies on the current page. */
 async function collectScripts(page: Page): Promise<PageScripts> {
   return page.evaluate(() => {
     const external = new Set<string>()
-    let inline = ""
+    const inline: string[] = []
     document.querySelectorAll("script").forEach((el) => {
       const src = el.src
       if (src) external.add(src)
-      else if (el.textContent) inline += el.textContent + "\n"
+      else if (el.textContent) inline.push(el.textContent)
+    })
+    document.querySelectorAll('link[rel~="modulepreload"], link[rel~="preload"][as="script"]').forEach((el) => {
+      const href = (el as HTMLLinkElement).href
+      if (href) external.add(href)
     })
     return { external: [...external], inline }
   })
 }
 
 /**
- * Mine endpoints from the page's JS — both external bundles and inline scripts.
- * External scripts are kept when in-scope (covers CDN subdomains, not just the
- * page origin) and fetched through the authenticated browser context (inherits
- * auth + proxy). Inline scripts often carry bootstrap config (apiBase, etc.), so
- * they're mined too. Confidence is modest — mined strings are candidates, not
- * declared contracts — so the proxy-agents test them (Approach B).
+ * Mine endpoint candidates from every in-scope script visible in the page DOM.
+ * No script-count, inline-size, or bundle-size cutoff is applied. Lazy-loaded
+ * bundles are also covered by the response listener in bundle-watch.
  */
 const jsbundle: Detector = {
   name: "jsbundle",
   kind: "api-call",
+  timeoutMs: null,
   async applies(): Promise<boolean> {
     return true
   },
@@ -46,7 +46,8 @@ const jsbundle: Detector = {
     let scripts: PageScripts
     try {
       scripts = await collectScripts(ctx.page)
-    } catch {
+    } catch (error) {
+      log.warn("could not enumerate page JavaScript sources", { error: String(error) })
       return EMPTY_RESULT
     }
 
@@ -57,23 +58,40 @@ const jsbundle: Detector = {
       }
     }
 
-    // Inline scripts (resolve root-relative paths against the app origin).
-    if (scripts.inline) collect(scripts.inline.slice(0, MAX_INLINE_BYTES))
+    for (const inline of scripts.inline) {
+      if (inline) collect(inline)
+    }
 
-    // External bundles — in-scope only, bounded, fetched via the page context.
     const inScopeExternal = scripts.external.filter((src) => {
       try {
         return ctx.inScope(new URL(src).hostname)
       } catch {
+        log.warn("invalid script URL discovered in page", { src })
         return false
       }
     })
-    for (const src of inScopeExternal.slice(0, MAX_SCRIPTS)) {
-      const text = await ctx.fetchText(src)
-      if (!text || text.length > MAX_BUNDLE_BYTES) continue
-      collect(text)
+    let failedFetches = 0
+    for (const src of inScopeExternal) {
+      try {
+        const source = await ctx.fetchText(src)
+        if (!source) {
+          failedFetches++
+          log.warn("could not fetch discovered JavaScript source", { src })
+          continue
+        }
+        collect(source)
+      } catch (error) {
+        failedFetches++
+        log.warn("JavaScript source fetch failed", { src, error: String(error) })
+      }
     }
 
+    log.info("JavaScript source discovery completed", {
+      inlineSources: scripts.inline.length,
+      externalSources: inScopeExternal.length,
+      failedFetches,
+      endpointCandidates: endpoints.size,
+    })
     if (endpoints.size === 0) return EMPTY_RESULT
     return { pages: [], endpoints: [...endpoints.values()], confidence: 0.5 }
   },

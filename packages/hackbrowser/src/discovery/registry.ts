@@ -23,14 +23,7 @@ export function detectors(): readonly Detector[] {
 
 /** Run one detector's applies+detect, isolated: never throws, bounded by a timeout. */
 async function runOne(detector: Detector, ctx: DiscoveryContext): Promise<DiscoveryResult> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<DiscoveryResult>((resolve) => {
-    timer = setTimeout(() => {
-      log.warn("detector timed out (skipped)", { detector: detector.name, ms: DETECTOR_TIMEOUT_MS })
-      resolve(EMPTY_RESULT)
-    }, DETECTOR_TIMEOUT_MS)
-  })
-  const work = (async () => {
+  const work = async (): Promise<DiscoveryResult> => {
     try {
       if (!(await detector.applies(ctx))) return EMPTY_RESULT
       const result = await detector.detect(ctx)
@@ -44,11 +37,24 @@ async function runOne(detector: Detector, ctx: DiscoveryContext): Promise<Discov
       log.warn("detector failed (skipped)", { detector: detector.name, err: String(err) })
       return EMPTY_RESULT
     }
-  })()
+  }
+
+  // Complete-worklist detectors cannot be abandoned after a global timeout:
+  // doing so would silently discard every script result after the time limit.
+  const timeoutMs = detector.timeoutMs === undefined ? DETECTOR_TIMEOUT_MS : detector.timeoutMs
+  if (timeoutMs === null) return work()
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<DiscoveryResult>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn("detector timed out (skipped)", { detector: detector.name, ms: timeoutMs })
+      resolve(EMPTY_RESULT)
+    }, timeoutMs)
+  })
   try {
-    return await Promise.race([work, timeout])
+    return await Promise.race([work(), timeout])
   } finally {
-    clearTimeout(timer)
+    if (timer) clearTimeout(timer)
   }
 }
 

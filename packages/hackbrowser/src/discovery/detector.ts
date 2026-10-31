@@ -48,6 +48,8 @@ export type DetectorKind = "nav" | "spec" | "js-route" | "api-call"
 export interface Detector {
   name: string
   kind: DetectorKind
+  /** Optional wall-clock timeout; null means the detector must finish its full worklist. */
+  timeoutMs?: number | null
   /** Cheap relevance / framework check — detect() is skipped when this is false. */
   applies(ctx: DiscoveryContext): Promise<boolean>
   /** Deterministic extraction. */
