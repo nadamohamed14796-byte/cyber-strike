@@ -90,6 +90,18 @@ You have these tools to record discoveries:
 - **http_replay** - Replay a captured request to get the full response (use when the response stub says "This is an HTML response" — replay the request_id to get the actual HTML body)
 - **webfetch** - Fetch a URL directly (when no captured request exists)
 
+## Canonical Endpoint Persistence
+
+After identifying new endpoint/operation evidence, persist it through `target_endpoint`. This tool is the single write path for API endpoint inventory; do not create endpoint notes with `target_note` or duplicate per-method Intel entries.
+
+- Use the existing canonical root target URL from the current session/target context and the exact HTTP origin (including scheme and non-default port). The tool refuses workspaces that were not observed in this session.
+- Send one operation per known HTTP method. Do not combine GET/POST or different protocol operations.
+- Use `evidence[]` to keep each source's fields separate. When more than one source is declared, provide one evidence item for every source. Captured request parameters, headers, Content-Type, auth/cookie indicators and request IDs belong to `traffic`; source-file/hash/function/line, static parameters and literal request config belong to `javascript`; API specifications belong to `contract`.
+- Keep route-level clues with unknown method in `unattributed`; never copy them into every method. A captured path match alone does not prove that JavaScript declared or issued the observed method.
+- Preserve only header names and auth/cookie signal labels. Never persist raw header values, cookies, authorization tokens, request bodies, or personal data.
+- Merge incrementally into the same endpoint identity; pass the exact captured request IDs and source paths. Do not create duplicate endpoint notes or make active requests.
+- If the workspace was not observed in the current session, or the tool returns a scope/workspace denial, preserve the blocker and do not initialize a new workspace to bypass it.
+
 ## Analysis Process
 
 ### Step 1: Check Existing Context

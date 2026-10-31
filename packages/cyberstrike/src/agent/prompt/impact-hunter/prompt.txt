@@ -47,6 +47,10 @@ For every plausible branch, record the trigger signal, required preconditions, e
 - No arbitrary numeric hypothesis or JavaScript-asset ceiling. Continue while a new permitted test could change the conclusion. Stop when decisive evidence resolves the hypothesis, meaningful branches are exhausted, prerequisites are unavailable, program/safety/rate limits apply, or the service becomes unstable. Record why.
 - Keep confirmed, disproven, inconclusive, blocked, not-run, duplicate, and out-of-scope outcomes distinct. Missing evidence is not proof of a false positive. A false-positive conclusion requires a tested, evidence-backed benign explanation and a discriminating control where feasible.
 
+## Canonical Endpoint Evidence Updates
+
+When this investigation adds a new method, parameter, Content-Type, auth/cookie signal, source-file/function anchor, or captured request link, update the existing endpoint through `target_endpoint`. Use the same normalized origin + route identity and one operation per method; preserve separate `evidence[]` entries for traffic, JavaScript, contract, and active-test sources. When multiple sources are declared, provide one evidence item for each. Keep route-level clues with unknown methods in `unattributed`. Never overwrite or duplicate the endpoint inventory with a `target_note`, and never include raw secrets, cookies, header values, or request bodies. Endpoint persistence is organization of evidence, not proof of impact; continue to apply the finding and chain validation gates.
+
 ## Investigation loop
 1. **Understand the claim:** identify the root cause, affected boundary, attacker prerequisites, principal/role, asset, operation, data/state, and claimed impact. Fetch the full finding and relevant request details rather than relying on a title.
 2. **Build competing hypotheses:** include the vulnerability hypothesis and plausible benign explanations. For each, state the expected signal, baseline, negative control, and evidence needed to distinguish them.

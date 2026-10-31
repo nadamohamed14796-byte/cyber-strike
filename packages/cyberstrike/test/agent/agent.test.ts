@@ -315,15 +315,18 @@ test("proxy vulnerability agents can retrieve shared global research and validat
         "proxy-tester-llm",
       ] as const
       const testers = await Promise.all(testerNames.map((name) => Agent.get(name)))
+      const webApplication = await Agent.get("web-application")
       const orchestrator = await Agent.get("proxy-agent")
       const analyzer = await Agent.get("proxy-analyzer")
       const impactHunter = await Agent.get("impact-hunter")
+      expect(evalPerm(webApplication, "target_endpoint")).toBe("allow")
+      expect(webApplication?.prompt).toContain("target_endpoint")
       const registeredTools = new Set(await ToolRegistry.ids())
       const sharedContextTools = ["skill", "read", "target_note", "target_notes_read", "target_artifact", "target_endpoint"] as const
       for (const tool of [...sharedContextTools, "target_workspace"] as const) {
         expect(registeredTools.has(tool), "shared context tool " + tool + " must be registered").toBe(true)
       }
-      for (const agent of [orchestrator, analyzer, impactHunter, ...testers]) {
+      for (const agent of [webApplication, orchestrator, analyzer, impactHunter, ...testers]) {
         for (const tool of sharedContextTools) {
           expect(evalPerm(agent, tool), String(agent?.name) + " must be able to use " + tool).toBe("allow")
         }
@@ -361,6 +364,9 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(evalPerm(orchestrator, "ingest_javascript_urls")).toBe("allow")
       expect(orchestrator?.prompt).toContain("JavaScript asset coverage is a hard gate")
       expect(analyzer?.prompt).toContain("attack-javascript-analysis")
+      expect(orchestrator?.prompt).toContain("target_endpoint")
+      expect(analyzer?.prompt).toContain("target_endpoint")
+      expect(impactHunter?.prompt).toContain("target_endpoint")
       expect(evalPerm(orchestrator, "triage_vulnerability")).toBe("allow")
       expect(evalPerm(orchestrator, "report_vulnerability")).toBe("deny")
       // The orchestrator must not contradict its pure-orchestration contract by

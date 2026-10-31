@@ -31,6 +31,10 @@ When `hackbrowser` is available and selected, it can navigate the app, fill form
 - `steps` (optional, 1–200): max pages to crawl, defaults to 50
 - `headless` (optional): defaults to true; forced to false when credentials provided
 
+### Canonical API endpoint inventory
+
+Persist discovered or enriched API routes with `target_endpoint`. Keep one endpoint per normalized origin + route template, one operation per HTTP method, and source-specific `evidence[]` entries. Traffic request IDs/parameters/headers/Content-Type belong to traffic evidence; JavaScript file/hash/function/line clues belong to JavaScript evidence. Keep unknown-method clues in `unattributed`. Do not use per-endpoint `target_note` or Intel records as a parallel inventory, and never store raw credentials or request bodies.
+
 ### JavaScript analysis
 
 For full collection and coverage, use the shared `/recon` workflow and the registered `ingest_javascript_urls` tool. Feed the complete discovered/supplied URL inventory to that tool rather than replacing it with hand-written `curl`/grep loops. The tool processes the entire dynamic worklist sequentially in one invocation, checkpoints every few items, and has no fixed URL-count or batch-count cap. If it is interrupted, or its result shows pending/retryable/missing records, immediately call it again with the same canonical `target_url` and `urls: []`. Repeat automatically until the persisted queue is drained or every remaining URL has a precise terminal failure/exclusion. Do not ask the user to say “continue”, do not stop at an arbitrary prefix, and do not call the work complete based on the number downloaded alone.
