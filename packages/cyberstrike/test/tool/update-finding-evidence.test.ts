@@ -30,8 +30,9 @@ async function makeCandidate(sessionID: string, withPoc = false) {
     sessionID,
     data: {
       severity: "medium",
-      title: "Potential reflected HTML injection in search output",
+      title: "[UNCONFIRMED CANDIDATE] Potential reflected HTML injection in search output",
       description: "A submitted marker appears in the HTML response, but safe encoding or browser execution has not yet been resolved.",
+      candidate: "medium",
       endpoint: "GET https://evidence-test.example.test/api/search",
       target_id: workspace.id,
       file: "javascript/assets/search.js",
