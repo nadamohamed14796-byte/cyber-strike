@@ -789,8 +789,10 @@ export interface JavaScriptEndpointCandidate {
   host: string | null
   origin: string | null
   path: string
-  /** Null means static evidence did not establish the HTTP method. */
+  /** Null means no reliable evidence established the HTTP method. */
   method?: string | null
+  /** Where the method itself was established; do not infer JavaScript support from traffic-only methods. */
+  methodEvidenceSources?: Array<"javascript" | "traffic">
   pathParameters?: string[]
   queryParameters?: string[]
   bodyParameters?: string[]
@@ -832,7 +834,7 @@ function normalizedTemplateShape(inputPath: string): string {
 export function mergeStructuredJavaScriptEndpoints(
   staticEndpoints: JavaScriptEndpointCandidate[],
   requests: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[] }>,
-  capturedRequests: Array<{ id: string; method: string }> = [],
+  _capturedRequests: Array<{ id: string; method: string }> = [],
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const routeKeyOf = (origin: string | null, route: string) =>
@@ -840,35 +842,35 @@ export function mergeStructuredJavaScriptEndpoints(
   const normalizeMethod = (method?: string | null) => method?.trim().toUpperCase() || null
   const keyOf = (origin: string | null, route: string, method?: string | null) =>
     routeKeyOf(origin, route) + "\\0method:" + (normalizeMethod(method) ?? "*")
-  const capturedMethodByID = new Map(capturedRequests.map((request) => [request.id, normalizeMethod(request.method)]))
-  const requestVariants = new Map<string, Map<string | null, typeof requests>>()
-  const unique = (values: string[]) => [...new Set(values)]
+  const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
 
-  for (const request of requests) {
-    const url = safeURL(request.urlTemplate)
-    const origin = request.origin ?? url?.origin ?? null
-    const method = normalizeMethod(request.method)
-    const routeKey = routeKeyOf(origin, request.path)
-    let byMethod = requestVariants.get(routeKey)
-    if (!byMethod) {
-      byMethod = new Map()
-      requestVariants.set(routeKey, byMethod)
+  function mergeEndpointEvidence(target: JavaScriptEndpointCandidate, source: JavaScriptEndpointCandidate) {
+    target.sourceFiles = unique([...target.sourceFiles, ...source.sourceFiles])
+    target.pathParameters = unique([...(target.pathParameters ?? []), ...(source.pathParameters ?? [])])
+    target.queryParameters = unique([...(target.queryParameters ?? []), ...(source.queryParameters ?? [])])
+    target.bodyParameters = unique([...(target.bodyParameters ?? []), ...(source.bodyParameters ?? [])])
+    target.headerNames = unique([...(target.headerNames ?? []), ...(source.headerNames ?? [])])
+    target.authSignals = unique([...(target.authSignals ?? []), ...(source.authSignals ?? [])])
+    target.cookieSignals = unique([...(target.cookieSignals ?? []), ...(source.cookieSignals ?? [])])
+    target.observedRequestIDs = unique([...target.observedRequestIDs, ...source.observedRequestIDs])
+    target.methodEvidenceSources = unique([
+      ...(target.methodEvidenceSources ?? []),
+      ...(source.methodEvidenceSources ?? []),
+    ]) as Array<"javascript" | "traffic">
+    if (target.observedRequestIDs.length) {
+      target.observedInTraffic = true
+      target.confidence = "observed"
     }
-    const items = byMethod.get(method) ?? []
-    items.push(request)
-    byMethod.set(method, items)
   }
 
-  function mergeStaticEndpoint(source: JavaScriptEndpointCandidate, method: string | null) {
+  function mergeStaticEndpoint(source: JavaScriptEndpointCandidate) {
+    const method = normalizeMethod(source.method)
     const key = keyOf(source.origin, source.path, method)
     let endpoint = byKey.get(key)
-    const sourceObservedIDs = method && capturedRequests.length
-      ? source.observedRequestIDs.filter((id) => capturedMethodByID.get(id) === method)
-      : source.observedRequestIDs
     if (!endpoint) {
       endpoint = {
         ...source,
-        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        id: "endpoint-operation:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
         method,
         sourceFiles: [],
         observedRequestIDs: [],
@@ -878,42 +880,19 @@ export function mergeStructuredJavaScriptEndpoints(
         headerNames: [],
         authSignals: [],
         cookieSignals: [],
+        methodEvidenceSources: [],
         observedInTraffic: false,
         confidence: "candidate",
       }
       byKey.set(key, endpoint)
     }
-    endpoint.sourceFiles = unique([...endpoint.sourceFiles, ...source.sourceFiles])
-    endpoint.pathParameters = unique([...(endpoint.pathParameters ?? []), ...(source.pathParameters ?? [])])
-    endpoint.queryParameters = unique([...(endpoint.queryParameters ?? []), ...(source.queryParameters ?? [])])
-    endpoint.bodyParameters = unique([...(endpoint.bodyParameters ?? []), ...(source.bodyParameters ?? [])])
-    endpoint.headerNames = unique([...(endpoint.headerNames ?? []), ...(source.headerNames ?? [])])
-    endpoint.authSignals = unique([...(endpoint.authSignals ?? []), ...(source.authSignals ?? [])])
-    endpoint.cookieSignals = unique([...(endpoint.cookieSignals ?? []), ...(source.cookieSignals ?? [])])
-    endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...sourceObservedIDs])
-    if (endpoint.observedRequestIDs.length) {
-      endpoint.observedInTraffic = true
-      endpoint.confidence = "observed"
-    }
+    mergeEndpointEvidence(endpoint, source)
   }
 
-  // A generic route literal may correspond to more than one HTTP method. Once the
-  // source reveals those methods, materialize one stable endpoint per method rather
-  // than mixing GET/POST evidence and parameter sets into a single route record.
-  for (const source of staticEndpoints) {
-    const routeKey = routeKeyOf(source.origin, source.path)
-    const variants = requestVariants.get(routeKey)
-    if (normalizeMethod(source.method)) {
-      mergeStaticEndpoint(source, normalizeMethod(source.method))
-      continue
-    }
-    const methods = variants ? [...variants.keys()] : []
-    if (methods.some((method) => method !== null)) {
-      for (const method of methods) mergeStaticEndpoint(source, method)
-    } else {
-      mergeStaticEndpoint(source, null)
-    }
-  }
+  // Keep method-unknown route clues as endpoint-level evidence. Never copy their
+  // parameters, headers, or auth hints into every known method merely because the
+  // paths match; that would incorrectly turn a route clue into an operation contract.
+  for (const source of staticEndpoints) mergeStaticEndpoint(source)
 
   for (const request of requests) {
     const url = safeURL(request.urlTemplate)
@@ -921,43 +900,33 @@ export function mergeStructuredJavaScriptEndpoints(
     const host = url?.host ?? request.host ?? null
     const method = normalizeMethod(request.method)
     const key = keyOf(origin, request.path, method)
-    let endpoint = byKey.get(key)
-    if (!endpoint) {
-      endpoint = {
-        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
-        literal: request.urlTemplate,
-        host,
-        origin,
-        path: request.path,
-        method,
-        sourceFiles: [],
-        observedRequestIDs: [],
-        pathParameters: [],
-        queryParameters: [],
-        bodyParameters: [],
-        headerNames: [],
-        authSignals: [],
-        cookieSignals: [],
-        observedInTraffic: false,
-        confidence: "candidate",
-      }
-      byKey.set(key, endpoint)
+    const requestEvidence: JavaScriptEndpointCandidate = {
+      id: "endpoint-operation:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+      literal: request.urlTemplate,
+      host,
+      origin,
+      path: request.path,
+      method,
+      methodEvidenceSources: method ? ["javascript"] : [],
+      sourceFiles: [request.sourceFile],
+      observedRequestIDs: [...request.observedRequestIDs],
+      pathParameters: [...request.pathParameters],
+      queryParameters: [...request.queryParameters],
+      bodyParameters: [...request.bodyParameters],
+      headerNames: [...request.headerNames],
+      authSignals: [...request.authSignals],
+      cookieSignals: [...request.cookieSignals],
+      observedInTraffic: request.observedRequestIDs.length > 0,
+      confidence: request.observedRequestIDs.length > 0 ? "observed" : "candidate",
     }
-    if (!endpoint.sourceFiles.includes(request.sourceFile)) endpoint.sourceFiles.push(request.sourceFile)
-    endpoint.pathParameters = unique([...(endpoint.pathParameters ?? []), ...request.pathParameters])
-    endpoint.queryParameters = unique([...(endpoint.queryParameters ?? []), ...request.queryParameters])
-    endpoint.bodyParameters = unique([...(endpoint.bodyParameters ?? []), ...request.bodyParameters])
-    endpoint.headerNames = unique([...(endpoint.headerNames ?? []), ...request.headerNames])
-    endpoint.authSignals = unique([...(endpoint.authSignals ?? []), ...request.authSignals])
-    endpoint.cookieSignals = unique([...(endpoint.cookieSignals ?? []), ...request.cookieSignals])
-    endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...request.observedRequestIDs])
-    if (endpoint.observedRequestIDs.length) {
-      endpoint.observedInTraffic = true
-      endpoint.confidence = "observed"
-    }
+    const existing = byKey.get(key)
+    if (existing) mergeEndpointEvidence(existing, requestEvidence)
+    else byKey.set(key, requestEvidence)
   }
+
   return [...byKey.values()]
 }
+
 
 export function correlateStaticJavaScriptEndpoints(
   sourceFiles: JavaScriptSourceFile[],
@@ -983,9 +952,9 @@ export function correlateStaticJavaScriptEndpoints(
       // Relative routes are not bound to the JavaScript bundle's host: browsers
       // resolve them against the document/API base. Use captured matching traffic to
       // discover the actual origin(s); if none are observed, leave origin unknown.
-      const variants = new Map<string, { origin: string | null; host: string | null; matching: typeof matchingRequests }>()
+      const origins = new Map<string, { origin: string | null; host: string | null; matching: typeof matchingRequests }>()
       if (explicitOrigin && endpointURL) {
-        variants.set(explicitOrigin, {
+        origins.set(explicitOrigin, {
           origin: explicitOrigin,
           host: endpointURL.host.toLowerCase(),
           matching: matchingRequests.filter((item) => item.url.origin.toLowerCase() === explicitOrigin),
@@ -993,44 +962,65 @@ export function correlateStaticJavaScriptEndpoints(
       } else if (matchingRequests.length) {
         for (const item of matchingRequests) {
           const origin = item.url.origin.toLowerCase()
-          const existing = variants.get(origin)
+          const existing = origins.get(origin)
           if (existing) existing.matching.push(item)
-          else variants.set(origin, { origin, host: item.url.host.toLowerCase(), matching: [item] })
+          else origins.set(origin, { origin, host: item.url.host.toLowerCase(), matching: [item] })
         }
       } else {
-        variants.set("*", { origin: null, host: null, matching: [] })
+        origins.set("*", { origin: null, host: null, matching: [] })
       }
 
-      for (const variant of variants.values()) {
-        const key = (variant.origin ?? "*") + "\0" + normalizedTemplateShape(endpointPath)
-        let candidate = candidates.get(key)
-        if (!candidate) {
-          candidate = {
-            id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
-            literal,
-            host: variant.host,
-            origin: variant.origin,
-            path: endpointPath,
-            sourceFiles: [],
-            observedRequestIDs: [],
-            observedInTraffic: false,
-            confidence: "candidate",
-          }
-          candidates.set(key, candidate)
-        }
-        if (!candidate.sourceFiles.includes(file.relativePath)) candidate.sourceFiles.push(file.relativePath)
+      for (const variant of origins.values()) {
+        // A path match proves traffic was observed at the route, not that this JS
+        // asset declared or issued the observed method. Preserve each captured method
+        // as its own traffic-sourced operation, including methods absent from JS.
+        const byMethod = new Map<string, typeof variant.matching>()
         for (const item of variant.matching) {
-          if (!candidate.observedRequestIDs.includes(item.request.id)) candidate.observedRequestIDs.push(item.request.id)
+          const method = item.request.method.trim().toUpperCase()
+          if (!method) continue
+          const group = byMethod.get(method) ?? []
+          group.push(item)
+          byMethod.set(method, group)
         }
-        if (candidate.observedRequestIDs.length) {
-          candidate.observedInTraffic = true
-          candidate.confidence = "observed"
+        const methodVariants: Array<{ method: string | null; matching: typeof variant.matching }> =
+          byMethod.size
+            ? [...byMethod.entries()].map(([method, matching]) => ({ method, matching }))
+            : [{ method: null, matching: [] }]
+
+        for (const methodVariant of methodVariants) {
+          const method = methodVariant.method
+          const key = (variant.origin ?? "*") + "\0" + normalizedTemplateShape(endpointPath) + "\0" + (method ?? "UNKNOWN")
+          let candidate = candidates.get(key)
+          if (!candidate) {
+            candidate = {
+              id: "endpoint-operation:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+              literal,
+              host: variant.host,
+              origin: variant.origin,
+              path: endpointPath,
+              ...(method ? { method, methodEvidenceSources: ["traffic" as const] } : {}),
+              sourceFiles: [],
+              observedRequestIDs: [],
+              observedInTraffic: false,
+              confidence: "candidate",
+            }
+            candidates.set(key, candidate)
+          }
+          if (!candidate.sourceFiles.includes(file.relativePath)) candidate.sourceFiles.push(file.relativePath)
+          for (const item of methodVariant.matching) {
+            if (!candidate.observedRequestIDs.includes(item.request.id)) candidate.observedRequestIDs.push(item.request.id)
+          }
+          if (candidate.observedRequestIDs.length) {
+            candidate.observedInTraffic = true
+            candidate.confidence = "observed"
+          }
         }
       }
     }
   }
   return [...candidates.values()]
 }
+
 
 export interface JavaScriptInventoryIssue {
   relativePath: string
@@ -1279,9 +1269,6 @@ export function mergeCanonicalJavaScriptEndpoints(
   }>,
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
-  const capturedMethodByID = new Map(
-    graphs.flatMap((graph) => graph.requests).map((request) => [request.id, request.method.trim().toUpperCase()] as const),
-  )
   const routeKey = (endpoint: JavaScriptEndpointCandidate) =>
     normalizeEndpointOrigin(endpoint.origin) + "\0" + normalizedTemplateShape(endpoint.path)
   const keyOf = (endpoint: JavaScriptEndpointCandidate) =>
@@ -1294,7 +1281,7 @@ export function mergeCanonicalJavaScriptEndpoints(
     if (!existing) {
       byKey.set(key, {
         ...endpoint,
-        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        id: "endpoint-operation:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
         sourceFiles: uniqueStrings(endpoint.sourceFiles ?? []),
         observedRequestIDs: uniqueStrings(endpoint.observedRequestIDs ?? []),
         pathParameters: uniqueStrings(endpoint.pathParameters ?? []),
@@ -1303,6 +1290,7 @@ export function mergeCanonicalJavaScriptEndpoints(
         headerNames: uniqueStrings(endpoint.headerNames ?? []),
         authSignals: uniqueStrings(endpoint.authSignals ?? []),
         cookieSignals: uniqueStrings(endpoint.cookieSignals ?? []),
+        methodEvidenceSources: uniqueStrings(endpoint.methodEvidenceSources ?? []) as Array<"javascript" | "traffic">,
       })
       continue
     }
@@ -1314,53 +1302,187 @@ export function mergeCanonicalJavaScriptEndpoints(
     existing.headerNames = uniqueStrings([...(existing.headerNames ?? []), ...(endpoint.headerNames ?? [])])
     existing.authSignals = uniqueStrings([...(existing.authSignals ?? []), ...(endpoint.authSignals ?? [])])
     existing.cookieSignals = uniqueStrings([...(existing.cookieSignals ?? []), ...(endpoint.cookieSignals ?? [])])
+    existing.methodEvidenceSources = uniqueStrings([
+      ...(existing.methodEvidenceSources ?? []),
+      ...(endpoint.methodEvidenceSources ?? []),
+    ]) as Array<"javascript" | "traffic">
     existing.observedInTraffic ||= endpoint.observedInTraffic
     if (existing.observedInTraffic) existing.confidence = "observed"
   }
 
-  // When later evidence establishes methods for a previously generic route,
-  // merge its parameter/source observations into those method-specific rows and
-  // remove the redundant UNKNOWN row for that same origin/path.
-  const rows = [...byKey.values()]
-  const byRoute = new Map<string, JavaScriptEndpointCandidate[]>()
-  for (const endpoint of rows) {
-    const route = routeKey(endpoint)
-    const siblings = byRoute.get(route) ?? []
-    siblings.push(endpoint)
-    byRoute.set(route, siblings)
+  return [...byKey.values()].sort((a, b) =>
+    normalizeEndpointOrigin(a.origin).localeCompare(normalizeEndpointOrigin(b.origin)) ||
+    normalizedTemplateShape(a.path).localeCompare(normalizedTemplateShape(b.path)) ||
+    (a.method ?? "UNKNOWN").localeCompare(b.method ?? "UNKNOWN"),
+  )
+}
+
+export interface CanonicalJavaScriptEndpointRecord {
+  id: string
+  literal: string
+  host: string | null
+  origin: string | null
+  path: string
+  sourceFiles: string[]
+  operations: JavaScriptEndpointCandidate[]
+  unattributed: {
+    sourceFiles: string[]
+    pathParameters: string[]
+    queryParameters: string[]
+    bodyParameters: string[]
+    headerNames: string[]
+    authSignals: string[]
+    cookieSignals: string[]
+    observedRequestIDs: string[]
   }
-  const removed = new Set<string>()
-  for (const siblings of byRoute.values()) {
-    const known = siblings.filter((endpoint) => Boolean(endpoint.method?.trim()))
-    const generic = siblings.filter((endpoint) => !endpoint.method?.trim())
-    if (!known.length || !generic.length) continue
-    for (const fallback of generic) {
-      for (const endpoint of known) {
-        endpoint.sourceFiles = uniqueStrings([...endpoint.sourceFiles, ...fallback.sourceFiles])
-        const matchingRequestIDs = fallback.observedRequestIDs.filter(
-          (requestID) => capturedMethodByID.get(requestID) === endpoint.method?.trim().toUpperCase(),
-        )
-        endpoint.observedRequestIDs = uniqueStrings([...endpoint.observedRequestIDs, ...matchingRequestIDs])
-        endpoint.pathParameters = uniqueStrings([...(endpoint.pathParameters ?? []), ...(fallback.pathParameters ?? [])])
-        endpoint.queryParameters = uniqueStrings([...(endpoint.queryParameters ?? []), ...(fallback.queryParameters ?? [])])
-        endpoint.bodyParameters = uniqueStrings([...(endpoint.bodyParameters ?? []), ...(fallback.bodyParameters ?? [])])
-        endpoint.headerNames = uniqueStrings([...(endpoint.headerNames ?? []), ...(fallback.headerNames ?? [])])
-        endpoint.authSignals = uniqueStrings([...(endpoint.authSignals ?? []), ...(fallback.authSignals ?? [])])
-        endpoint.cookieSignals = uniqueStrings([...(endpoint.cookieSignals ?? []), ...(fallback.cookieSignals ?? [])])
-        if (matchingRequestIDs.length) endpoint.observedInTraffic = true
-        if (endpoint.observedInTraffic) endpoint.confidence = "observed"
+}
+
+/**
+ * Group method-specific operations beneath one endpoint identity (origin + route
+ * template). Unknown-method clues stay endpoint-level; captured methods absent
+ * from JavaScript become traffic-only operations and are never relabeled as JS.
+ */
+export function groupCanonicalJavaScriptEndpoints(
+  graphs: Array<{
+    endpointCandidates: JavaScriptEndpointCandidate[]
+    requests: Array<{ id: string; method: string }>
+  }>,
+): CanonicalJavaScriptEndpointRecord[] {
+  const operations = mergeCanonicalJavaScriptEndpoints(graphs)
+  const capturedMethodByID = new Map(
+    graphs.flatMap((graph) => graph.requests).map((request) => [request.id, request.method.trim().toUpperCase()] as const),
+  )
+  const records = new Map<string, CanonicalJavaScriptEndpointRecord>()
+  const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
+  const routeIdentity = (endpoint: Pick<JavaScriptEndpointCandidate, "origin" | "path">) =>
+    normalizeEndpointOrigin(endpoint.origin) + "\0" + normalizedTemplateShape(endpoint.path)
+
+  function getRecord(endpoint: JavaScriptEndpointCandidate): CanonicalJavaScriptEndpointRecord {
+    const key = routeIdentity(endpoint)
+    let record = records.get(key)
+    if (!record) {
+      const origin = endpoint.origin
+      const pathValue = endpoint.path.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
+      record = {
+        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        literal: endpoint.literal,
+        host: endpoint.host,
+        origin,
+        path: pathValue,
+        sourceFiles: [],
+        operations: [],
+        unattributed: {
+          sourceFiles: [],
+          pathParameters: [],
+          queryParameters: [],
+          bodyParameters: [],
+          headerNames: [],
+          authSignals: [],
+          cookieSignals: [],
+          observedRequestIDs: [],
+        },
       }
-      removed.add(keyOf(fallback))
+      records.set(key, record)
+    }
+    return record
+  }
+
+  function mergeOperation(record: CanonicalJavaScriptEndpointRecord, incoming: JavaScriptEndpointCandidate) {
+    const method = incoming.method?.trim().toUpperCase()
+    if (!method) return
+    let operation = record.operations.find((item) => item.method?.trim().toUpperCase() === method)
+    if (!operation) {
+      operation = {
+        ...incoming,
+        method,
+        sourceFiles: [],
+        observedRequestIDs: [],
+        pathParameters: [],
+        queryParameters: [],
+        bodyParameters: [],
+        headerNames: [],
+        authSignals: [],
+        cookieSignals: [],
+        methodEvidenceSources: [],
+      }
+      record.operations.push(operation)
+    }
+    operation.sourceFiles = unique([...operation.sourceFiles, ...incoming.sourceFiles])
+    operation.observedRequestIDs = unique([...operation.observedRequestIDs, ...incoming.observedRequestIDs])
+    operation.pathParameters = unique([...(operation.pathParameters ?? []), ...(incoming.pathParameters ?? [])])
+    operation.queryParameters = unique([...(operation.queryParameters ?? []), ...(incoming.queryParameters ?? [])])
+    operation.bodyParameters = unique([...(operation.bodyParameters ?? []), ...(incoming.bodyParameters ?? [])])
+    operation.headerNames = unique([...(operation.headerNames ?? []), ...(incoming.headerNames ?? [])])
+    operation.authSignals = unique([...(operation.authSignals ?? []), ...(incoming.authSignals ?? [])])
+    operation.cookieSignals = unique([...(operation.cookieSignals ?? []), ...(incoming.cookieSignals ?? [])])
+    operation.methodEvidenceSources = unique([
+      ...(operation.methodEvidenceSources ?? []),
+      ...(incoming.methodEvidenceSources ?? []),
+    ]) as Array<"javascript" | "traffic">
+    if (operation.observedRequestIDs.length) {
+      operation.observedInTraffic = true
+      operation.confidence = "observed"
     }
   }
-  return rows
-    .filter((endpoint) => !removed.has(keyOf(endpoint)))
+
+  for (const item of operations) {
+    const record = getRecord(item)
+    record.sourceFiles = unique([...record.sourceFiles, ...item.sourceFiles])
+    if (item.method?.trim()) {
+      mergeOperation(record, item)
+      continue
+    }
+
+    const unassigned = record.unattributed
+    unassigned.sourceFiles = unique([...unassigned.sourceFiles, ...item.sourceFiles])
+    unassigned.pathParameters = unique([...unassigned.pathParameters, ...(item.pathParameters ?? [])])
+    unassigned.queryParameters = unique([...unassigned.queryParameters, ...(item.queryParameters ?? [])])
+    unassigned.bodyParameters = unique([...unassigned.bodyParameters, ...(item.bodyParameters ?? [])])
+    unassigned.headerNames = unique([...unassigned.headerNames, ...(item.headerNames ?? [])])
+    unassigned.authSignals = unique([...unassigned.authSignals, ...(item.authSignals ?? [])])
+    unassigned.cookieSignals = unique([...unassigned.cookieSignals, ...(item.cookieSignals ?? [])])
+
+    for (const requestID of item.observedRequestIDs) {
+      const method = capturedMethodByID.get(requestID)
+      if (method) {
+        const trafficOperation: JavaScriptEndpointCandidate = {
+          id: "endpoint-operation:" + createHash("sha256").update(routeIdentity(item) + "\0" + method).digest("hex").slice(0, 16),
+          literal: item.literal,
+          host: item.host,
+          origin: item.origin,
+          path: item.path,
+          method,
+          methodEvidenceSources: ["traffic"],
+          sourceFiles: [],
+          observedRequestIDs: [requestID],
+          pathParameters: [],
+          queryParameters: [],
+          bodyParameters: [],
+          headerNames: [],
+          authSignals: [],
+          cookieSignals: [],
+          observedInTraffic: true,
+          confidence: "observed",
+        }
+        mergeOperation(record, trafficOperation)
+      } else {
+        unassigned.observedRequestIDs = unique([...unassigned.observedRequestIDs, requestID])
+      }
+    }
+  }
+
+  return [...records.values()]
+    .map((record) => {
+      record.operations.sort((a, b) => (a.method ?? "").localeCompare(b.method ?? ""))
+      record.sourceFiles = unique(record.sourceFiles)
+      return record
+    })
     .sort((a, b) =>
       normalizeEndpointOrigin(a.origin).localeCompare(normalizeEndpointOrigin(b.origin)) ||
-      (a.method ?? "UNKNOWN").localeCompare(b.method ?? "UNKNOWN") ||
       normalizedTemplateShape(a.path).localeCompare(normalizedTemplateShape(b.path)),
     )
 }
+
 
 function safeSummaryURL(input: string): string {
   try {
@@ -1875,32 +1997,56 @@ function renderCanonicalJavaScriptAnalysis(
 }
 
 function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelationGraph): string {
-  const endpoints = mergeCanonicalJavaScriptEndpoints([graph])
+  const endpoints = groupCanonicalJavaScriptEndpoints([graph])
   const lines = [
     JAVASCRIPT_ENDPOINTS_BEGIN,
-    "# JavaScript-derived endpoints; identity is normalized origin + method + path template.",
-    "# Parameter/source/auth observations are merged per endpoint. Traffic overlap is not proof that the script issued a request.",
-    ...endpoints.map((endpoint) => {
+    "# Canonical identity: normalized origin + path template. Each HTTP method is a separate operation nested under its endpoint.",
+    "# Operation parameters, headers, auth/cookie clues, and captured request IDs remain method-specific. Traffic-only methods are not attributed to JavaScript.",
+    ...endpoints.flatMap((endpoint) => {
       const inline = (value: string) => safeSummaryText(value).replace(/[|]/g, "/")
       const origin = normalizeEndpointOrigin(endpoint.origin)
-      const method = endpoint.method?.trim().toUpperCase() || "UNKNOWN"
-      const displayPath = endpoint.path.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
-      return method + " " + origin + displayPath +
-        " — path_params=[" + (endpoint.pathParameters ?? []).map(inline).join(", ") + "]" +
-        " — query_params=[" + (endpoint.queryParameters ?? []).map(inline).join(", ") + "]" +
-        " — body_params=[" + (endpoint.bodyParameters ?? []).map(inline).join(", ") + "]" +
-        " — headers=[" + (endpoint.headerNames ?? []).map(inline).join(", ") + "]" +
-        " — auth=[" + (endpoint.authSignals ?? []).map(inline).join(", ") + "]" +
-        " — cookies=[" + (endpoint.cookieSignals ?? []).map(inline).join(", ") + "]" +
-        " — sources=[" + endpoint.sourceFiles.map(inline).join(", ") + "]" +
-        " — request_ids=[" + endpoint.observedRequestIDs.join(", ") + "]" +
-        " — traffic=" + (endpoint.observedInTraffic ? "observed" : "not-yet-observed") +
-        " — confidence=" + endpoint.confidence
+      const endpointLine = "Endpoint: " + origin + endpoint.path + " — id=" + endpoint.id
+      const sourceLine = "  endpoint_sources=[" + endpoint.sourceFiles.map(inline).join(", ") + "]"
+      const operationLines = endpoint.operations.flatMap((operation) => {
+        const method = operation.method?.trim().toUpperCase() || "UNKNOWN"
+        const methodSources = (operation.methodEvidenceSources ?? []).join("+") || "unspecified"
+        return [
+          "  Operation: " + method + " — method_source=" + methodSources +
+            " — traffic=" + (operation.observedInTraffic ? "observed" : "not-yet-observed") +
+            " — confidence=" + operation.confidence,
+          "    path_params=[" + (operation.pathParameters ?? []).map(inline).join(", ") + "]" +
+            " — query_params=[" + (operation.queryParameters ?? []).map(inline).join(", ") + "]" +
+            " — body_params=[" + (operation.bodyParameters ?? []).map(inline).join(", ") + "]",
+          "    headers=[" + (operation.headerNames ?? []).map(inline).join(", ") + "]" +
+            " — auth=[" + (operation.authSignals ?? []).map(inline).join(", ") + "]" +
+            " — cookies=[" + (operation.cookieSignals ?? []).map(inline).join(", ") + "]",
+          "    sources=[" + operation.sourceFiles.map(inline).join(", ") + "]" +
+            " — request_ids=[" + operation.observedRequestIDs.join(", ") + "]",
+        ]
+      })
+      const unassigned = endpoint.unattributed
+      const hasUnassigned = unassigned.sourceFiles.length || unassigned.pathParameters.length ||
+        unassigned.queryParameters.length || unassigned.bodyParameters.length ||
+        unassigned.headerNames.length || unassigned.authSignals.length ||
+        unassigned.cookieSignals.length || unassigned.observedRequestIDs.length
+      const unassignedLines = hasUnassigned ? [
+        "  Method-unattributed endpoint evidence (not copied into any operation):",
+        "    path_params=[" + unassigned.pathParameters.map(inline).join(", ") + "]" +
+          " — query_params=[" + unassigned.queryParameters.map(inline).join(", ") + "]" +
+          " — body_params=[" + unassigned.bodyParameters.map(inline).join(", ") + "]",
+        "    headers=[" + unassigned.headerNames.map(inline).join(", ") + "]" +
+          " — auth=[" + unassigned.authSignals.map(inline).join(", ") + "]" +
+          " — cookies=[" + unassigned.cookieSignals.map(inline).join(", ") + "]",
+        "    sources=[" + unassigned.sourceFiles.map(inline).join(", ") + "]" +
+          " — request_ids_without_method=[" + unassigned.observedRequestIDs.join(", ") + "]",
+      ] : []
+      return [endpointLine, sourceLine, ...operationLines, ...unassignedLines, ""]
     }),
     JAVASCRIPT_ENDPOINTS_END,
   ]
   return lines.join("\n") + "\n"
 }
+
 
 async function persistCanonicalJavaScriptArtifacts(
   workspace: Parameters<typeof TargetMemory.writeWorkspaceFile>[0],
