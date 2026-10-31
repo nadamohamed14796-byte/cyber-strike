@@ -181,3 +181,36 @@ test("proof-gap gate rejects PoC-bearing or non-NEW records", async () => {
     },
   })
 })
+
+
+test("execution-unconfirmed candidates can enter proof-gap mode even when poc contains only baseline or encoded-reflection notes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const session = await Session.create({})
+      try {
+        const { finding, request } = await makeScopedCandidate(session.id)
+        const baselineNotes = "Captured HTML response contains the marker but encodes it as text; no executable payload or browser trigger has been demonstrated."
+        expect(Vulnerability.update({
+          sessionID: session.id,
+          id: finding.id,
+          poc: baselineNotes,
+          candidate: "high",
+          expectedStatus: "new",
+        })).toBe(true)
+        const saved = Vulnerability.get(session.id).find((row) => row.id === finding.id)!
+        const result = evaluateImpactHunterGate({
+          finding: saved,
+          sessionID: session.id,
+          mode: "proof_gap",
+          preferredRequestIDs: request?.id ? [request.id] : [],
+        })
+        expect(result.allowed).toBe(true)
+        expect(result.requestIDs).toContain(request?.id)
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
