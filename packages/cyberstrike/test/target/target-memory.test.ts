@@ -1006,7 +1006,7 @@ test("merges JavaScript and captured methods into one canonical endpoint note wi
       expect(endpointNotes).toHaveLength(1)
       const note = endpointNotes[0]!
       const structured = note.content.match(
-        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\\n([\\s\\S]*?)\\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
+        /<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_BEGIN -->\n([\s\S]*?)\n<!-- CYBERSTRIKE_CANONICAL_ENDPOINT_V1_END -->/,
       )
       expect(structured).not.toBeNull()
       const record = JSON.parse(structured![1]!)
