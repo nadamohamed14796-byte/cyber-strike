@@ -65,7 +65,7 @@ export const UpdateFindingImpactTool = Tool.define("update_finding_impact", {
     }
     const severityChanged = params.severity !== finding.severity
 
-    const validationHistory = FindingValidation.history({ sessionID, vulnerabilityID: finding.id, limit: 100 })
+    const validationHistory = FindingValidation.history({ sessionID, vulnerabilityID: params.id, limit: 100 })
     const baselineValidation = validationHistory.find((item) => item.id === params.baseline_validation_id)
     const latest = validationHistory[0]
     if (!baselineValidation || !hasCompleteConfirmedValidation(baselineValidation)) {
