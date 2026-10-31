@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assessFindingChecks, FINDING_VALIDATION_CHECKS, recommendValidationStrategies, type FindingValidationInputCheck } from "../../src/methodology/finding-validation"
+import { assessFindingChecks, FINDING_VALIDATION_CHECKS, hasCompleteConfirmedValidation, recommendValidationStrategies, type FindingValidationInputCheck } from "../../src/methodology/finding-validation"
 import { FindingValidation } from "../../src/methodology/finding-validation"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
@@ -85,6 +85,30 @@ test("requires all ten unique checks", () => {
   const checks = checklist()
   expect(() => assessFindingChecks(checks.slice(0, 9))).toThrow("Exactly 10")
   expect(() => assessFindingChecks([...checks.slice(0, 9), checks[0]])).toThrow("Duplicate")
+})
+
+test("shared confirmation gate requires exactly ten evidence-backed checks", () => {
+  const assessment = assessFindingChecks(checklist({
+    identity_context: { status: "not_applicable", reason: "No identity boundary is part of this claim", evidence: "" },
+  }))
+  expect(assessment.verdict).toBe("confirmed")
+  expect(hasCompleteConfirmedValidation({ verdict: assessment.verdict, checks: assessment.checks })).toBe(true)
+  expect(hasCompleteConfirmedValidation({
+    verdict: "confirmed",
+    checks: assessment.checks.slice(0, 9),
+  })).toBe(false)
+  expect(hasCompleteConfirmedValidation({
+    verdict: "confirmed",
+    checks: assessment.checks.map((check) =>
+      check.id === "identity_context" ? { ...check, reason: null } : check,
+    ),
+  })).toBe(false)
+  expect(hasCompleteConfirmedValidation({
+    verdict: "confirmed",
+    checks: assessment.checks.map((check) =>
+      check.id === "security_impact" ? { ...check, evidence: null } : check,
+    ),
+  })).toBe(false)
 })
 
 test("classifies as confirmed only when all required checks pass", () => {
