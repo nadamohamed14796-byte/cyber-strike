@@ -18,7 +18,7 @@ export interface ImpactHunterHandoffResult {
 /**
  * Dispatch one finding-specific Impact Hunter task.
  *
- * proof_gap is only for an actionable NEW candidate that lacks a PoC but has
+ * proof_gap is only for an actionable NEW candidate that lacks a reproducible PoC (or has only baseline/reflection notes with an execution-unconfirmed marker) and has
  * an exact scoped endpoint and captured-request or source-location evidence.
  * approved_impact is only for a finding that passed ten-check validation,
  * has a durable CONFIRMED ledger result, and was explicitly triaged approved.
