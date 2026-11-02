@@ -430,6 +430,12 @@ export namespace SessionPrompt {
       // pending subtask
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
+        // Normalize both new stable-ID tasks and legacy unique display-name tasks
+        // before persisting or executing the delegated child.
+        const taskAgent = await Agent.get(task.agent)
+        if (!taskAgent) throw new Error(`Task agent "${task.agent}" is not registered.`)
+        const taskAgentID = await Agent.resolveID(taskAgent)
+        if (!taskAgentID) throw new Error(`Unable to resolve stable agent ID for task agent "${task.agent}".`)
         const taskTool = await TaskTool.init()
         const taskModel = task.model ? await Provider.getModel(task.model.providerID, task.model.modelID) : model
         const assistantMessage = (await Session.updateMessage({
@@ -437,8 +443,8 @@ export namespace SessionPrompt {
           role: "assistant",
           parentID: lastUser.id,
           sessionID,
-          mode: task.agent,
-          agent: task.agent,
+          mode: taskAgent.name,
+          agent: taskAgentID,
           variant: lastUser.variant,
           path: {
             cwd: Instance.directory,
@@ -469,7 +475,7 @@ export namespace SessionPrompt {
             input: {
               prompt: task.prompt,
               description: task.description,
-              subagent_type: task.agent,
+              subagent_type: taskAgentID,
               command: task.command,
             },
             time: {
@@ -480,7 +486,7 @@ export namespace SessionPrompt {
         const taskArgs = {
           prompt: task.prompt,
           description: task.description,
-          subagent_type: task.agent,
+          subagent_type: taskAgentID,
           command: task.command,
         }
         await Plugin.trigger(
@@ -493,10 +499,8 @@ export namespace SessionPrompt {
           { args: taskArgs },
         )
         let executionError: Error | undefined
-        const taskAgent = await Agent.get(task.agent)
-        if (!taskAgent) throw new Error(`Task agent "${task.agent}" is not registered.`)
         const taskCtx: Tool.Context = {
-          agent: task.agent,
+          agent: taskAgentID,
           messageID: assistantMessage.id,
           sessionID: sessionID,
           abort,
@@ -523,7 +527,7 @@ export namespace SessionPrompt {
         }
         const result = await taskTool.execute(taskArgs, taskCtx).catch((error) => {
           executionError = error
-          log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
+          log.error("subtask execution failed", { error, agent: taskAgentID, description: task.description })
           return undefined
         })
         await Plugin.trigger(

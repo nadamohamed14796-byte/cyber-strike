@@ -140,3 +140,20 @@ test("command-created subtasks persist stable agent registry IDs, not display la
   expect(subtaskBuilder).toContain("agent: agentID")
   expect(subtaskBuilder).not.toContain("agent: agent.name")
 })
+
+
+test("pending command subtasks normalize legacy labels before execution and keep display names separate", async () => {
+  const source = await Bun.file(path.resolve(import.meta.dir, "../../src/session/prompt.ts")).text()
+  const start = source.indexOf("// pending subtask")
+  const end = source.indexOf("// normal processing", start)
+  expect(start).toBeGreaterThanOrEqual(0)
+  expect(end).toBeGreaterThan(start)
+  const runner = source.slice(start, end)
+
+  expect(runner).toContain("const taskAgent = await Agent.get(task.agent)")
+  expect(runner).toContain("const taskAgentID = await Agent.resolveID(taskAgent)")
+  expect(runner).toContain("mode: taskAgent.name")
+  expect(runner).toContain("agent: taskAgentID")
+  expect(runner).toContain("subagent_type: taskAgentID")
+  expect(runner).not.toContain("subagent_type: task.agent")
+})
