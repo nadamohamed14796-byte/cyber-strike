@@ -220,6 +220,30 @@ describe("AgentPerformance — Agent Selection", () => {
     })
   })
 
+  test("does not dispatch target reconnaissance to the codebase-only explore agent", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        const selection = AgentPerformance.selectAgentForMission(session.id, "target reconnaissance and asset discovery")
+        expect(selection.agent).not.toBe("explore")
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("selects explore for explicit repository and source-code analysis missions", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        const selection = AgentPerformance.selectAgentForMission(session.id, "repository exploration and codebase analysis")
+        expect(selection.agent).toBe("explore")
+        await Session.remove(session.id)
+      },
+    })
+  })
+
   test("selects cloud-security for cloud-related missions", async () => {
     await Instance.provide({
       directory: projectRoot,
@@ -272,6 +296,20 @@ describe("AgentPerformance — selectAgentsForPhase", () => {
         expect(agents[0].role).toBe("primary")
         expect(agents[0].codename).toBe("STRIKER")
 
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("retains cyberstrike as the reporting-phase primary", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        const agents = AgentPerformance.selectAgentsForPhase(session.id, "reporting")
+        expect(agents.map((agent) => agent.name)).toEqual(["cyberstrike"])
+        expect(agents[0].codename).toBe("COMMANDER")
+        expect(agents[0].role).toBe("primary")
         await Session.remove(session.id)
       },
     })
