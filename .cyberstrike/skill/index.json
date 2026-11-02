@@ -20,6 +20,33 @@
       "category": "identity-security"
     },
     {
+      "name": "attack-bb-methodology",
+      "description": "Plan and run evidence-led bug bounty work from authorized scope through focused hypotheses, validation handoff, triage, and reporting",
+      "verified": "unverified",
+      "tags": [
+        "bug-bounty",
+        "workflow",
+        "prioritization",
+        "evidence",
+        "hypothesis",
+        "chaining",
+        "deduplication",
+        "scope",
+        "triage",
+        "reporting"
+      ],
+      "tech_stack": [
+        "web",
+        "api",
+        "infrastructure"
+      ],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ],
+      "category": "methodology"
+    },
+    {
       "name": "attack-exceptional-conditions",
       "description": "Review error, timeout, retry, partial-failure, cancellation, and fallback paths for inconsistent security controls.",
       "verified": "unverified",
