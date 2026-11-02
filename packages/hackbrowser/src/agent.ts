@@ -67,6 +67,10 @@ import type { RawElement } from "./types.ts"
 
 const log = Log.create({ service: "hackbrowser:agent" })
 
+function isExpectedAbort(error: unknown, signal?: AbortSignal): boolean {
+  return Boolean(signal?.aborted && error instanceof Error && error.name === "AbortError")
+}
+
 // ── Env-gated fault injector (test-only, #117) ─────────────────────────────
 // Deliberately triggers a worker-level fault so the crash safety net can be
 // verified end-to-end. NO effect unless CYBERSTRIKE_HB_FAULT is set. Fires once
@@ -723,6 +727,7 @@ async function explorePageWithAI(
   // Inline-exploration capability; default is a no-op at max depth so callers that
   // don't opt in keep the plain BFS-enqueue behavior (backward compatible).
   nav: ExploreContext = { explore: async () => {}, depth: MAX_INLINE_DEPTH },
+  signal?: AbortSignal,
 ): Promise<string[]> {
   const linksToEnqueue: string[] = []
   const semanticActionsDone = new Set<string>()
@@ -768,16 +773,23 @@ async function explorePageWithAI(
     }
     globalState.authRetryAttempts.add(retryKey)
 
-    let result = await autoLogin(page, credentials, config.signal)
-    if (!result.success && result.error !== "saved_login_origin_mismatch") {
-      result = await aiLogin(page, credentials, model, usageAcc, config.signal)
+    let result
+    try {
+      result = await autoLogin(page, credentials, signal)
+      if (!result.success && result.error !== "saved_login_origin_mismatch" && !signal?.aborted) {
+        result = await aiLogin(page, credentials, model, usageAcc, signal)
+      }
+      if (!result.success && !signal?.aborted) {
+        log.warn("automatic session recovery did not complete; waiting for operator authentication", {
+          reason: result.error,
+        })
+        await waitForManualLogin(page, "session re-authentication", undefined, signal)
+      }
+    } catch (error) {
+      if (isExpectedAbort(error, signal)) return visibleLinks()
+      throw error
     }
-    if (!result.success) {
-      log.warn("automatic session recovery did not complete; waiting for operator authentication", {
-        reason: result.error,
-      })
-      await waitForManualLogin(page, "session re-authentication", undefined, config.signal)
-    }
+    if (signal?.aborted) return visibleLinks()
 
     pageUrl = page.url()
     elements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
@@ -2216,7 +2228,13 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     // Manual login for this credential. Pass position in the sequence so the
     // button shows progress (e.g. "ADMIN (1/2)") and only the final credential
     // says "START SCAN" — earlier ones say "CONFIRM & NEXT".
-    await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length }, config.signal)
+    try {
+      await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length }, config.signal)
+    } catch (error) {
+      if (isExpectedAbort(error, config.signal)) break
+      throw error
+    }
+    if (config.signal?.aborted) break
 
     // Register credential with CyberStrike (same as Firefox extension pattern)
     let credentialId = cred.id
@@ -2451,6 +2469,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
           maxPages,
           usageAcc,
           { explore: exploreInline, depth },
+          config.signal,
         )
         for (const u of found) enqueueWithContext(u, ctx.id, pageQueue, visitedPages, inScope, pathPatternCounts)
       }
@@ -2466,6 +2485,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
           maxPages,
           usageAcc,
           { explore: exploreInline, depth: 0 },
+          config.signal,
         )
         for (const url of discovered) {
           enqueueWithContext(url, ctx.id, pageQueue, visitedPages, inScope, pathPatternCounts)
@@ -2772,6 +2792,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
 
     // Login flow: --authenticated → manual login, --user/--pass → auto-login, neither → anonymous
     const isAuthenticated = config.auth.authenticated || !!scopedCredentials
+    try {
     if (config.auth.authenticated) {
       await waitForManualLogin(page, undefined, undefined, config.signal)
       // Resolve label → UUID. credentialId from the launcher is a user-supplied
@@ -2803,6 +2824,10 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       }
     } else {
       await handle2FA(page, undefined, undefined, config.signal)
+    }
+    } catch (error) {
+      if (!isExpectedAbort(error, config.signal)) throw error
+      log.info("authentication wait cancelled; ending crawl without starting further page exploration")
     }
 
     // Initialize global state (Aşama 13: outOfScope snapshotted from config)
@@ -3025,6 +3050,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           maxPages,
           usageAcc,
           { explore: exploreInline, depth },
+          config.signal,
         )
         for (const u of found) enqueueUrl(u, globalState, inScope)
       }
@@ -3041,6 +3067,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           maxPages,
           usageAcc,
           { explore: exploreInline, depth: 0 },
+          config.signal,
         )
       } catch (err) {
         if (isBrowserDead(health)) {
