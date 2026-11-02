@@ -2027,7 +2027,7 @@ export const SessionRoutes = lazy(() =>
                 after: IngestSummary.snapshot(sessionID),
                 transcript: false,
               })
-            }, sessionID)
+            })
           }
         }
         c.status(202)
