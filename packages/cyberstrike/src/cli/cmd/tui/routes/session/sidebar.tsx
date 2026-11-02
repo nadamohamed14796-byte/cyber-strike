@@ -32,6 +32,20 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
         (item.title === "Extension Agent Tasks" || item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
     )
   })
+  let syncedExtensionTaskSessionID: string | undefined
+  createEffect(() => {
+    const childID = proxyBroker()?.id
+    if (!childID || childID === syncedExtensionTaskSessionID) return
+    syncedExtensionTaskSessionID = childID
+    void sync.session.sync(childID).catch(() => undefined)
+  })
+  const extensionTaskMessages = createMemo(() => {
+    const childID = proxyBroker()?.id
+    return childID ? (sync.data.message[childID] ?? []) : []
+  })
+  const extensionTaskCount = createMemo(
+    () => extensionTaskMessages().filter((message) => message.role === "user").length,
+  )
   // Automatic Impact Hunter runs are direct children of the root session.
   // Keep them visible here with an explicit Open action; opening one navigates
   // the UI only and does not pause or cancel the root session.
@@ -71,8 +85,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return out
   })
   const requests = createMemo(() => sync.data.request[props.sessionID] ?? [])
-  // Cumulative total of all requests received by the Extension Agent.
-  const extensionRequestCount = createMemo(() => requests().length)
   const enterProxyBroker = () => {
     const child = proxyBroker()
     if (child) navigate({ type: "session", sessionID: child.id })
@@ -257,11 +269,11 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
             <Show when={!session()?.parentID && proxyBroker()}>
               <box flexDirection="column" gap={1}>
                 <text fg={theme.text}>
-                  <b>Extension Agent</b>
+                  <b>Extension Agent Tasks</b>
                 </text>
                 <box flexDirection="row" alignItems="center" gap={1}>
                   <box paddingLeft={1} paddingRight={1} backgroundColor={theme.backgroundElement}>
-                    <text fg={theme.text}>{extensionRequestCount()}</text>
+                    <text fg={theme.text}>{extensionTaskCount()}</text>
                   </box>
                   <box
                     onMouseUp={enterProxyBroker}
@@ -270,7 +282,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     paddingRight={1}
                   >
                     <text fg={theme.accent}>
-                      <b>Enter</b>
+                      <b>Open</b>
                     </text>
                   </box>
                 </box>
