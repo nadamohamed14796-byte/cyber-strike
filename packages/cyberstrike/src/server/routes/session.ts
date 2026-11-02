@@ -1626,7 +1626,7 @@ export const SessionRoutes = lazy(() =>
       describeRoute({
         summary: "Ingest message",
         description:
-          "Accept captured HTTP requests or plain-text messages from another port or service. HTTP captures are analyzed in independent child sessions so they do not take over the parent chat window; plain-text messages are processed in the supplied session. Creates a session if sessionID is missing or invalid.",
+          "Accept captured HTTP requests or plain-text messages from another port or service. Extension inputs are analyzed in an independent child Agent session so they never enter or take over the parent chat window. Creates a session if sessionID is missing or invalid.",
         operationId: "session.ingest",
         responses: {
           202: {
@@ -1961,30 +1961,37 @@ export const SessionRoutes = lazy(() =>
             }
           }
         } else {
-          // Non-HTTP request (plain text message)
+          // Non-HTTP extension input is still an Agent task, never a message
+          // in the user's active chat. Reuse the same dedicated child session
+          // used by captured HTTP traffic so the normal session UI displays the
+          // assistant turn, tool calls, and any delegated subagents.
           const promptText = buildPromptWithCredentialContext(body.text, credentialID)
           if (ingestDryRun) {
             log.info("ingest dry-run (text)", { sessionID })
             log.info("prompt preview:\n" + promptText)
           } else {
             const agentName = body.agent ?? "proxy-agent"
-            IngestQueue.enqueue(sessionID, async () => {
+            const brokerSession = await getOrCreateProxyBrokerSession({
+              parentSessionID: activeSessionID,
+            })
+            IngestQueue.enqueue(brokerSession.id, async () => {
               const before = IngestSummary.snapshot(sessionID)
               await SessionPrompt.prompt({
-                sessionID,
+                sessionID: brokerSession.id,
                 agent: agentName,
                 model: body.model,
                 excludeHistory: true,
                 parts: [{ type: "text", text: promptText }],
               })
-              const model = body.model ?? (await SessionPrompt.lastModel(sessionID))
+              const model = body.model ?? (await SessionPrompt.lastModel(brokerSession.id))
               await IngestSummary.write({
-                sessionID,
+                sessionID: brokerSession.id,
                 agent: agentName,
                 model,
-                source: "text ingest",
+                source: "extension text ingest",
                 before,
                 after: IngestSummary.snapshot(sessionID),
+                transcript: false,
               })
             }, sessionID)
           }
