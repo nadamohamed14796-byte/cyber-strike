@@ -2853,8 +2853,9 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     // Discovery Engine (#126): seed the BFS from declared sources (sitemap /
     // robots now; specs / JS routes in later phases) via the authenticated,
     // proxy-aware browser context. Best-effort + additive — a failure here
-    // never blocks the crawl; results just augment the queue.
-    try {
+    // never blocks the crawl; results just augment the queue. Do not start
+    // passive discovery after an operator has already cancelled the run.
+    if (!config.signal?.aborted) try {
       // Resolve against the current URL only if it's still in scope — an initial
       // navigation can redirect to an out-of-scope SSO/IdP; fall back to target.
       const seedBase = isInScope(page.url(), inScope) ? page.url() : targetUrl
