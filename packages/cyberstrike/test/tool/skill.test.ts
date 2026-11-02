@@ -769,7 +769,7 @@ The skill body must still load.
       skills: Array<{ name: string; files?: string[] }>
     }
     const entries = manifest.skills.filter((entry) =>
-      entry.name.startsWith("src-hunter-") || entry.name === "community-tool-selection" || entry.name === "recon-methodology",
+      entry.name.startsWith("src-hunter-") || entry.name === "community-tool-selection" || entry.name === "recon-master",
     )
     expect(entries.length).toBeGreaterThanOrEqual(8)
 
