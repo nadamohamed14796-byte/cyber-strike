@@ -226,6 +226,8 @@ For each candidate, store:
 - bounded next validation step and stop condition;
 - priority, deduplication fingerprint, and status.
 
+### Candidate handoff record
+
 The queue item is a reproducible handoff, not merely a URL and a skill name. Include these fields when applicable:
 
 - `canonical_asset` and `scope_evidence`: normalized host/service identity and the exact reason it is eligible, passive-only, excluded, or unresolved.
