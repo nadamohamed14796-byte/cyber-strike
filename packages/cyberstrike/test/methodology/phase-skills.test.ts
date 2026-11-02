@@ -87,15 +87,28 @@ describe("Phase-critical skill pinning", () => {
       fn: async () => {
         const skill = await Skill.get("recon-master")
         expect(skill, "recon-master must be registered and loadable").toBeDefined()
-        for (const source of [
+        for (const heading of [
+          "## 01. Core reconnaissance methodology",
+          "## 02. Subdomain enumeration and validation",
+          "## 03. ASN and infrastructure mapping",
+          "## 04. Origin IP exposure assessment",
+          "## 05. Port and service discovery",
+          "## 06. Virtual-host enumeration",
+          "## 07. CMS and component fingerprinting",
+          "## 08. Visual reconnaissance and application clustering",
+          "## 09. Public GitLab project reconnaissance",
+          "## 10. Email domain security assessment",
+          "## 11. Exposed error-log analysis",
+        ]) expect(skill!.content).toContain(heading)
+        for (const retired of [
           "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
           "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
           "recon-origin-ip-discovery", "recon-port-service-discovery",
           "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon",
-        ]) expect(skill!.content).toContain("## " + source)
-        expect(skill!.content).toContain("HTTP method selection")
-        expect(skill!.content).toContain("Tool versions and flags")
-        expect(skill!.content).toContain("Stop Conditions")
+        ]) expect(await Skill.get(retired), retired + " must not remain a separately loadable skill").toBeUndefined()
+        expect(skill!.content).toContain("HTTP method policy")
+        expect(skill!.content).toContain("Tool selection and runtime discipline")
+        expect(skill!.content).toMatch(/stop conditions/i)
       },
     })
   })
@@ -172,10 +185,14 @@ describe("Phase-critical skill pinning", () => {
     expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
     expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
     expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "attack-javascript-analysis"]))
+    const retiredReconSkills = [
+      "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
+      "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
+      "recon-origin-ip-discovery", "recon-port-service-discovery",
+      "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon",
+    ]
     for (const phase of ["scope_analysis", "passive_recon", "active_recon"] as const) {
-      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-methodology")
-      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-subdomain-enumeration")
-      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-port-service-discovery")
+      for (const retired of retiredReconSkills) expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain(retired)
       expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("community-tool-selection")
     }
   })
