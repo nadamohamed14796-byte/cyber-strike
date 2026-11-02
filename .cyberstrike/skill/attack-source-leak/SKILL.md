@@ -20,7 +20,7 @@ chains_with:
   - attack-dependency-cve-scanning
   - attack-information-disclosure
   - attack-wordpress
-  - recon-methodology
+  - recon-master
 prerequisites: []
 severity_boost:
   attack-information-disclosure: "Source leakage is confirmed disclosure when non-public source or operational configuration is readable outside its intended audience."
