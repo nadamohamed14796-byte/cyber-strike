@@ -344,7 +344,7 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Clear reason for ownership attribution and scope classification.
 - A vulnerability report must include separate proof of impact; subdomain discovery alone is not a finding.
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace) as the only tool/API/CLI/helper catalog. Select sources adaptively; inspect registered schemas and preflight only external commands that may actually be used. The catalog lists optional helpers and the simple canonical output contract. A listed candidate is not proof of installation, suitability, or authorization.
 
@@ -491,7 +491,7 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 - Prefix size, provider/shared-hosting notes, and confidence level.
 - Do not report a broad infrastructure map as a vulnerability without a demonstrated exposure or security impact.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - dig, whois/RDAP clients, asnmap, dnsx, httpx, mapcidr, and naabu where permitted.
 - Certificate Transparency search and reputable BGP/RPKI explorers.
@@ -556,7 +556,7 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 ##### Ownership-confidence ladder and scan boundary
 For every IP/prefix/ASN pivot, retain the organization attribution source, relationship type (owned subsidiary, provider, shared cloud/CDN, stale historical link), observation date, and confidence. Corroborate with first-party asset lists, RDAP/RIR records, certificates, DNS, and product branding before assigning ownership; ASN membership alone never authorizes scanning every announced address. Keep passive-only leads separate from active-scan candidates and record why a candidate passes the target's actual program scope. Use new IPs to discover relationships, not to widen scope implicitly. Route confirmed public service exposure to service discovery and cloud-owned resource policy questions to cloud assessment.
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 ##### Tools and purpose
 - `asnmap` — map known organizations/domains to ASN and prefix candidates using passive/public attribution sources.
@@ -641,7 +641,7 @@ A reportable issue requires a control that can be bypassed or an unintended serv
 - Exact control that differs and a minimal impact demonstration.
 - Redact tokens and private application data.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - `dig` and `dnsx`: compare current DNS answers and preserve record/source metadata.
 - `httpx`: collect low-volume HTTP metadata for known in-scope hosts.
@@ -711,7 +711,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 Build candidate origins from historical DNS, certificate/deployment metadata, first-party configuration, and observed redirects, but score each by freshness and organization attribution. A CDN/origin relationship does not automatically permit direct-origin requests; verify the candidate is in program scope and that testing the origin is allowed. If permitted, compare one harmless public path through the normal edge and candidate origin, recording TLS, Host/routing, authentication, and applicable controls. Do not bypass a WAF to access protected content or treat an origin IP as a security bug by itself. Confirm a meaningful difference before chaining to host-header, cache, or access-control review.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Prefer passive DNS/certificate history and provider attribution. `dnsx`, `httpx`, and `openssl s_client` help compare records and certificate/SNI behavior for known, explicitly authorized hosts. Optional passive sources include SecurityTrails and Censys APIs where available.
 
@@ -789,7 +789,7 @@ For a suspected issue, capture a single benign handshake or read-only response a
 - Service identity evidence and reason the exposure is unexpected.
 - For a vulnerability, the access-control gap or sensitive impact, not just a banner.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - Nmap for targeted TCP/UDP service discovery where permitted.
 - naabu for approved TCP port inventory.
@@ -857,7 +857,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 ##### Service fingerprint and owner gate
 For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use capabilities that produce inspectable output. Port/service checks are active network activity: confirm the target and allowed port ranges before running them, respect program rate limits, and stop if instability appears. The tool names and commands below are optional, non-exhaustive examples—not phase requirements. Search the current registry for the evidence gap and use any suitable available tool/API/CLI whose real capability and side effects fit the authorized task; do not install or require a listed candidate merely because it appears here.
 
@@ -950,7 +950,7 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - Evidence tying the host to the organization.
 - For any vulnerability, a separate minimal proof of security impact beyond host discovery.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - `dig`, `dnsx`, certificate-transparency sources, `httpx`, and `curl` for scoped DNS/HTTP inventory.
 - `openssl s_client` for certificate/SNI metadata on authorized hostnames.
@@ -1021,7 +1021,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 Establish stable fingerprints for a known host, a known-invalid host header, and a random nonexistent path. Vary only the authority/Host dimension while keeping IP, TLS SNI, path, and request headers clear in the notes. Record status, title, body hash/length, redirects, cookies, and server-selected application; a different title or 200 alone may be a default virtual host. Confirm a discovered vhost through product-specific content or a second source and re-check program scope before active tests. Route valid applications to web recon and host-derived links to host-header review; do not treat shared reverse-proxy routing as a vulnerability without a security consequence.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 ##### Tools
 - `httpx` — establish a baseline for known in-scope hosts and save machine-readable status/title/technology metadata.
@@ -1110,7 +1110,7 @@ Map a confirmed component/version to a credible advisory, then verify the vulner
 - Advisory identifier and exact affected-version range for any vulnerability claim.
 - A minimal proof of the security condition, with secrets and user data redacted.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - `httpx` and `curl`: collect bounded response headers, status, title, and content fingerprints.
 - `whatweb` / `webanalyze`: optional CMS/technology fingerprinting on approved hosts.
@@ -1192,7 +1192,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 Maintain independent confidence for CMS identity, component identity/version, deployment ownership, and vulnerability applicability. Corroborate a fingerprint with multiple signals and account for reverse-proxy caches, custom themes, backported fixes, and misleading banners. Before invoking a version-specific skill, verify the affected component is reachable and that the preconditions are plausible; do not map a scanner's version label directly to a confirmed CVE. Use passive/GET-only probes where possible, preserve response hashes and the exact fingerprint source, and stop when no meaningful permitted observation remains. Chain to the CMS-specific skill only after identity evidence, then require that skill's independent proof gate.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
 
@@ -1286,7 +1286,7 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 - Cluster rationale and confidence.
 - Separate technical evidence for any claimed vulnerability.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - Playwright or Chromium headless capture.
 - gowitness or EyeWitness where available.
@@ -1368,7 +1368,7 @@ Return normalized asset, scope/provenance, capture conditions, confidence, dupli
 Capture consistent screenshots at the same viewport and auth context, then cluster only as a navigation aid—not as proof that two apps share code or ownership. Retain URL, screenshot hash/path, title, favicon/theme fingerprint, response status, and comparison rationale. Convert each visual anomaly into one question (different tenant, admin console, old version, hidden workflow, unexpected login state) and verify with normal HTTP evidence. Avoid screenshotting personal information and redact account names/IDs. Route admin-specific paths to BFLA, tenant/object references to IDOR, and visually different auth flows to the authentication specialist only after the request behavior corroborates the visual clue.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
 
@@ -1458,7 +1458,7 @@ A report should identify the public asset, why it belongs to the organization, w
 - For CI/CD, the relevant trust rule and resulting permission boundary.
 - Secret values and private personal data must not be copied into the report; do not test a candidate secret.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - GitLab documented public API and `glab` CLI where appropriate; do not depend on the web UI.
 - `git`: bounded repository/history inspection for public repositories within the task's permitted scope.
@@ -1531,7 +1531,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 Confirm namespace/organization attribution and public visibility before pivoting through group projects, forks, issue attachments, packages, snippets, build artifacts, and commit history. Preserve repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Secret-like matches must be recorded as type plus redacted fingerprint; do not test or reuse credentials or access projects beyond what is public and authorized. Distinguish public code disclosure from an exploitable credential or CI trust boundary. Route workflow/runner problems to CI/CD review, first-party JavaScript to JS analysis, and secret candidates to evidence-safe triage without invoking them.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
 
@@ -1626,7 +1626,7 @@ Prefer passive DNS and analysis of legitimate test messages. If active spoofing 
 - If approved, a controlled test message's sanitized Authentication-Results, From, Return-Path, DKIM d=, and DMARC alignment result.
 - Never include recipient personal data, session material, or deceptive-message content in reusable artifacts.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - `dig` / `host`: inspect SPF, DKIM selector, DMARC, MTA-STS, and TLS-RPT DNS records.
 - `openssl s_client`: inspect SMTP TLS negotiation where explicitly permitted.
@@ -1701,7 +1701,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact; validate with an authorized synthetic recipient/domain and do not send deceptive mail to real users. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
 
@@ -1801,7 +1801,7 @@ Check production debug settings, web-server deny rules, deployment packaging, lo
 - Secret values, personal data, cookies, tokens, and customer content must be redacted.
 - Note whether the file is current and whether sensitive material was validated without using it.
 
-#### Tools
+#### Tool examples and roles (verify in the shared catalog)
 
 - `curl` with explicit timeouts, byte ranges, and output-size limits for an observed authorized resource.
 - `file`, `grep`, `rg`, and Python parsers for log-format classification.
@@ -1873,7 +1873,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to triage with a specific demonstrated impact statement.
 
 
-#### Agent-executable CLI tooling, resources, and helper scripts
+#### Chapter-specific implementation notes and resources
 
 Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
 
