@@ -9,7 +9,7 @@ prerequisites:
   - "A saved target workspace and its authoritative scope manifest"
   - "At least one persisted observation, candidate, endpoint, asset, or finding"
 chains_with:
-  - attack-web-recon
+  - recon-master
   - attack-javascript-analysis
   - attack-variant-analysis
   - attack-triage-validation
