@@ -181,15 +181,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           }
         }
 
-        await ctx.ask({
-          permission: "task",
-          patterns: [params.subagent_type],
-          always: ["*"],
-          metadata: {
-            description: params.description,
-            subagent_type: params.subagent_type,
-          },
-        })
       }
 
       // Ordinary primary-agent tasks have no session-bound captured request;
@@ -301,6 +292,20 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
           throw error
         }
+      }
+
+      // Ask for permission only after request identity, duplicate-lane, and
+      // per-request budget checks. Rejected duplicate fan-out must not prompt the user.
+      if (!ctx.extra?.bypassAgentCheck && !impactHandoff) {
+        await ctx.ask({
+          permission: "task",
+          patterns: [params.subagent_type],
+          always: ["*"],
+          metadata: {
+            description: params.description,
+            subagent_type: params.subagent_type,
+          },
+        })
       }
 
       const hasTaskPermission = PermissionNext.evaluate("task", "*", agent.permission).action !== "deny"
