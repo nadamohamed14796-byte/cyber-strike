@@ -15,12 +15,14 @@ export namespace Scheduler {
   type Entry = {
     tasks: Map<string, Task>
     timers: Map<string, Timer>
+    running: Set<string>
   }
 
   const create = (): Entry => {
     const tasks = new Map<string, Task>()
     const timers = new Map<string, Timer>()
-    return { tasks, timers }
+    const running = new Set<string>()
+    return { tasks, timers, running }
   }
 
   const shared = create()
@@ -47,18 +49,28 @@ export namespace Scheduler {
     if (current) clearInterval(current)
 
     entry.tasks.set(task.id, task)
-    void run(task)
+    void run(entry, task)
     const timer = setInterval(() => {
-      void run(task)
+      void run(entry, task)
     }, task.interval)
     timer.unref()
     entry.timers.set(task.id, timer)
   }
 
-  async function run(task: Task) {
-    log.info("run", { id: task.id })
-    await task.run().catch((error) => {
-      log.error("run failed", { id: task.id, error })
-    })
+  async function run(entry: Entry, task: Task) {
+    if (entry.running.has(task.id)) {
+      log.debug("overlapping run skipped", { id: task.id })
+      return
+    }
+
+    entry.running.add(task.id)
+    try {
+      log.info("run", { id: task.id })
+      await task.run().catch((error) => {
+        log.error("run failed", { id: task.id, error })
+      })
+    } finally {
+      entry.running.delete(task.id)
+    }
   }
 }
