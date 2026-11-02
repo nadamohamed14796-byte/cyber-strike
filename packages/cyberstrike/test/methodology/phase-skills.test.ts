@@ -123,9 +123,9 @@ describe("Phase-critical skill pinning", () => {
         expect(skill!.content).not.toContain("## Mandatory startup contract")
         expect(skill!.content).not.toContain("## Engagement workflow")
         expect(skill!.content).not.toContain("## Tool selection and runtime discipline")
-        expect(skill!.content).not.toContain("### HTTP method policy")
         expect(skill!.content).not.toContain("### Candidate handoff record")
-        expect(skill!.content).toMatch(/stop conditions/i)
+        expect(skill!.content).toContain("runtime scope gate")
+        expect(skill!.content).toContain("Source coverage and count semantics")
 
         const correlation = await Skill.get("attack-finding-correlation")
         expect(correlation?.content).toContain("negative_control_needed")
