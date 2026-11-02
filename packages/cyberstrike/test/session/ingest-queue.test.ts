@@ -1268,3 +1268,54 @@ describe("captured request HTTP route scope gate", () => {
     })
   })
 })
+
+describe("Request.findEquivalentProcessed - anonymous capture identity", () => {
+  test("reuses exact anonymous captures but preserves cookie and response changes", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-anonymous-equivalent-test" })
+      const baseRequest = "GET / HTTP/1.1\\r\\nHost: example.test\\r\\nAccept: text/html\\r\\n\\r\\n"
+      const create = (input: {
+        rawRequest?: string
+        responseBody?: string
+        credentialID?: string
+      } = {}) => {
+        const item = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          origin: "https://example.test",
+          credentialID: input.credentialID,
+          rawRequest: input.rawRequest ?? baseRequest,
+          keyHash: "anonymous-home-shape",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: input.responseBody ?? "<html><body>same home</body></html>",
+          },
+        })
+        if (!item) throw new Error("anonymous request fixture was not inserted")
+        return item
+      }
+
+      const first = create()
+      Request.updateStatus({ id: first.id, status: "processed" })
+
+      const exactRepeat = create()
+      expect(Request.findEquivalentProcessed(exactRepeat)?.id).toBe(first.id)
+
+      const changedCookie = create({
+        rawRequest: baseRequest.replace("Accept: text/html", "Cookie: session=other\\r\\nAccept: text/html"),
+      })
+      expect(Request.findEquivalentProcessed(changedCookie)).toBeUndefined()
+
+      const changedResponse = create({ responseBody: "<html><body>different user</body></html>" })
+      expect(Request.findEquivalentProcessed(changedResponse)).toBeUndefined()
+
+      const differentCredential = create({ credentialID: "credential-user-a" })
+      expect(Request.findEquivalentProcessed(differentCredential)).toBeUndefined()
+
+      await Session.remove(session.id)
+    })
+  })
+})
+
