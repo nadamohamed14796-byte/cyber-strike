@@ -224,7 +224,7 @@
     },
     {
       "name": "recon-master",
-      "description": "Unified scope-aware reconnaissance playbook automatically loaded after scope acceptance; preserves all specialist recon procedures and dynamically selects applicable branches and tools.",
+      "description": "Professional scope-aware reconnaissance handbook with one workflow, conditional specialist procedures, clear evidence standards, and phase-based outputs.",
       "verified": "unverified",
       "tags": [
         "recon",
@@ -242,13 +242,15 @@
         "services",
         "http",
         "tls",
-        "crawler",
+        "crawling",
         "endpoints",
         "cms",
         "gitlab",
         "email-security",
         "visual-recon",
         "error-logs",
+        "asset-inventory",
+        "evidence",
         "scope",
         "tool-selection"
       ],
@@ -266,8 +268,8 @@
       ],
       "cwe_ids": [],
       "files": [
-        "SKILL.md",
-        "RECON_PHASE_TOOL_MATRIX.md"
+        "RECON_PHASE_TOOL_MATRIX.md",
+        "SKILL.md"
       ],
       "category": "information-gathering"
     },
