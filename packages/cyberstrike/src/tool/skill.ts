@@ -445,16 +445,19 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           `Base directory for this skill: ${base}`,
           "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
           "",
-          skill.content.trim(),
-          companionFileListComplete
-            ? "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill."
-            : "Companion-file listing failed; only the SKILL.md content was loaded. Do not assume missing companion paths are absent.",
-          "",
+          // Keep companion paths before the skill body. Large handbook skills can
+          // exceed the global tool-output preview cap; agents must still receive
+          // the exact paths needed to read phase matrices and helper references.
           "<skill_files>",
           files,
           "</skill_files>",
+          companionFileListComplete
+            ? "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill."
+            : "Companion-file listing failed; only the SKILL.md content was loaded. Do not assume missing companion paths are absent.",
           chainInfo,
           prerequisiteInfo,
+          "",
+          skill.content.trim(),
           "</skill_content>",
         ].join("\n"),
         metadata: { name: skill.name, dir },
