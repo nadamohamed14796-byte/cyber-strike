@@ -146,7 +146,16 @@ export function Prompt(props: PromptProps) {
         sync.session.get(props.sessionID)?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         lastUserMessage()?.agent === "proxy-agent"),
   )
-  const activeAgentName = () => (isProxyAgentSession() ? (lastUserMessage()?.agent ?? "proxy-agent") : local.agent.current().id)
+  const activeAgentName = () => {
+    if (!isProxyAgentSession()) return local.agent.current().id
+    const recorded = lastUserMessage()?.agent
+    if (recorded) return recorded
+    // A new generic Extension task session has no prior turn to inherit.
+    // Preserve the current selection instead of forcing the legacy Proxy Agent.
+    return sync.session.get(props.sessionID!)?.title === "Extension Agent Tasks"
+      ? local.agent.current().id
+      : "proxy-agent"
+  }
   const activeModel = () => {
     if (isProxyAgentSession()) {
       const model = lastUserMessage()?.model
