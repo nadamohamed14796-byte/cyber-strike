@@ -19,13 +19,6 @@ export function CapturedRequestAnalysisPanel() {
   const sync = useSync()
 
   const parentID = () => params.id ?? ""
-  const [requestsReady, setRequestsReady] = createSignal(false)
-
-  createEffect(() => {
-    const sessionID = parentID()
-    if (!sessionID) return
-    void sync.session.request(sessionID).then(() => setRequestsReady(true)).catch(() => setRequestsReady(true))
-  })
 
   const brokerSession = createMemo(() =>
     (sync.data.session ?? []).find(
@@ -63,39 +56,6 @@ export function CapturedRequestAnalysisPanel() {
 
   // Each extension turn is one task, regardless of whether it originated as HTTP or plain text.
   const taskCount = createMemo(() => brokerMessages().filter((message) => message.role === "user").length)
-
-  // New extension captures/tasks should open the Agent execution view automatically.
-  // Keep the initial count as a baseline so reopening an old session does not
-  // unexpectedly navigate away. The broker may appear in sync data slightly
-  // after the request row, so retain the pending navigation until it is ready.
-  let initialized = false
-  let previousRequestCount = 0
-  let previousBrokerID: string | undefined
-  let pendingAgentNavigation = false
-
-  createEffect(() => {
-    const ready = requestsReady()
-    const count = taskCount()
-    const broker = brokerSession()
-
-    if (!ready) return
-
-    if (!initialized) {
-      initialized = true
-      previousRequestCount = count
-      previousBrokerID = broker?.id
-      return
-    }
-
-    if (count > previousRequestCount) pendingAgentNavigation = true
-    if (broker?.id && broker.id !== previousBrokerID) pendingAgentNavigation = true
-    previousRequestCount = count
-    previousBrokerID = broker?.id
-
-    if (!pendingAgentNavigation || !broker?.id) return
-    pendingAgentNavigation = false
-    navigate(`/${params.dir}/session/${broker.id}`)
-  })
 
   function enterExtensionTasks() {
     const childID = brokerSession()?.id
