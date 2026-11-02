@@ -253,6 +253,44 @@ describe("lazy tool registry snapshot reconciliation", () => {
       }
     })
   })
+
+  test("loads selected MCP tools only from their owning servers", async () => {
+    await withProject(async () => {
+      const alphaID = MCP.toolID("alpha.server", "lookup_alpha")
+      const betaID = MCP.toolID("beta.server", "lookup_beta")
+      LazyToolRegistry.reconcileServerTools("alpha.server", [
+        { name: "lookup_alpha", description: "lookup alpha records" },
+      ])
+      LazyToolRegistry.reconcileServerTools("beta.server", [
+        { name: "lookup_beta", description: "lookup beta records" },
+      ])
+
+      const requestedServers: string[][] = []
+      const toolsSpy = spyOn(MCP, "tools").mockImplementation(async (servers?: readonly string[]) => {
+        requestedServers.push([...(servers ?? [])])
+        return {
+          [alphaID]: {
+            description: "lookup alpha records",
+            inputSchema: { type: "object", properties: {} },
+            execute: async () => ({ content: [] }),
+          },
+          [betaID]: {
+            description: "lookup beta records",
+            inputSchema: { type: "object", properties: {} },
+            execute: async () => ({ content: [] }),
+          },
+        } as any
+      })
+      try {
+        const loaded = await LazyToolRegistry.load([alphaID])
+        expect(loaded.map((item) => item.id)).toEqual([alphaID])
+        expect(requestedServers).toEqual([["alpha.server"]])
+      } finally {
+        toolsSpy.mockRestore()
+      }
+    })
+  })
+
   test("matches all query words independently, including reversed multi-word queries", async () => {
     await withProject(() => {
       LazyToolRegistry.reconcileServerTools("test.server", [
