@@ -705,7 +705,7 @@ export type Request = {
   raw_request?: string
   body_hash?: string
   query_hash?: string
-  status: "queued" | "processing" | "processed"
+  status: "queued" | "processing" | "processed" | "failed"
   trigger_element?: string
   element_roles?: Array<string>
   ui_context?: {
