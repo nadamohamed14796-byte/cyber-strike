@@ -2,12 +2,11 @@ import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import z from "zod"
 import { Database, eq, and, isNull, asc, or } from "../storage/db"
-import { RequestJavaScriptCaptureTable, RequestTable } from "./session.sql"
+import { RequestJavaScriptCaptureTable, RequestTable, SessionTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { createHash } from "crypto"
 import { processResponse, type ResponseInput } from "./response-processor"
 import { isConfirmedEmptyStaticHTML } from "./captured-request-triage"
-import { Session } from "./index"
 
 function requestResponseURL(input: {
   normalizedPath: string
@@ -433,14 +432,30 @@ export namespace Request {
    * requests may belong to child sessions created for delegated agents.
    */
   export function findById(sessionID: string, requestID: string): Info | undefined {
-    const row = Database.use((db) =>
-      db.select().from(RequestTable)
+    const row = Database.use((db) => {
+      const request = db.select().from(RequestTable)
         .where(eq(RequestTable.id, requestID))
-        .get(),
-    )
-    if (!row) return undefined
-    if (Session.root(row.session_id) !== Session.root(sessionID)) return undefined
-    return rowToInfo(row)
+        .get()
+      if (!request) return undefined
+
+      const root = (id: string) => {
+        let current = id
+        const visited = new Set<string>()
+        while (true) {
+          if (visited.has(current)) throw new Error("Session parent cycle detected while resolving request evidence")
+          visited.add(current)
+          const session = db.select({ parent_id: SessionTable.parent_id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, current))
+            .get()
+          if (!session?.parent_id) return current
+          current = session.parent_id
+        }
+      }
+
+      return root(request.session_id) === root(sessionID) ? request : undefined
+    })
+    return row ? rowToInfo(row) : undefined
   }
 
   /**
