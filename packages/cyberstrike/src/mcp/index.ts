@@ -992,7 +992,7 @@ export namespace MCP {
       "_t" + toolName.length + "_" + stableToolIDPart(toolName)
   }
 
-  export async function tools() {
+  export async function tools(serverNames?: readonly string[]) {
     const result: Record<string, Tool> = {}
     const s = await state()
     const cfg = await Config.get()
@@ -1000,9 +1000,14 @@ export namespace MCP {
     const boltConfig = cfg.bolt ?? {}
     const clientsSnapshot = await clients()
     const defaultTimeout = cfg.experimental?.mcp_timeout
+    // Loading one selected tool should not enumerate every connected MCP server.
+    // Callers without a filter retain the legacy all-server behavior.
+    const requestedServers = serverNames ? new Set(serverNames) : undefined
 
     const connectedClients = Object.entries(clientsSnapshot).filter(
-      ([clientName]) => s.status[clientName]?.status === "connected",
+      ([clientName]) =>
+        s.status[clientName]?.status === "connected" &&
+        (!requestedServers || requestedServers.has(clientName)),
     )
 
     const toolsResults = await Promise.all(

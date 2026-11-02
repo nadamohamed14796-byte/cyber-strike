@@ -312,9 +312,18 @@ export namespace LazyToolRegistry {
       })
     }
 
-    // Avoid a full MCP tool listing when every requested tool is already loaded
-    // (or no longer exists in this project's current snapshot).
-    const mcpTools = toLoad.length > 0 ? await MCP.tools() : {}
+    // Only enumerate servers that own the explicitly requested lazy tools.
+    // MCP.tools() without a filter remains available for legacy all-server callers.
+    const requestedServers = [
+      ...new Set(
+        toLoad
+          .map((id) => current.lazyTools.get(id)?.mcpServer)
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ]
+    const mcpTools = toLoad.length > 0
+      ? await MCP.tools(requestedServers.length > 0 ? requestedServers : undefined)
+      : {}
     for (const id of requestedIDs) {
       if (current.loadedToolIds.has(id)) {
         const existing = current.loadedTools.get(id)
