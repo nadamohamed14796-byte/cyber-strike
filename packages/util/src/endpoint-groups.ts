@@ -35,7 +35,7 @@ export type CapturedDomainGroup<T extends CapturedEndpointRequest> = {
   requestCount: number
 }
 
-function formatEndpointHost(host: string | undefined, port: number | undefined): string {
+export function formatEndpointHost(host: string | undefined, port: number | undefined): string {
   if (!host) return ""
   if (port == null || port === 80 || port === 443) return host
   return `${host}:${port}`
