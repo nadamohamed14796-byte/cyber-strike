@@ -539,7 +539,7 @@ export default function Page() {
         }),
       )
       // Hide legacy synthetic requestAnalysis transcript entries. Current Extension
-      // status is read from the request inventory and shown by the Agent Proxy card.
+      // status is read from the request inventory and shown by the Extension Agent Tasks panel.
       return ordinary
     },
     emptyUserMessages,
