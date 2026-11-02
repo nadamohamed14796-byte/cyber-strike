@@ -57,8 +57,10 @@ describe("TUI captured request grouping", () => {
     ])
     const operations = groups[0]!.endpoints[0]!.operations
     expect(operations).toHaveLength(2)
-    expect(operations[0]!.requests.map((capture) => capture.id)).toEqual(["req_1", "req_2"])
-    expect(operations[1]!.operation).toBe("mutation:UpdateViewer")
+    const query = operations.find((operation) => operation.operation === "query:Viewer")!
+    const mutation = operations.find((operation) => operation.operation === "mutation:UpdateViewer")!
+    expect(query.requests.map((capture) => capture.id)).toEqual(["req_1", "req_2"])
+    expect(mutation.requests.map((capture) => capture.id)).toEqual(["req_3"])
   })
 
   test("keeps unknown hosts grouped instead of dropping requests", () => {
