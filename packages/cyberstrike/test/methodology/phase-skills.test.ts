@@ -6,21 +6,29 @@ import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from 
 import { Skill } from "../../src/skill"
 import { Instance } from "../../src/project/instance"
 import type { SkillIndex } from "../../src/skill/index-engine"
-import { RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
+import { RECON_SPECIALIZED_ASSET_PROMPT } from "../../src/methodology/recon"
 
 describe("Recon prompt specialization", () => {
-  test("keeps coverage detail without duplicating the canonical workflow", () => {
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("RECON COVERAGE MATRIX")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("DNS and subdomain coverage")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Infrastructure/ASN and origin leads")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("JavaScript and client-side surfaces")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Specialized asset types")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Coverage accounting")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("orchestrator remains the single source of truth")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("0. Read and validate the scope")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("recon_checkpoint(action=")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("4. Collect URLs from independent sources")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT.length).toBeLessThan(7000)
+  test("keeps only the non-web asset extension outside the canonical recon playbooks", () => {
+    expect(RECON_SPECIALIZED_ASSET_PROMPT).toContain("SPECIALIZED NON-WEB ASSET HANDLING")
+    expect(RECON_SPECIALIZED_ASSET_PROMPT).toContain("typed asset record")
+    expect(RECON_SPECIALIZED_ASSET_PROMPT).toContain("permitted test surface")
+    expect(RECON_SPECIALIZED_ASSET_PROMPT).not.toContain("RECON COVERAGE MATRIX")
+    expect(RECON_SPECIALIZED_ASSET_PROMPT).not.toContain("JavaScript and client-side surfaces")
+    expect(RECON_SPECIALIZED_ASSET_PROMPT.length).toBeLessThan(2500)
+  })
+
+  test("the JS phase loads its specialist on evidence and publishes one canonical inventory index", async () => {
+    const promptPath = path.resolve(import.meta.dir, "../../src/command/template/recon.txt")
+    const prompt = await Bun.file(promptPath).text()
+    expect(prompt).toContain('skill(action="load", name="attack-javascript-analysis")')
+    expect(prompt).toContain("url_sources")
+    expect(prompt).toContain("ingest_javascript_urls")
+    expect(prompt).toContain("collection_complete=true")
+    expect(prompt).toContain("analysis_complete=true")
+    expect(prompt).toContain("inventory index")
+    expect(prompt).toContain("javascript/asset-manifest.json")
+    expect(prompt).toContain("endpoints.txt")
   })
 })
 
@@ -88,7 +96,7 @@ describe("Phase-critical skill pinning", () => {
         const skill = await Skill.get("recon-master")
         expect(skill, "recon-master must be registered and loadable").toBeDefined()
         for (const heading of [
-          "## 01. Core reconnaissance methodology",
+          "## 01. Cross-asset attribution and delta analysis",
           "## 02. Subdomain enumeration and validation",
           "## 03. ASN and infrastructure mapping",
           "## 04. Origin IP exposure assessment",
@@ -106,14 +114,23 @@ describe("Phase-critical skill pinning", () => {
           "recon-origin-ip-discovery", "recon-port-service-discovery",
           "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon", "attack-web-recon",
         ]) expect(await Skill.get(retired), retired + " must not remain a separately loadable skill").toBeUndefined()
-        expect(skill!.content).toContain("HTTP method policy")
-        expect(skill!.content).toContain("Tool selection and runtime discipline")
+        expect(skill!.content).toContain("Purpose and ownership")
+        expect(skill!.content).toContain("attack-javascript-analysis")
+        expect(skill!.content).toContain("first_seen")
+        expect(skill!.content).toContain("removed-from-current-observation")
         expect(skill!.content).toContain("Source coverage and count semantics")
         expect(skill!.content).toContain("zero-results")
-        expect(skill!.content).toContain("Candidate handoff record")
-        expect(skill!.content).toContain("negative_control_needed")
-        expect(skill!.content).toContain("removed-from-current-observation")
+        expect(skill!.content).not.toContain("## Mandatory startup contract")
+        expect(skill!.content).not.toContain("## Engagement workflow")
+        expect(skill!.content).not.toContain("## Tool selection and runtime discipline")
+        expect(skill!.content).not.toContain("### HTTP method policy")
+        expect(skill!.content).not.toContain("### Candidate handoff record")
         expect(skill!.content).toMatch(/stop conditions/i)
+
+        const correlation = await Skill.get("attack-finding-correlation")
+        expect(correlation?.content).toContain("negative_control_needed")
+        expect(correlation?.content).toContain("candidate_skill")
+        expect(correlation?.content).toContain("first_seen")
       },
     })
   })
@@ -218,8 +235,12 @@ describe("Phase-critical skill pinning", () => {
 
   test("recon phases pin the master skill and keep specialist fan-out optional", () => {
     expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
-    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
-    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(["recon-master"])
+    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(["recon-master"])
+    expect(PHASE_REQUIRED_SKILLS.passive_recon).not.toContain("attack-javascript-analysis")
+    expect(PHASE_REQUIRED_SKILLS.active_recon).not.toContain("attack-javascript-analysis")
+    expect(skillQueriesForPhase("passive_recon")).not.toContain("attack-javascript-analysis")
+    expect(skillQueriesForPhase("active_recon")).not.toContain("attack-javascript-analysis")
     const retiredReconSkills = [
       "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
       "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
@@ -250,6 +271,7 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-master")
     expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-master")
+    expect(skillQueriesForPhase("passive_recon")).not.toContain("attack-javascript-analysis")
     expect(skillQueriesForPhase("passive_recon")).not.toContain("recon-subdomain-enumeration")
     expect(skillQueriesForPhase("passive_recon")).not.toContain("recon-asn-infrastructure")
     expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
@@ -380,7 +402,7 @@ describe("Methodology phase skill routing", () => {
     })
   })
 
-  test("recon phases rank their base and specialized skills without dropping skill retrieval", () => {
+  test("recon phases rank the canonical playbook while keeping JavaScript analysis evidence-triggered", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
       description: "Reconnaissance enumeration and discovery",
@@ -392,12 +414,11 @@ describe("Methodology phase skill routing", () => {
       prerequisites: [],
       severity_boost: {},
     })
-    const ranked = rankSkillsForPhase("active_recon", [
-      "recon-master", "attack-javascript-analysis",
-    ].map(makeSkill))
+    const ranked = rankSkillsForPhase("active_recon", ["recon-master"].map(makeSkill))
     const names = ranked.map((skill) => skill.name)
     expect(names).toContain("recon-master")
-    expect(names).toContain("attack-javascript-analysis")
+    expect(PHASE_REQUIRED_SKILLS.active_recon).not.toContain("attack-javascript-analysis")
+    expect(skillQueriesForPhase("active_recon")).not.toContain("attack-javascript-analysis")
   })
 
   test("phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
