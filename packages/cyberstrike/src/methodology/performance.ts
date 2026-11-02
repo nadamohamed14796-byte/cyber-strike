@@ -31,7 +31,7 @@ export namespace AgentPerformance {
     explore: {
       codename: "GHOST",
       archetype: "stealthy",
-      strengths: ["codebase analysis", "pattern discovery", "recon"],
+      strengths: ["codebase analysis", "repository exploration", "source-code pattern discovery"],
     },
     "cloud-security": {
       codename: "AURORA",
@@ -245,7 +245,7 @@ export namespace AgentPerformance {
 
     for (const agentName of phaseDef.agents) {
       const bones = BONES[agentName]
-      if (!bones || agentName === "cyberstrike") continue
+      if (!bones || (agentName === "cyberstrike" && phaseId !== "reporting")) continue
 
       const stats = getOrCreate(sessionID, agentName)
       let score = stats.performanceScore > 0 ? stats.performanceScore : 50
@@ -277,8 +277,13 @@ export namespace AgentPerformance {
   export function selectAgentForMission(sessionID: string, missionType: string): { agent: string; reason: string } {
     const candidates: Array<{ name: string; score: number; reason: string }> = []
 
+    const isRepositoryMission = /\b(codebase|repository|repo|source[- ]code|implementation)\b/i.test(missionType)
+
     for (const [name, bones] of Object.entries(BONES)) {
-      if (name === "cyberstrike") continue // orchestrator doesn't do missions
+      if (name === "cyberstrike") continue // orchestrator doesn't do specialist missions
+      // The codebase-only Explore agent must not win generic target recon or
+      // vulnerability work just because "recon" appeared in its old strengths.
+      if (name === "explore" && !isRepositoryMission) continue
 
       const stats = getOrCreate(sessionID, name)
       let score = stats.performanceScore
