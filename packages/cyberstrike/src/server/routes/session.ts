@@ -1970,7 +1970,10 @@ export const SessionRoutes = lazy(() =>
             log.info("ingest dry-run (text)", { sessionID })
             log.info("prompt preview:\n" + promptText)
           } else {
-            const agentName = body.agent ?? "proxy-agent"
+            // Plain-text extension tasks are not automatically Proxy tasks. Honor an
+            // explicit agent selection; otherwise use the general-purpose agent.
+            // HTTP captures continue through the dedicated proxy orchestrator above.
+            const agentName = body.agent ?? "general"
             const brokerSession = await getOrCreateProxyBrokerSession({
               parentSessionID: activeSessionID,
             })
