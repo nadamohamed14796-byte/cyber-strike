@@ -468,7 +468,7 @@ test("representative skills in the full catalog can be loaded into context", asy
           const selected = [
             "target-workspace-workflow",
             "community-tool-selection",
-            "recon-methodology",
+            "recon-master",
             "attack-javascript-analysis",
             "wstg-authz-04",
           ]
