@@ -7,7 +7,7 @@ author: "CyberStrike contributors; consolidated with upstream attribution"
 tags: [subdomain, takeover, dns, cname, cloud]
 tech_stack: [dns, http, cloud, cdn]
 cwe_ids: [CWE-350]
-chains_with: [recon-methodology, attack-triage-validation]
+chains_with: [recon-master, attack-triage-validation]
 prerequisites:
   - "The hostname must be explicitly in scope"
   - "Permission for DNS/service validation; no unauthorized resource claiming"
