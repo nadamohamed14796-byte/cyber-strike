@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js"
+import { createEffect, createMemo, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 
