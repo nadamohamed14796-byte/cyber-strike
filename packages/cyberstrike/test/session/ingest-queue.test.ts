@@ -5,6 +5,7 @@ import { SessionQueueStatus } from "../../src/session/queue-status"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
+import { Agent } from "../../src/agent/agent"
 import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
 import { Server } from "../../src/server/server"
@@ -1176,7 +1177,28 @@ describe("captured request HTTP route scope gate", () => {
         const children = await Session.children(parent.id)
         const taskSessions = children.filter((child) => child.title === "Extension Agent Tasks")
         expect(taskSessions).toHaveLength(1)
-        expect(taskSessions[0]?.parentID).toBe(parent.id)
+        const taskSession = taskSessions[0]!
+        expect(taskSession.parentID).toBe(parent.id)
+
+        // The route returns as soon as the child task is queued. Wait for the
+        // actual synthetic user turn, proving the Agent received the extension
+        // input instead of merely creating an empty child session.
+        let taskMessages = await Session.messages({ sessionID: taskSession.id })
+        for (let attempt = 0; attempt < 100 && !taskMessages.some((message) => message.info.role === "user"); attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          taskMessages = await Session.messages({ sessionID: taskSession.id })
+        }
+        const taskUserMessage = taskMessages.find((message) => message.info.role === "user")
+        expect(taskUserMessage).toBeDefined()
+        expect(taskUserMessage?.info.agent).toBe(await Agent.defaultAgent())
+        expect(
+          taskUserMessage?.parts.some(
+            (part) =>
+              part.type === "text" &&
+              part.synthetic === true &&
+              part.text.includes("Inspect the captured page context"),
+          ),
+        ).toBe(true)
         expect(await Session.messages({ sessionID: parent.id })).toHaveLength(0)
       } finally {
         const children = await Session.children(parent.id).catch(() => [])
