@@ -197,7 +197,11 @@ export namespace IngestQueue {
   /** Release a reservation when normalization, deduplication, or validation
    * determines that no Proxy Agent turn should be created for this capture. */
   export function skipReserved(reservation: Reservation) {
-    void reservation.previous.then(() => reservation.release())
+    // A skipped slot has no work, so settle its pending counter immediately.
+    // Its FIFO chain is still ordered because the chain was created as
+    // previous.then(() => slot); resolving slot cannot move later work ahead
+    // of the reservation's predecessor.
+    reservation.release()
   }
 
   /**
