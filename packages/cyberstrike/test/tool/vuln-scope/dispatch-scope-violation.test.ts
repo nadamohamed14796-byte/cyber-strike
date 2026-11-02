@@ -46,6 +46,16 @@ describe("dispatchScopeViolation", () => {
       expect(dispatchScopeViolation("proxy-tester-authz", "Test Auth Bypass")).toBeNull()
     })
 
+    test("authn tester is rejected for an explicit authorization-bypass objective", () => {
+      const result = dispatchScopeViolation("proxy-tester-authn", "Test Authorization Bypass")
+      expect(result?.inferred).toBe("authz")
+    })
+
+    test("authz tester is rejected for an explicit authentication-bypass objective", () => {
+      const result = dispatchScopeViolation("proxy-tester-authz", "Test Authentication Bypass")
+      expect(result?.inferred).toBe("authn")
+    })
+
     test("LLM tester dispatched for prompt-injection objective", () => {
       expect(dispatchScopeViolation("proxy-tester-llm", "Test indirect prompt injection in chatbot")).toBeNull()
     })
