@@ -458,7 +458,13 @@ A free-text field alone is NOT proof of a database sink, executable reflection, 
 
 Do this only after any justified analyzer run is COMPLETE and you reviewed its output. The analyzer is NEVER part of the tester batch; when it was correctly skipped because no architecture delta exists, do not run it merely to satisfy ordering.
 
-Dispatch the single highest-value specialist only when its own hypothesis has an observed signal, a safe authorized test path, and a clear evidence goal. One relevant specialist is enough when it fully addresses the demonstrated evidence gap. A second specialist is allowed only for a genuinely independent hypothesis with distinct evidence and a separate validation goal. Do not automatically launch every tester whose category might loosely fit the endpoint. If more than two lanes appear plausible, rank them, dispatch the strongest supported one or two, and record the remaining hypotheses with the exact missing evidence. If no active hypothesis meets the gate, do passive analysis and record what is missing.
+Build an evidence-backed coverage decision for every registered specialist lane against the canonical endpoint family and the current method/operation. Evaluate all available lanes — IDOR/BOLA, authorization, mass assignment, injection, authentication/session, business logic, SSRF, file handling, and LLM — but mark a lane applicable only when the combined request, response, JavaScript/contract, role/object, and workflow evidence supports its specific hypothesis and a safe authorized test path. A path, verb, parameter name, or technology label alone is not enough.
+
+Dispatch **every lane that remains independently justified**, not merely the first or highest-ranked lane. The Task runtime limit of two sibling foreground specialists is a **concurrency limit, not a total-dispatch limit**: run supported lanes in batches of at most two, wait for each batch, reconcile its results and new evidence, then dispatch the next still-justified lane. Continue until every candidate lane has a terminal decision: tested with an evidence-backed result, explicitly not applicable with the reason, blocked with the exact missing prerequisite/policy/tool, or pending with a concrete resume condition. Do not silently drop a supported lane because two other testers already ran; do not impose an arbitrary total tester or attempt count.
+
+Before dispatch, search the live skill catalog for each concrete signal and load **all materially relevant canonical skills** for the selected lane(s), not just the first search hit. Verify every loaded skill returned its full content. Give each specialist the exact current `request_id`, endpoint/method, evidence and source references, roles/objects/credentials, hypothesis, baseline/negative control, safe test constraints, and the skill/playbook paths it must independently read. If a skill is missing or denied, record that exact gap but do not suppress a tester whose observed evidence independently justifies the lane.
+
+Avoid duplicate work by comparing endpoint-family + method/operation + specialist lane + hypothesis/evidence fingerprint against completed tests. Reuse a completed result when the evidence is unchanged; reopen only the affected lane when new methods, parameters, identities, roles, tenants, object ownership, source sinks, response behavior, or workflow state materially changes the hypothesis. If no lane passes its evidence/safety gate, finish passive analysis and state exactly what evidence would make a lane testable.
 
 Illustrative example only — use this pair only if both hypotheses are supported by the actual captured request:
 ```
@@ -515,11 +521,11 @@ For each candidate specialist, state the observed signal, the specific hypothesi
 2. **Always query session context** - use accumulated knowledge to inform decisions
 3. **Don't use rigid routing rules** - analyze request characteristics dynamically
 4. **Give agents specific instructions** - explain what to test and why
-5. **Keep tester dispatch bounded** - launch one best-fit specialist by default; launch a second only when it addresses a distinct, independently evidenced hypothesis. Never fan out to every tester or repeat a completed lane without a meaningful evidence delta.
+5. **Cover every evidence-supported tester lane** - do not stop after the first one or two specialists. Run all independently justified lanes in batches of at most two concurrent foreground specialists; the concurrency bound is not a total-dispatch cap. Reconcile each batch before selecting the next, and keep unsupported lanes explicitly not applicable rather than launching them.
 6. **Require a credible hypothesis** - a single credential can support a bounded IDOR hypothesis only when an object identifier and a relevant authorization boundary are evidenced; do not launch agents merely because context is limited.
 7. **Prioritize high-impact tests** - SSRF to cloud metadata is critical, XSS is important but lower priority
 8. **Trust agent self-assessment** - agents will skip if truly not applicable
-9. **Be comprehensive but efficient** - preserve every supported hypothesis, but automatically dispatch no more than two independent specialist lanes for one captured request. Keep other plausible lanes as hypotheses until new evidence justifies them; never sacrifice evidence quality for breadth.
+9. **Be comprehensive without duplicate work** - every independently supported hypothesis must reach a terminal decision. There is no fixed total tester count: process the justified lanes in bounded batches, and avoid repeating a completed lane unless a meaningful evidence delta changes its hypothesis.
 10. **Update approach based on findings** - if agents consistently skip, reconsider selection logic
 
 ## Output
@@ -528,9 +534,10 @@ After orchestration, provide a brief summary:
 - What was analyzed (endpoint, method, key parameters)
 - Credential used (or unauthenticated)
 - Key architecture discoveries (new objects, roles, functions)
-- Which testing agents were launched and why
+- Every specialist lane evaluated, its observed signal, and whether it was dispatched, completed, not applicable, blocked, or pending
+- Which skills/playbook references were loaded for each dispatched lane (and exact lookup gaps)
 - High-level results from each agent
-- What testing is pending (awaiting more context or re-test queue)
+- What testing remains pending and its concrete resume condition
 
 Keep the summary concise - the detailed findings are in vulnerability reports from subagents.
 
