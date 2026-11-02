@@ -69,7 +69,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
     onSyncSession?: SyncSessionFn
-  onSyncTodo?: SyncSessionFn
+    onSyncTodo?: SyncSessionFn
     agentColor?: AgentColorFn
   }) => {
     return {
