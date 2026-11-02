@@ -29,7 +29,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return sync.data.session.find(
       (item) =>
         item.parentID === current.id &&
-        (item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
+        (item.title === "Extension Agent Tasks" || item.title === "Agent Proxy" || item.title === "Extension Proxy Broker (@proxy-agent subagent)"),
     )
   })
   // Automatic Impact Hunter runs are direct children of the root session.
@@ -46,7 +46,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     const visited = new Set<string>()
     while (cursor?.parentID && !visited.has(cursor.id)) {
       visited.add(cursor.id)
-      if (cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") return true
+      if (cursor.title === "Extension Agent Tasks" || cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") return true
       cursor = all.find((item) => item.id === cursor?.parentID)
     }
     return false
