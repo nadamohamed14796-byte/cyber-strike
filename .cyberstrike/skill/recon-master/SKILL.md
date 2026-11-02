@@ -2,29 +2,33 @@
 name: recon-master
 description: "Professional scope-aware reconnaissance handbook with one workflow, conditional specialist procedures, clear evidence standards, and phase-based outputs."
 category: information-gathering
-version: "2.2.0"
+version: "2.3.0"
 author: "CyberStrike contributors"
 tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, asn, cidr, origin-ip, vhost, ports, services, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, error-logs, asset-inventory, scope, evidence, tool-selection]
 tech_stack: [dns, http, tls, tcp, javascript, api, cloud, browser, git, smtp]
 prerequisites: []
-chains_with: [community-tool-selection, attack-javascript-analysis, attack-shadow-api, attack-subdomain-takeover, attack-api-contract-testing]
+chains_with: [community-tool-selection, target-workspace-workflow, attack-javascript-analysis, attack-finding-correlation, attack-shadow-api, attack-subdomain-takeover, attack-api-contract-testing]
 ---
-
 # Recon Master
 
-## Purpose and operating model
+## Purpose and ownership
 
-This is the single entry point for reconnaissance in CyberStrike. It combines the core methodology and eleven specialist procedures into one ordered handbook. Load it after scope is accepted and persisted, and before invoking reconnaissance tools.
+This skill is the canonical library of **conditional, technique-specific reconnaissance procedures**. It is not a second run orchestrator. Load it for its relevant chapters; do not execute every chapter merely because it exists.
 
-The handbook is **workflow-first and branch-aware**:
-- Follow the core methodology for every engagement.
-- Select specialist chapters only when the target shape, evidence, technology, or explicit authorization makes them relevant.
-- Do not run every technique against every target merely because it exists in this file.
-- Keep discovery, attribution, authorization, and vulnerability proof as separate claims.
+One owner is authoritative for each cross-cutting responsibility:
+
+- `/recon` owns engagement order, evidence-driven phase progression, scope setup, source selection decisions, checkpoints, resume behavior, and the final run summary.
+- `recon_checkpoint` owns resumable phase state and artifact completion checks. `RECON_PHASE_TOOL_MATRIX.md` is the shared reference for phase outputs and completion criteria.
+- `community-tool-selection` and its `TOOLING_CATALOG.md` own the shared tool/helper catalog, installation guidance, and executable preflight. Do not reproduce tool inventories here.
+- `target-workspace-workflow` owns the canonical workspace layout, artifact paths, persistence rules, and target isolation.
+- `attack-javascript-analysis` owns JavaScript/HTML/source-map acquisition, per-file analysis, queue recovery, and JS-derived candidates.
+- `attack-finding-correlation` owns endpoint aggregation, provenance-preserving evidence graphs, deduplication, and specialist handoffs.
+
+This handbook owns only the detailed techniques in its numbered chapters. When a task crosses one of the boundaries above, hand it to that owner instead of copying its procedure into this skill.
 
 ## Contents
 
-1. [Core reconnaissance methodology](#01-core-reconnaissance-methodology)
+1. [Cross-asset attribution and delta analysis](#01-cross-asset-attribution-and-delta-analysis)
 2. [Subdomain enumeration and validation](#02-subdomain-enumeration-and-validation)
 3. [ASN and infrastructure mapping](#03-asn-and-infrastructure-mapping)
 4. [Origin IP exposure assessment](#04-origin-ip-exposure-assessment)
@@ -36,40 +40,9 @@ The handbook is **workflow-first and branch-aware**:
 10. [Email domain security assessment](#10-email-domain-security-assessment)
 11. [Exposed error-log analysis](#11-exposed-error-log-analysis)
 
-## Mandatory startup contract
+## Shared boundaries
 
-Immediately after scope acceptance and persistence:
-
-1. Read the program policy, exact in-scope assets, exclusions, wildcard semantics, allowed methods, rate limits, scan windows, and authentication constraints.
-2. Initialize or resume the canonical target workspace and recon_checkpoint; reuse existing evidence instead of repeating completed work.
-3. Load recon-master through SkillTool. This is the required reconnaissance playbook.
-4. Load community-tool-selection, then read its single TOOLING_CATALOG.md using the path and base directory returned by the skill loader. Never resolve that path against the target workspace.
-5. Build the engagement plan from the scope shape and evidence. Start with passive sources, then run only authorized active validation.
-6. Persist evidence and checkpoint state incrementally. Report verified outputs, skipped branches with reasons, errors, coverage gaps, and next actions.
-
-Do not ask the user to repeat information already present in the persisted scope. Ask only when authorization or a genuinely required input is missing.
-
-## Scope and authorization gates
-
-- An asset is eligible only when it is explicitly in scope or covered by the program's documented wildcard semantics.
-- A discovered hostname, IP, ASN, CIDR, sibling domain, cloud address, repository, or mail system does not automatically become authorized.
-- Shared hosting, shared CDNs, cloud-provider ranges, third-party SaaS, and infrastructure adjacency are attribution clues—not scope expansion.
-- Apply exclusions before scheduling requests. Keep exclusions effective across redirects, DNS results, CNAME chains, discovered links, and related infrastructure.
-- Passive collection may reveal leads outside scope; retain only the minimum attribution needed and do not actively probe those leads.
-- Use GET for ordinary read-only discovery. Use HEAD only when reliable. POST requires documented read-only semantics or a safe test fixture plus explicit policy permission. Do not use PUT, PATCH, DELETE, or other state-changing methods in routine recon.
-- Credential-like values, tokens, personal data, and private records must be redacted. Never validate discovered credentials by logging in or replaying them.
-
-## Engagement workflow
-
-| Step | Work | Required decision or output |
-|---|---|---|
-| 1. Establish baseline | Normalize scope, exclusions, existing inventory, prior checkpoints, and known program policy | A stable scope manifest and a resumable workspace |
-| 2. Passive discovery | Collect permitted public DNS, certificate, search, code, documentation, and other relevant sources | Deduplicated candidate assets with source and timestamp |
-| 3. Attribute assets | Resolve DNS, identify ownership signals, classify wildcard behavior, and separate first-party from shared infrastructure | Confidence-rated assets; no inferred scope expansion |
-| 4. Validate live surfaces | Check only eligible hosts with low-impact HTTP/TLS and any explicitly permitted service checks | Live-host and service evidence with status, method, and tool provenance |
-| 5. Map applications | Crawl eligible web surfaces, collect URLs and parameters, identify technologies, and cluster distinct applications | An application inventory and prioritized endpoint queue |
-| 6. Run conditional chapters | Select the relevant specialist procedures from the routing matrix below | Chapter-specific evidence and an explicit applicability decision |
-| 7. Reconcile and hand off | Deduplicate assets/endpoints, correlate evidence, record gaps, and checkpoint | A complete inventory, prioritized next tests, and a reproducible handoff |
+Use the persisted scope and policy supplied by the active run. Asset discovery, DNS relationships, certificates, shared IPs, redirects, script references, and third-party integrations are leads—not permission to expand scope. Recheck every active request and redirect through the runtime scope gate. Keep secrets and personal data redacted, do not execute downloaded code, and leave vulnerability testing to the explicit testing-intent and authorization gate owned by `/recon`.
 
 ## Specialist routing matrix
 
@@ -86,211 +59,31 @@ Do not ask the user to repeat information already present in the persisted scope
 | 10. Email security | A confirmed organization-owned mail domain is in scope | The domain is third-party or mail testing is excluded | SPF/DKIM/DMARC/MX/MTA-STS/TLS-RPT posture with validation limits |
 | 11. Error logs | An in-scope application or public artifact exposes a plausible log/debug resource | A candidate is out of scope or collection would expose excessive personal data/secrets | Minimal redacted proof, disclosure classification, and impact assessment |
 
-## Tool selection and runtime discipline
+## 01. Cross-asset attribution and delta analysis
 
-The community-tool-selection/TOOLING_CATALOG.md is the only shared tool catalog. This handbook defines the task and evidence requirements; the catalog defines tool candidates, installation guidance, and version/flag verification. Do not create per-phase tool inventories. Its `Verified per-tool recon flag guide (2026-11-02)` section contains release-pinned examples for `subfinder`, `httpx`, `dnsx`, `naabu`, `katana`, `ffuf`, Amass, and the separate Nuclei testing boundary, plus the GET/HEAD/POST decision table. Use that section to choose options, then verify every option against the installed binary's own help before execution.
+### Purpose
 
-Before invoking a CLI tool, verify its actual path, installed version, platform compatibility, and the installed version's own help output. Compare with official upstream release notes/docs when current behavior matters. Record the installed version separately from the upstream version checked. Never assume a catalog version is installed, invent a flag, silently upgrade a pinned dependency, or reuse stale CLI syntax.
+Interpret relationships between discovered assets without confusing technical association, ownership, current scope, liveness, and security impact. Use this chapter when several sources disagree, infrastructure is shared, or a prior recon snapshot is available.
 
-Flag selection must follow the evidence gap:
-- All-source/all-resolver modes: use when multiple independent sources materially increase coverage and the request/rate budget supports them.
-- Recursive modes: use only when nested/delegated naming or a documented recursion benefit exists.
-- Wordlists/brute force: require explicit active permission, a justified list, and a bounded rate.
-- All-port/full-range modes: require explicit IP/CIDR authorization and a written reason; otherwise prefer common/evidence-derived ports.
-- Technology-specific flags: require a corroborated fingerprint.
-- Large scopes: batch, deduplicate incrementally, checkpoint continuously, and process every eligible item without arbitrary item caps.
-- Urgent or rate-limited scopes: prioritize high-signal sources and existing evidence; reduce concurrency and back off rather than forcing volume.
+### Attribution
 
-### HTTP method policy
+- Correlate only observed relationships: DNS A/AAAA/CNAME/PTR chains, TLS CN/SAN values, certificate-transparency names, HTTP/TLS fingerprints, redirects, first-party links, script/API origins, and documented organization assets.
+- Classify each relationship as first-party-supported, shared-provider/CDN, third-party service, alias/dependency, historical-only, ambiguous, or unresolved. Preserve the source, observation time, and confidence; a shared IP, certificate SAN, CNAME, or first-party reference does not prove ownership.
+- Keep attribution confidence separate from the persisted scope decision and from vulnerability confidence. An out-of-scope or unresolved lead must not enter active target inventories or be probed.
+- For dependencies, record evidence-backed lifecycle state such as active, deprecated/legacy, orphan-suspected, or unknown. Route suspected takeover or shadow-API work to its dedicated skill only when scope and the required evidence support that handoff.
 
-GET is the default for read-only pages, headers, robots.txt, sitemap, assets, API docs, and normal crawling. HEAD is optional only when the server handles it reliably; fall back to GET when unsupported or materially different. POST is not a generic fallback: use it only when documented endpoint semantics or a normal application workflow requires it, the operation is read-only or uses a safe test fixture, and policy permits it. Preserve content type, body schema, authentication context, and provenance. Keep method-specific endpoint variants; never merge GET and POST into one operation. State-changing methods are outside routine reconnaissance.
+### Delta and freshness
 
-## Evidence, inventory, and handoff contract
+- Compare the current verified snapshot with prior observations for DNS/CNAME/provider changes, TLS/HTTP fingerprints, URLs and method/parameter variants, JS content hashes, authentication coverage, and third-party destinations.
+- Preserve `first_seen`, `last_seen`, and `last_checked` where available. Classify changes as new, changed, stale, removed-from-current-observation, or unresolved; absence from a later collection is not proof that an asset was deleted.
+- Reuse old evidence only while its input, tool/settings, and freshness remain valid. Revalidate changed or stale observations without rerunning unrelated completed collection.
+- Track anonymous and each authorized-role observation separately. A login wall, unavailable test account, or missing role is blocked coverage—not proof that the endpoint is safe.
 
-Every observation must retain enough context to reproduce and judge it:
-- Target/asset and normalized URL or network locator.
-- Observation type, source, source URL or input artifact, timestamp, and collection method.
-- Tool name/version and relevant options when a tool produced the result.
-- Scope/ownership status, confidence, and the reason for that confidence.
-- HTTP method, status, relevant headers, and request/response artifact references when applicable.
-- Errors, rate limits, exclusions, redirects, unresolved attribution, and other limitations.
+### Persistence and handoff
 
-Keep raw output only when it adds unique evidence, reproducibility, or diagnostic value. Prefer normalized JSON/JSONL records and a small set of canonical inventories over a pile of duplicate files. Deduplicate incrementally without discarding source provenance.
-
-### Endpoint and JavaScript handoff
-
-Route JavaScript and API observations to attack-javascript-analysis and the canonical endpoint inventory. Gather JS URLs from every permitted source, deduplicate URLs, fetch eligible files locally, and analyze each downloaded file; a failed or missing download must be recorded rather than silently treated as analyzed. Do not impose arbitrary file-count caps.
-
-Merge static JS candidates and observed HTTP traffic into the same canonical endpoint identity where appropriate, but preserve their provenance and confidence. Keep separate method-specific variants (GET, POST, and so on). A method seen only in traffic is observed-only evidence; do not claim that static JavaScript declared it. Preserve route, parameters, headers, auth signals, GraphQL operations, request/response references, and the source file or captured request. Static endpoints are leads, not proof of reachability or vulnerability.
-
-### Completion checklist
-
-Recon is complete for the current scope window when:
-- Every in-scope asset and relevant candidate has a disposition: verified, excluded, duplicate, unresolved, or deferred with reason.
-- Applicable specialist branches have been run or explicitly marked not applicable with a reason.
-- No arbitrary cap silently discarded eligible hosts, URLs, or files.
-- Tool failures, throttling, unsupported options, and skipped sources are recorded.
-- Assets, endpoints, and method variants are deduplicated without losing provenance.
-- Secrets and personal data are redacted; no discovered credential was used.
-- The phase matrix and recon_checkpoint reflect the final state and next action.
-
-The canonical phase/artifact contract is [RECON_PHASE_TOOL_MATRIX.md](RECON_PHASE_TOOL_MATRIX.md). Use its phase-specific outputs and stop conditions; do not recreate a competing matrix here.
-
-## Specialist playbooks
-
-The following chapters retain the original specialist procedures, reorganized into a single execution-oriented order. Metadata is condensed into each chapter profile; substantive methodology, evidence, verification, tooling guidance, false-positive controls, and handoff instructions are retained.
-
-## 01. Core reconnaissance methodology
-
-### Reconnaissance Methodology
-
-### Chapter profile
-
-**Purpose:** Plan and execute evidence-led, scope-locked reconnaissance that produces a deduplicated, prioritized testing queue
-
-**Prerequisites:** Written authorization, scope rules, exclusions, and permitted testing intensity
-
-**Technology:** `dns`, `http`, `tls`, `javascript`, `api`, `cloud`
-
-**Coverage tags:** `recon`, `enumeration`, `osint`, `subdomain`, `asset-inventory`, `scope`, `infrastructure-lifecycle`, `api-contracts`, `dependency-risk`
-
-**Related security workflows:** `attack-subdomain-takeover`, `attack-idor-automation`, `attack-api-contract-testing`, `attack-dependency-cve-scanning`, `attack-triage-validation`
-
-**Legacy source:** `recon-methodology` v"1.2.0"; credited to CyberStrike contributors; consolidated with upstream attribution.
-
-**Source attribution:** [1](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web2-recon/SKILL.md) · [2](https://github.com/uphiago/recon-skills/blob/main/meta/recon-playbook/SKILL.md) · [3](https://github.com/uphiago/recon-skills/blob/main/meta/pentest-playbook/SKILL.md) · [4](https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md) · [5](https://github.com/uphiago/recon-skills/blob/main/recon/web-enumeration/SKILL.md)
-
-#### Mission
-
-Turn an authorized target list into a scope-checked, deduplicated inventory and prioritized queue of hypotheses. Recon observations are leads, not findings. The goal is to identify the smallest next test likely to establish a meaningful security property while minimizing duplicate work and operational risk.
-
-#### 1. Engagement contract
-
-Before any active request, record:
-- exact assets, wildcard rules, exclusions, third-party services, and program links;
-- allowed recon methods, request rate, scan windows, and prohibited techniques;
-- authentication prerequisites and test accounts;
-- workspace and evidence-retention location;
-- stop conditions for instability, rate limits, unexpected sensitive data, or scope ambiguity.
-
-Public reachability does not imply authorization. Every discovered hostname, IP, API, repository, or third-party service must pass the scope resolver before active testing.
-
-#### 2. Recon pipeline
-
-##### A. Normalize and lock scope
-
-Canonicalize hostnames, schemes, ports, trailing dots, IDNs, wildcard entries, and exclusions. Preserve the original candidate and the normalization decision. Resolve wildcard rules conservatively; do not treat an entire shared CDN or cloud provider as in scope. Keep scope decisions explicit: in-scope, out-of-scope, needs-owner-confirmation, or passive-only.
-
-##### B. Passive discovery first
-
-Use program-provided asset lists, certificate transparency, public DNS history, public code search, archived URLs, public repositories, and other permitted passive sources. Preserve provenance, timestamp, and source reliability. Do not scrape private systems, use leaked credentials, or infer permission from exposed data.
-
-##### C. DNS and infrastructure mapping
-
-Resolve candidates and distinguish confirmed records, aliases, wildcard DNS, parked domains, unresolved names, and stale records. Keep CNAME chains and provider fingerprints. A dangling-looking record or cloud-provider fingerprint is only a lead; verify ownership and current scope before any takeover-related check. DNS resolution is not proof that a hostname is owned or in scope.
-
-##### D. HTTP and service validation
-
-For in-scope hosts, record status, title, redirect chain, TLS certificate, content type, stable response fingerprints, and authentication behavior. Use bounded timeouts, conservative concurrency, and a documented request budget. Avoid broad port scans or content brute force unless explicitly permitted. Do not follow redirects to a different host without rechecking scope.
-
-##### E. Web and API enumeration
-
-Collect URLs from permitted crawling, application traffic, JavaScript bundles, source maps, API documentation, robots/sitemap files, and known application routes. Normalize and deduplicate while retaining parameter names, methods, auth context, source, and discovery time. Separate public routes from authenticated routes, and read-only operations from writes/destructive actions.
-
-For JavaScript assets, retain the asset URL and hash, source-map availability, extracted endpoint/function references, and the evidence connecting each reference to an observed request. Treat strings and comments as leads until runtime traffic or documentation supports them.
-
-##### F. Technology and ownership signals
-
-Record framework, CDN, cloud provider, CMS, API style, authentication mechanism, and likely tenant boundaries only when evidence supports the inference. Keep confidence and evidence for each fingerprint; do not convert a banner, version string, or scanner guess into a vulnerability claim.
-
-##### F.1 Infrastructure and dependency lifecycle
-
-Build a small relationship map from evidence already found: first-party hosts, CNAME destinations, storage/CDN bindings, API hosts and versions, external script/service origins, mail/DNS records when relevant, and source artifacts. Record the exact source and confidence for each relationship. Do not expand into a provider's shared infrastructure or treat an external destination as in scope just because a first-party asset references it.
-
-Classify each dependency as active, deprecated/legacy, orphan-suspected, or unknown. For an orphan-suspected hostname, use current DNS and provider-specific, read-only evidence; route to `attack-subdomain-takeover` only when the hostname is in scope. Never claim a resource, change DNS, publish content, or infer takeover from a CNAME/404 alone. For undocumented or version-drifted API surfaces, preserve version and observation context and route to `attack-shadow-api` or `attack-api-contract-testing`.
-
-When an explicitly authorized source checkout or source artifact contains manifests/lockfiles, route it to `attack-dependency-cve-scanning`. A package name seen in a bundle is not proof of an installed version; a CVE match is not proof that vulnerable code is reachable or deployed. Keep this as an evidence-linked risk inventory, not a new mandatory phase. Merge relationships into the existing target inventory/report instead of creating one file per discovered dependency.
-
-##### G. Authentication-aware coverage
-
-Track which endpoints were tested anonymously and with each authorized role. Record login walls, registration requirements, MFA/OTP dependencies, session expiry, and routes unavailable because the test account lacks permission. Do not label an endpoint untested as safe merely because authentication was unavailable; mark it blocked and retain the dependency.
-
-##### H. Queue construction
-
-For each candidate, store:
-- canonical target and scope decision;
-- source/provenance and first/last-seen timestamps;
-- observation and confidence;
-- explicit security hypothesis and expected policy;
-- required account/role and prerequisites;
-- bounded next validation step and stop condition;
-- priority, deduplication fingerprint, and status.
-
-### Candidate handoff record
-
-The queue item is a reproducible handoff, not merely a URL and a skill name. Include these fields when applicable:
-
-- `canonical_asset` and `scope_evidence`: normalized host/service identity and the exact reason it is eligible, passive-only, excluded, or unresolved.
-- `attribution_confidence`, `discovery_source`, source URL/input artifact, and source observation time.
-- `first_seen`, `last_seen`, and `last_checked` so historical, newly observed, and recently validated evidence remain distinct.
-- `route_key`, HTTP `method`, `parameter_locations`, and `auth_context`; preserve method-specific operation semantics and parameter provenance.
-- `observed_signal`, bounded `hypothesis`, and `negative_control_needed`.
-- `candidate_skill`, `active_test_allowed`, and the prerequisites/authorization basis for any proposed active follow-up.
-- `evidence_refs`, disposition `status`, exact `blocked_reason` when applicable, priority rationale, and `next_action`.
-
-Keep asset-attribution confidence separate from security confidence. A queued item may be a first-party asset with no security hypothesis, or a plausible security signal on an asset whose attribution is still unresolved. Never conflate these states. Do not place credentials or raw secret values in queue records.
-
-Prioritize trust boundaries, newly discovered assets, exposed APIs, cross-tenant behavior, sensitive state transitions, and changes from the previous recon wave. Avoid ranking solely by number of URLs or scanner severity.
-
-#### 3. Delta analysis and resumability
-
-Compare new observations with the previous verified snapshot: hosts/DNS/CNAME/provider changes, TLS/HTTP fingerprints, URL/method/parameter combinations, JavaScript content hashes, authentication state, and third-party destinations. Reuse earlier evidence only when its input, tool/settings, and source freshness/TTL remain valid. Revalidate changed or stale evidence rather than repeating a whole scan. Preserve `first_seen`, `last_seen`, and `last_checked` for assets and routes. Report deltas as new, removed-from-current-observation, changed, stale, or unresolved; absence from a later run is not proof that an asset was deleted or is no longer relevant. Retain the previous evidence and mark its freshness instead of silently deleting it.
-
-Persist item-level outcomes and cursors in the canonical checkpoint/source ledger. Resume unfinished work without resetting completed or rejected items. Missing credentials are a blocker, not an empty/safe result. Keep ownership/scope confidence separate from vulnerability confidence; queue only signal-matched follow-up hypotheses with required roles, baseline/control, one bounded next step, and a stop condition.
-
-#### 4. Evidence and data hygiene
-
-Keep raw outputs outside the source repository unless explicitly required. Store redacted evidence references, not live cookies, bearer tokens, API keys, recovery links, personal data, or secret-bearing environment values. Record the minimum evidence needed to reproduce an observation. Ensure findings can be traced back to asset, request, response, account context, and discovery source.
-
-#### 5. Stop conditions
-
-Stop when a target is out of scope, rate-limited, unstable, serving unexpected private data, or ownership is uncertain. Stop active testing if redirects cross scope, credentials appear in an unexpected destination, or a test triggers real-world side effects. Do not broaden testing after the security property is already demonstrated.
-
-#### 6. Quality gates
-
-Before handing a lead to a testing skill:
-- [ ] scope is explicitly confirmed;
-- [ ] observation is reproducible and provenance is recorded;
-- [ ] duplicate hosts/URLs are normalized without losing method or parameter context;
-- [ ] confidence and uncertainty are explicit;
-- [ ] hypothesis and expected policy are written down;
-- [ ] next test is bounded, authorized, and has a stop condition;
-- [ ] authentication blockers are distinguished from negative results;
-- [ ] lead is not mislabeled as a vulnerability;
-- [ ] evidence contains no secrets or unnecessary personal data.
-
-#### Output contract
-
-Return normalized asset and endpoint inventories, scope decisions, provenance, delta summary, authentication coverage, deduplicated prioritized hypotheses, blockers, and next-step recommendations. Keep discovery facts separate from security conclusions.
-
-#### Recon-specific tool guardrails
-
-- Nuclei is not part of default reconnaissance. Use it only in a separate, explicitly requested testing phase with reviewed templates and required authorization.
-- Use local `git diff` only when reviewing saved artifact changes; it does not replace evidence validation.
-
-Reuse `recon_checkpoint` as the only phase-state ledger. Do not create a second phase manifest or per-phase runner manifest that duplicates its states. Add a small run/item record only when the existing checkpoint/source ledger lacks a necessary cursor, tool version, artifact hash, exit code, or failure detail. Keep raw evidence only when needed for provenance/debugging, normalize once into canonical inventories, and report actual commands/tools used, paths, verified counts, failures, confidence, and the next relevant specialist skill.
-
-#### Adaptive tool selection
-
-The canonical `/recon` prompt and `recon_checkpoint` own initialization, persisted scope, phase order, checkpoint actions, resumability, canonical outputs, and completion/reporting. The checkpoint defines **what work is current and what artifacts prove completion**, not a fixed phase-to-tool assignment. Every connected/registered tool can be considered at every active checkpoint; choose based on its actual capability, current evidence gap, verified availability, saved artifacts, and policy. Consult the single `TOOLING_CATALOG.md` reference through `community-tool-selection` and the `RECON_PHASE_TOOL_MATRIX.md` companion through this skill's returned `<skill_files>` and `Base directory`. The catalog describes candidate tools; the matrix defines phase artifacts and completion criteria. Neither is an execution allowlist.
-
-Load specialist skills only when observed assets, technology, or evidence make their detailed procedure relevant. Select a useful combination of tools dynamically; add alternatives for distinct coverage, corroboration, or recovery, not merely because they are listed. Check schemas/versions only for candidates being considered, avoid repeated preflight/installing the entire catalog, and never reject a suitable tool only because its nominal category differs from the active checkpoint. Distinguish zero results from failure, unavailable, blocked, skipped-by-selection, not applicable, and pending work. The explicit vulnerability-testing checkpoint and all persisted scope, authorization, impact, and rate controls remain mandatory. A phase is complete only after applicable work and saved artifacts are verified, with remaining gaps stated honestly.
-
+Update the existing canonical asset/endpoint records and evidence graph through `target-workspace-workflow` and `attack-finding-correlation`. Do not create a second recon queue, candidate register, delta manifest, or per-host report. Keep the original source evidence and link any candidate to its asset, request/response, method, identity context, confidence, blocker, and next evidence-driven action.
 
 ---
-
----
-
 ## 02. Subdomain enumeration and validation
 
 ### Subdomain Enumeration and Validation
