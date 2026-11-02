@@ -67,11 +67,13 @@ export namespace Send {
     let last: ReplayResponse.Result | undefined
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      if (gov.budget && !gov.budget.tryConsume()) {
-        return last ? { ...last, attempts } : { skipped: "budget", attempts, timing: { totalMs: 0 } }
-      }
+      // Check the host breaker before charging the session budget: a request
+      // rejected locally by an open circuit never reaches the network.
       if (gov.breaker && !gov.breaker.canRequest(now())) {
         return last ? { ...last, attempts } : { skipped: "circuit", attempts, timing: { totalMs: 0 } }
+      }
+      if (gov.budget && !gov.budget.tryConsume()) {
+        return last ? { ...last, attempts } : { skipped: "budget", attempts, timing: { totalMs: 0 } }
       }
 
       attempts++
