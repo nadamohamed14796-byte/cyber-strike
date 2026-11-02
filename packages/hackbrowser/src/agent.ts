@@ -768,15 +768,15 @@ async function explorePageWithAI(
     }
     globalState.authRetryAttempts.add(retryKey)
 
-    let result = await autoLogin(page, credentials)
+    let result = await autoLogin(page, credentials, config.signal)
     if (!result.success && result.error !== "saved_login_origin_mismatch") {
-      result = await aiLogin(page, credentials, model, usageAcc)
+      result = await aiLogin(page, credentials, model, usageAcc, config.signal)
     }
     if (!result.success) {
       log.warn("automatic session recovery did not complete; waiting for operator authentication", {
         reason: result.error,
       })
-      await waitForManualLogin(page, "session re-authentication")
+      await waitForManualLogin(page, "session re-authentication", undefined, config.signal)
     }
 
     pageUrl = page.url()
@@ -1647,7 +1647,9 @@ async function aiLogin(
   credentials: NonNullable<AgentConfig["auth"]["credentials"]>,
   model: LanguageModel,
   usageAcc?: CrawlUsage,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; error?: string }> {
+  if (signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError")
   const originAllowed = () => {
     if (!credentials.origin) return true
     try {
@@ -1705,7 +1707,7 @@ async function aiLogin(
     if (!acted) break
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    await handle2FA(page, credentials.otpProvider, credentials.origin)
+    await handle2FA(page, credentials.otpProvider, credentials.origin, config.signal)
     await page.waitForTimeout(750)
     if (!(await stillOnLogin())) return { success: true }
   }
@@ -2213,7 +2215,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     // Manual login for this credential. Pass position in the sequence so the
     // button shows progress (e.g. "ADMIN (1/2)") and only the final credential
     // says "START SCAN" — earlier ones say "CONFIRM & NEXT".
-    await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length })
+    await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length }, config.signal)
 
     // Register credential with CyberStrike (same as Firefox extension pattern)
     let credentialId = cred.id
@@ -2763,7 +2765,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     // Login flow: --authenticated → manual login, --user/--pass → auto-login, neither → anonymous
     const isAuthenticated = config.auth.authenticated || !!scopedCredentials
     if (config.auth.authenticated) {
-      await waitForManualLogin(page)
+      await waitForManualLogin(page, undefined, undefined, config.signal)
       // Resolve label → UUID. credentialId from the launcher is a user-supplied
       // label ("admin", "user"). The server only accepts PATCH /web/credentials/{uuid},
       // so syncCredentialHeaders (F.2) would 404 silently on every capture without
@@ -2778,21 +2780,21 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
         }
       }
     } else if (scopedCredentials) {
-      const loginResult = await autoLogin(page, scopedCredentials)
+      const loginResult = await autoLogin(page, scopedCredentials, config.signal)
       if (!loginResult.success && loginResult.error !== "saved_login_origin_mismatch") {
         const fallback = model
-          ? await aiLogin(page, scopedCredentials, model, usageAcc)
+          ? await aiLogin(page, scopedCredentials, model, usageAcc, config.signal)
           : { success: false, error: "no_model" }
         if (!fallback.success) {
           log.warn("AI login fallback failed; waiting for operator login", { reason: fallback.error })
-          await waitForManualLogin(page, "initial login")
+          await waitForManualLogin(page, "initial login", undefined, config.signal)
         }
       } else if (loginResult.error === "saved_login_origin_mismatch") {
         log.warn("saved login does not match the current page origin; refusing credential autofill")
-        await waitForManualLogin(page, "external authentication")
+        await waitForManualLogin(page, "external authentication", undefined, config.signal)
       }
     } else {
-      await handle2FA(page)
+      await handle2FA(page, undefined, undefined, config.signal)
     }
 
     // Initialize global state (Aşama 13: outOfScope snapshotted from config)
