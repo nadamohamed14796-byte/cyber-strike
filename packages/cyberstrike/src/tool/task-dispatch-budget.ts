@@ -28,6 +28,9 @@ export function evaluateProxyRequestDispatch(input: {
   const agentMarker = AGENT_MARKER(input.agentID)
   const existing = scoped.find((child) => child.title.includes(agentMarker))
   if (existing) return { allowed: false, reason: "duplicate", existingTaskID: existing.id }
+  if ((input.reservedAgentIDs ?? []).includes(input.agentID)) {
+    return { allowed: false, reason: "duplicate" }
+  }
 
   const isSpecialist = input.agentID.startsWith("proxy-tester-")
   if (!isSpecialist) return { allowed: true }
