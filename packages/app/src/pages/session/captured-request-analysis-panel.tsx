@@ -34,6 +34,32 @@ export function CapturedRequestAnalysisPanel() {
   // Cumulative number of all requests received by this parent session.
   const requestCount = createMemo(() => sync.data.request[parentID()]?.length ?? 0)
 
+  // New extension captures should open the Agent execution view automatically.
+  // Keep the initial count as a baseline so reopening an old session does not
+  // unexpectedly navigate away. The broker may appear in sync data slightly
+  // after the request row, so retain the pending navigation until it is ready.
+  let initialized = false
+  let previousRequestCount = 0
+  let pendingAgentNavigation = false
+
+  createEffect(() => {
+    const count = requestCount()
+    const broker = brokerSession()
+
+    if (!initialized) {
+      initialized = true
+      previousRequestCount = count
+      return
+    }
+
+    if (count > previousRequestCount) pendingAgentNavigation = true
+    previousRequestCount = count
+
+    if (!pendingAgentNavigation || !broker?.id) return
+    pendingAgentNavigation = false
+    navigate(`/${params.dir}/session/${broker.id}`)
+  })
+
   function enterAgentProxy() {
     const childID = brokerSession()?.id
     if (!childID) return
