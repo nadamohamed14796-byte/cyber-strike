@@ -81,6 +81,25 @@ describe("Phase-critical skill pinning", () => {
     })
   })
 
+  test("recon master is loadable and preserves every dedicated recon source procedure", async () => {
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const skill = await Skill.get("recon-master")
+        expect(skill, "recon-master must be registered and loadable").toBeDefined()
+        for (const source of [
+          "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
+          "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
+          "recon-origin-ip-discovery", "recon-port-service-discovery",
+          "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon",
+        ]) expect(skill!.content).toContain("## " + source)
+        expect(skill!.content).toContain("HTTP method selection")
+        expect(skill!.content).toContain("Tool versions and flags")
+        expect(skill!.content).toContain("Stop Conditions")
+      },
+    })
+  })
+
   test("triage skill includes explicit counterevidence closure and severity calibration", async () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
@@ -150,9 +169,9 @@ describe("Phase-critical skill pinning", () => {
   })
 
   test("recon phases pin specialist skills and keep generic guidance optional", () => {
-    expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology"]))
-    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"]))
-    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
+    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"]))
     for (const phase of ["scope_analysis", "passive_recon", "active_recon"] as const) {
       expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-methodology")
       expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("community-tool-selection")
@@ -172,6 +191,9 @@ describe("Methodology phase skill routing", () => {
   test("scope/recon, authorization, reporting, and mobile phases prioritize relevant skill families", () => {
     expect(skillQueriesForPhase("scope_analysis")).toContain("target-workspace-workflow")
     expect(skillQueriesForPhase("scope_analysis")).toContain("attack-bb-methodology")
+    expect(skillQueriesForPhase("scope_analysis")).toContain("recon-master")
+    expect(skillQueriesForPhase("passive_recon")).toContain("recon-master")
+    expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-subdomain-enumeration")
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-asn-infrastructure")
     expect(skillQueriesForPhase("active_recon")).toContain("recon-port-service-discovery")
