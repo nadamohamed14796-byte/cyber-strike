@@ -188,3 +188,19 @@ Version refresh checklist for each selected tool:
 ## Recon tool selection record
 
 For each selected tool, save capability requested, evidence gap, installed version, official version checked, verified flags/options, input scope, rate/concurrency/timeout, output format, exit status, artifact path, and reason for selection. For alternatives, state the distinct coverage or recovery value. Do not run equivalent tools just to increase counts.
+## Verified upstream release snapshot (2026-11-02)
+
+These are official GitHub `releases/latest` tags checked on 2026-11-02. They are **upstream reference versions**, not claims about the versions installed in any CyberStrike runtime. The agent must still inspect the local binary version and help output before use.
+
+| Tool | Latest upstream tag checked | Release date (UTC) | Official release |
+|---|---:|---|---|
+| subfinder | v2.17.0 | 2026-10-08 | https://github.com/projectdiscovery/subfinder/releases/tag/v2.17.0 |
+| httpx | v1.12.0 | 2026-09-08 | https://github.com/projectdiscovery/httpx/releases/tag/v1.12.0 |
+| dnsx | v1.3.1 | 2026-08-31 | https://github.com/projectdiscovery/dnsx/releases/tag/v1.3.1 |
+| naabu | v2.7.0 | 2026-10-28 | https://github.com/projectdiscovery/naabu/releases/tag/v2.7.0 |
+| katana | v1.8.0 | 2026-10-05 | https://github.com/projectdiscovery/katana/releases/tag/v1.8.0 |
+| nuclei | v3.11.1 | 2026-08-08 | https://github.com/projectdiscovery/nuclei/releases/tag/v3.11.1 |
+| ffuf | v2.3.0 | 2026-09-09 | https://github.com/ffuf/ffuf/releases/tag/v2.3.0 |
+| OWASP Amass | v5.1.3 | 2026-10-25 | https://github.com/owasp-amass/amass/releases/tag/v5.1.3 |
+
+Recheck this table during maintenance; never assume it remains current. Amass v5 is a major CLI generation change: do not reuse v3/v4 command recipes without checking v5 help and migration documentation. Nuclei is not part of default recon; it remains an explicitly requested vulnerability-testing tool.
