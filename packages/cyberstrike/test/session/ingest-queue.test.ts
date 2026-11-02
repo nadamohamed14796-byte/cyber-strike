@@ -1319,3 +1319,30 @@ describe("Request.findEquivalentProcessed - anonymous capture identity", () => {
   })
 })
 
+
+describe("IngestQueue.skipReserved", () => {
+  test("settles skipped reservations immediately without breaking FIFO order", async () => {
+    await withInstance(async () => {
+      const sessionID = "skip-reserved-fifo"
+      const first = IngestQueue.reserve(sessionID)
+      const duplicate = IngestQueue.reserve(sessionID)
+      expect(IngestQueue.pendingCount(sessionID)).toBe(2)
+
+      IngestQueue.skipReserved(duplicate)
+      expect(IngestQueue.pendingCount(sessionID)).toBe(1)
+
+      const started: string[] = []
+      IngestQueue.enqueue(sessionID, async () => {
+        started.push("third")
+      })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(started).toEqual([])
+
+      IngestQueue.skipReserved(first)
+      await new Promise((resolve) => setTimeout(resolve, 15))
+      expect(started).toEqual(["third"])
+      expect(IngestQueue.pendingCount(sessionID)).toBe(0)
+    })
+  })
+})
+
