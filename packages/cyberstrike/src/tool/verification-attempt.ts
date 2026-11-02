@@ -1,6 +1,7 @@
 import z from "zod"
 import { Tool } from "./tool"
 import { Session } from "../session"
+import { Request } from "../session/request"
 import { VerificationLedger } from "../session/verification-ledger"
 import { VerificationAttempts as Policy } from "../methodology/verification-attempts"
 import { redactTargetNoteSecrets } from "../target/redact"
@@ -19,7 +20,7 @@ const RecordAction = z.object({
   variant_key: z.string().min(1).describe("Meaningful context/input variant; identical strategy+variant retries do not count."),
   rationale: z.string().min(1).describe("Why this is the next most informative test based on previous results."),
   result_summary: z.string().min(1).describe("What actually happened; never write a guessed result."),
-  evidence_ref: z.string().optional().describe("Reference to stored request/response, artifact, or reproducible evidence. Required when valid_conditions=true so the result is evidence-backed."),
+  evidence_ref: z.string().optional().describe("ID of a captured request in this session's Requests table. Required when valid_conditions=true; free-form text and IDs from other sessions are rejected."),
   valid_conditions: z.boolean().describe("True only when prerequisites, identity/session, scope, and test setup were valid."),
   decisive_result: z.enum(["none", "confirmed", "disproven"]).optional().default("none"),
   blocked_reason: z.string().optional(),
@@ -42,16 +43,26 @@ type VerificationAttemptMetadata = {
 
 export const VerificationAttemptTool = Tool.define<typeof Parameters, VerificationAttemptMetadata>("verification_attempt", {
   description:
-    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. There is no arbitrary fixed hypothesis-count ceiling; exact strategy_id + variant_key retries are deduplicated. Only attempts with valid_conditions=true AND a durable evidence_ref are evidence-backed; missing evidence references are rejected for valid attempts, and duplicate retries do not consume the budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, or WAF response alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN outcome requires valid conditions and direct contradictory evidence_ref, not a minimum number of attempts. If unresolved, status remains INCONCLUSIVE / NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
+    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. There is no arbitrary fixed hypothesis-count ceiling; exact strategy_id + variant_key retries are deduplicated. evidence_ref must be an actual captured request ID belonging to this session; free-form references and IDs from other sessions are rejected. Only attempts with valid_conditions=true AND a verified request reference are evidence-backed; missing or invalid references are rejected for valid attempts, and duplicate retries do not consume the budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, or WAF response alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN outcome requires valid conditions and direct contradictory evidence_ref, not a minimum number of attempts. If unresolved, status remains INCONCLUSIVE / NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
   parameters: Parameters,
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
     const hypothesisKey = redactTargetNoteSecrets(params.hypothesis_key)
-    if (params.action === "record" && params.valid_conditions && !params.evidence_ref?.trim()) {
-      return {
-        title: "Verification attempt rejected: evidence reference required",
-        output: "No attempt was recorded. valid_conditions=true requires evidence_ref pointing to a stored request/response, artifact, or reproducible observation. If evidence is not available, record valid_conditions=false and keep the hypothesis inconclusive until evidence is preserved.",
-        metadata: { hypothesisKey, attemptsUsed: 0,  outcome: "inconclusive", canContinue: true },
+    if (params.action === "record") {
+      const evidenceRef = params.evidence_ref?.trim() || undefined
+      if (evidenceRef && !Request.findById(sessionID, evidenceRef)) {
+        return {
+          title: "Verification attempt rejected: request reference not found",
+          output: "No attempt was recorded. evidence_ref must be the ID of a captured request in the current session. The supplied reference does not match a request stored in this session. Use the captured request ID from the Requests list.",
+          metadata: { hypothesisKey, attemptsUsed: 0, outcome: "inconclusive", canContinue: true },
+        }
+      }
+      if (params.valid_conditions && !evidenceRef) {
+        return {
+          title: "Verification attempt rejected: evidence reference required",
+          output: "No attempt was recorded. valid_conditions=true requires evidence_ref containing an existing captured request ID from this session. If no captured request supports the attempt, record valid_conditions=false and keep the hypothesis inconclusive until evidence is preserved.",
+          metadata: { hypothesisKey, attemptsUsed: 0, outcome: "inconclusive", canContinue: true },
+        }
       }
     }
     if (params.action === "status") {
@@ -80,6 +91,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       }
     }
 
+    const evidenceRef = params.evidence_ref?.trim() || undefined
     const result = VerificationLedger.record({
       sessionID,
       hypothesisKey,
@@ -93,7 +105,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
         resultSummary: redactTargetNoteSecrets(params.blocked_reason
           ? `${params.result_summary} [Blocked: ${params.blocked_reason}]`
           : params.result_summary),
-        evidenceRef: safeLedgerText(params.evidence_ref),
+        evidenceRef: safeLedgerText(evidenceRef),
         validConditions: params.valid_conditions,
       },
       decisiveResult: params.decisive_result,
