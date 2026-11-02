@@ -204,7 +204,15 @@ export function applyDirectoryEvent(input: {
     }
     case "session.queue.status": {
       const props = event.properties as { sessionID: string; status: State["session_queue_status"][string] }
-      input.setStore("session_queue_status", props.sessionID, reconcile(props.status))
+      input.setStore(
+        produce((draft) => {
+          if (!props.status.paused && props.status.pending === 0) {
+            delete draft.session_queue_status[props.sessionID]
+            return
+          }
+          draft.session_queue_status[props.sessionID] = props.status
+        }),
+      )
       break
     }
     case "message.updated": {
