@@ -155,15 +155,15 @@ describe("lazy tool registry snapshot reconciliation", () => {
       await Instance.provide({
         directory: first.path,
         fn: () => {
-          expect(LazyToolRegistry.search("project alpha")).toHaveLength(1)
-          expect(LazyToolRegistry.search("project beta")).toHaveLength(0)
+          expect(LazyToolRegistry.search("alpha")).toHaveLength(1)
+          expect(LazyToolRegistry.search("beta")).toHaveLength(0)
         },
       })
       await Instance.provide({
         directory: second.path,
         fn: () => {
-          expect(LazyToolRegistry.search("project beta")).toHaveLength(1)
-          expect(LazyToolRegistry.search("project alpha")).toHaveLength(0)
+          expect(LazyToolRegistry.search("beta")).toHaveLength(1)
+          expect(LazyToolRegistry.search("alpha")).toHaveLength(0)
         },
       })
     } finally {
