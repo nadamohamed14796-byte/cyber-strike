@@ -2,7 +2,7 @@
 name: recon-master
 description: "Professional scope-aware reconnaissance handbook with one workflow, conditional specialist procedures, clear evidence standards, and phase-based outputs."
 category: information-gathering
-version: "2.1.0"
+version: "2.2.0"
 author: "CyberStrike contributors"
 tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, asn, cidr, origin-ip, vhost, ports, services, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, error-logs, asset-inventory, scope, evidence, tool-selection]
 tech_stack: [dns, http, tls, tcp, javascript, api, cloud, browser, git, smtp]
@@ -88,7 +88,7 @@ Do not ask the user to repeat information already present in the persisted scope
 
 ## Tool selection and runtime discipline
 
-The community-tool-selection/TOOLING_CATALOG.md is the only shared tool catalog. This handbook defines the task and evidence requirements; the catalog defines tool candidates, installation guidance, and version/flag verification. Do not create per-phase tool inventories.
+The community-tool-selection/TOOLING_CATALOG.md is the only shared tool catalog. This handbook defines the task and evidence requirements; the catalog defines tool candidates, installation guidance, and version/flag verification. Do not create per-phase tool inventories. Its `Verified per-tool recon flag guide (2026-11-02)` section contains release-pinned examples for `subfinder`, `httpx`, `dnsx`, `naabu`, `katana`, `ffuf`, Amass, and the separate Nuclei testing boundary, plus the GET/HEAD/POST decision table. Use that section to choose options, then verify every option against the installed binary's own help before execution.
 
 Before invoking a CLI tool, verify its actual path, installed version, platform compatibility, and the installed version's own help output. Compare with official upstream release notes/docs when current behavior matters. Record the installed version separately from the upstream version checked. Never assume a catalog version is installed, invent a flag, silently upgrade a pinned dependency, or reuse stale CLI syntax.
 
