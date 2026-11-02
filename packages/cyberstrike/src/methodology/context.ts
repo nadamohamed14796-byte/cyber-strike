@@ -15,14 +15,12 @@ import { Skill } from "../skill"
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   // The canonical recon workflow owns phase ordering. Skills provide detailed, conditional sub-workflows.
   scope_analysis: [
-    "target-workspace-workflow", "attack-bb-methodology", "recon-master", "recon-methodology", "community-tool-selection", "bug-bounty-evidence-workflow",
+    "target-workspace-workflow", "attack-bb-methodology", "recon-master", "community-tool-selection", "bug-bounty-evidence-workflow",
     "scope analysis", "scope validation", "wildcard scope", "program policy",
   ],
   mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
-    "recon-master", "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-asn-infrastructure",
-    "recon-origin-ip-discovery", "recon-email-security", "recon-gitlab-public-recon",
-    "recon-visual-recon", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "recon-error-log-mining", "passive reconnaissance", "OSINT", "certificate transparency",
+    "recon-master", "community-tool-selection", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
     "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-port-service-discovery",
