@@ -20,6 +20,7 @@ import { evaluateImpactHunterGate, type ImpactHunterMode } from "../methodology/
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
+import { evaluateProxyRequestDispatch } from "./task-dispatch-budget"
 import {
   assertTaskResumeScope,
   isInternalImpactHandoff,
@@ -38,6 +39,11 @@ import {
 // makes the extra tokens cheap. The full content stays retrievable via
 // web_get_request_detail for the rare response that still exceeds this.
 const MAX_PREPEND_BYTES = 48 * 1024
+
+// Reserve request-scoped Proxy Agent lanes before the first await so concurrent
+// Task calls cannot race past the per-request tester budget.
+const proxyRequestDispatchReservations = new Map<string, Set<string>>()
+
 
 // A persistent Proxy Agent broker handles many captured requests in one child
 // session. Resolve the latest trusted request identity in the current conversation,
@@ -233,6 +239,59 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         )
       }
 
+      let proxyDispatchReservation: { key: string; agentID: string } | undefined
+      if (
+        callerID === "proxy-agent" &&
+        requestID &&
+        !params.task_id &&
+        !ctx.extra?.bypassAgentCheck &&
+        (agent.id === "proxy-analyzer" || agent.id.startsWith("proxy-tester-"))
+      ) {
+        const reservationKey = ctx.sessionID + ":" + requestID
+        let reservations = proxyRequestDispatchReservations.get(reservationKey)
+        if (!reservations) {
+          reservations = new Set<string>()
+          proxyRequestDispatchReservations.set(reservationKey, reservations)
+        }
+        const alreadyReserved = [...reservations]
+        reservations.add(agent.id)
+        try {
+          const children = await Session.children(ctx.sessionID)
+          const decision = evaluateProxyRequestDispatch({
+            requestID,
+            agentID: agent.id,
+            children,
+            reservedAgentIDs: alreadyReserved,
+            maxSpecialists: 2,
+          })
+          if (!decision.allowed) {
+            reservations.delete(agent.id)
+            if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
+            const existingTaskID = decision.reason === "duplicate" ? decision.existingTaskID : undefined
+            return {
+              title: decision.reason === "duplicate"
+                ? "Duplicate specialist dispatch skipped"
+                : "Specialist dispatch budget reached",
+              output: decision.reason === "duplicate"
+                ? existingTaskID
+                  ? `This exact lane was already dispatched for request ${requestID}. Do not create another task. Resume the existing task with task_id: ${existingTaskID} when its result is needed.`
+                  : `This lane is already being dispatched for request ${requestID}. Do not create another task.`
+                : `Request ${requestID} already has two distinct specialist lanes (${decision.existingSpecialists.join(", ")}). Do not fan out further. Preserve other hypotheses for later evidence instead of creating more agents.`,
+              metadata: {
+                sessionId: existingTaskID ?? "",
+                model: { providerID: "", modelID: "" },
+                outcome: "clean" as const,
+              },
+            }
+          }
+          proxyDispatchReservation = { key: reservationKey, agentID: agent.id }
+        } catch (error) {
+          reservations.delete(agent.id)
+          if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
+          throw error
+        }
+      }
+
       const hasTaskPermission = PermissionNext.evaluate("task", "*", agent.permission).action !== "deny"
 
       const parentSessionID = params.parent_session_id ?? ctx.sessionID
@@ -246,7 +305,9 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         }
       }
 
-      const session = await iife(async () => {
+      let session: Awaited<ReturnType<typeof Session.get>>
+      try {
+        session = await iife(async () => {
         if (params.task_id) {
           const found = await Session.get(params.task_id).catch(() => {})
           if (!found) {
@@ -277,7 +338,10 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
         return await Session.create({
           parentID: parentSessionID,
-          title: params.description + ` (@${agent.name} subagent)`,
+          title: params.description + ` (@${agent.name} subagent)` +
+            (proxyDispatchReservation && requestID
+              ? ` [request:${requestID}] [agent:${agent.id}]`
+              : ""),
           permission: [
             {
               permission: "todowrite",
@@ -305,7 +369,14 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             })) ?? []),
           ],
         })
-      })
+        })
+      } finally {
+        if (proxyDispatchReservation) {
+          const reservations = proxyRequestDispatchReservations.get(proxyDispatchReservation.key)
+          reservations?.delete(proxyDispatchReservation.agentID)
+          if (reservations?.size === 0) proxyRequestDispatchReservations.delete(proxyDispatchReservation.key)
+        }
+      }
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
