@@ -32,26 +32,23 @@ export type CapturedDomainGroup<T extends CapturedEndpointRequest> = {
   requestCount: number
 }
 
-/**
- * Build the sidebar's domain → endpoint → HTTP operation → captured request tree.
- * Request rows are never merged: every capture remains independently addressable.
- */
+/** Build domain → endpoint → HTTP operation → independent captured-request groups. */
 export function groupCapturedRequests<T extends CapturedEndpointRequest>(requests: T[]): CapturedDomainGroup<T>[] {
-  const domains = new Map<string, Map<string, Map<string, T[]>>>()
+  const domains = new Map<string, { label: string; endpoints: Map<string, Map<string, T[]>> }>()
 
   for (const request of requests) {
     const host = formatEndpointHost(request.host, request.port) || "(unknown host)"
     const domainKey = request.origin || host
-    let endpoints = domains.get(domainKey)
-    if (!endpoints) {
-      endpoints = new Map()
-      domains.set(domainKey, endpoints)
+    let domain = domains.get(domainKey)
+    if (!domain) {
+      domain = { label: host, endpoints: new Map() }
+      domains.set(domainKey, domain)
     }
 
-    let operations = endpoints.get(request.normalized_path)
+    let operations = domain.endpoints.get(request.normalized_path)
     if (!operations) {
       operations = new Map()
-      endpoints.set(request.normalized_path, operations)
+      domain.endpoints.set(request.normalized_path, operations)
     }
 
     const operationKey = [request.method.toUpperCase(), request.protocol ?? "", request.operation ?? ""].join("|")
@@ -61,12 +58,8 @@ export function groupCapturedRequests<T extends CapturedEndpointRequest>(request
   }
 
   return [...domains.entries()]
-    .map(([key, endpoints]) => {
-      const label = formatEndpointHost(
-        requests.find((request) => (request.origin || formatEndpointHost(request.host, request.port) || "(unknown host)") === key)?.host,
-        requests.find((request) => (request.origin || formatEndpointHost(request.host, request.port) || "(unknown host)") === key)?.port,
-      ) || key
-      const endpointGroups = [...endpoints.entries()]
+    .map(([key, domain]) => {
+      const endpoints = [...domain.endpoints.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([path, operations]) => {
           const operationGroups = [...operations.entries()]
@@ -93,9 +86,9 @@ export function groupCapturedRequests<T extends CapturedEndpointRequest>(request
         })
       return {
         key,
-        label,
-        endpoints: endpointGroups,
-        requestCount: endpointGroups.reduce((sum, endpoint) => sum + endpoint.requestCount, 0),
+        label: domain.label,
+        endpoints,
+        requestCount: endpoints.reduce((sum, endpoint) => sum + endpoint.requestCount, 0),
       }
     })
     .sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key))
