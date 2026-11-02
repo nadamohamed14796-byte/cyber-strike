@@ -226,11 +226,23 @@ For each candidate, store:
 - bounded next validation step and stop condition;
 - priority, deduplication fingerprint, and status.
 
+The queue item is a reproducible handoff, not merely a URL and a skill name. Include these fields when applicable:
+
+- `canonical_asset` and `scope_evidence`: normalized host/service identity and the exact reason it is eligible, passive-only, excluded, or unresolved.
+- `attribution_confidence`, `discovery_source`, source URL/input artifact, and source observation time.
+- `first_seen`, `last_seen`, and `last_checked` so historical, newly observed, and recently validated evidence remain distinct.
+- `route_key`, HTTP `method`, `parameter_locations`, and `auth_context`; preserve method-specific operation semantics and parameter provenance.
+- `observed_signal`, bounded `hypothesis`, and `negative_control_needed`.
+- `candidate_skill`, `active_test_allowed`, and the prerequisites/authorization basis for any proposed active follow-up.
+- `evidence_refs`, disposition `status`, exact `blocked_reason` when applicable, priority rationale, and `next_action`.
+
+Keep asset-attribution confidence separate from security confidence. A queued item may be a first-party asset with no security hypothesis, or a plausible security signal on an asset whose attribution is still unresolved. Never conflate these states. Do not place credentials or raw secret values in queue records.
+
 Prioritize trust boundaries, newly discovered assets, exposed APIs, cross-tenant behavior, sensitive state transitions, and changes from the previous recon wave. Avoid ranking solely by number of URLs or scanner severity.
 
 #### 3. Delta analysis and resumability
 
-Compare new observations with the previous verified snapshot: hosts/DNS/CNAME/provider changes, TLS/HTTP fingerprints, URL/method/parameter combinations, JavaScript content hashes, authentication state, and third-party destinations. Reuse earlier evidence only when its input, tool/settings, and source freshness/TTL remain valid. Revalidate changed or stale evidence rather than repeating a whole scan.
+Compare new observations with the previous verified snapshot: hosts/DNS/CNAME/provider changes, TLS/HTTP fingerprints, URL/method/parameter combinations, JavaScript content hashes, authentication state, and third-party destinations. Reuse earlier evidence only when its input, tool/settings, and source freshness/TTL remain valid. Revalidate changed or stale evidence rather than repeating a whole scan. Preserve `first_seen`, `last_seen`, and `last_checked` for assets and routes. Report deltas as new, removed-from-current-observation, changed, stale, or unresolved; absence from a later run is not proof that an asset was deleted or is no longer relevant. Retain the previous evidence and mark its freshness instead of silently deleting it.
 
 Persist item-level outcomes and cursors in the canonical checkpoint/source ledger. Resume unfinished work without resetting completed or rejected items. Missing credentials are a blocker, not an empty/safe result. Keep ownership/scope confidence separate from vulnerability confidence; queue only signal-matched follow-up hypotheses with required roles, baseline/control, one bounded next step, and a stop condition.
 
