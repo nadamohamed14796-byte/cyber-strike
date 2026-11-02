@@ -272,8 +272,8 @@ export function DialogHackbrowserLaunch(props: DialogHackbrowserLaunchProps) {
 
       <Show when={store.credentialsPresent}>
         <text fg={theme.warning ?? theme.textMuted} paddingLeft={1}>
-          ⚠ Manual login: Esc and /hackbrowser-stop cannot cancel during the login wait. Close the browser window
-          manually to abort. (INTEGRATION.md §10.10)
+          ⚠ Manual login: The browser stays visible. During login/MFA, press Esc in the session or run /hackbrowser-stop
+          to cancel; captured requests are drained before browser cleanup.
         </text>
       </Show>
 
