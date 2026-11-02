@@ -1952,7 +1952,32 @@ export const SessionRoutes = lazy(() =>
             return coverage ? `${coverage}\n\n${base}` : base
           }
 
-          if (ingestDryRun) {
+          // Fast intake triage: retain this request row and its endpoint observation,
+          // but do not reserve a Proxy Agent turn for a proven inert document or
+          // an exact capture whose full request/response was already analyzed.
+          const emptyStatic = Request.isConfirmedEmptyStatic(req.id)
+          const equivalent = emptyStatic ? undefined : Request.findEquivalentProcessed(req)
+          const fastSkipReason = emptyStatic
+            ? "confirmed-empty-static-html"
+            : equivalent
+              ? "exact-processed-repeat"
+              : undefined
+
+          if (!ingestDryRun && fastSkipReason) {
+            Request.updateStatus({ id: req.id, status: "processed" })
+            if (captureReservation) {
+              IngestQueue.skipReserved(captureReservation)
+              reservationTransferred = true
+            }
+            log.info("captured request accepted without another Proxy Agent turn", {
+              sessionID,
+              requestID: req.id,
+              priorRequestID: equivalent?.id,
+              reason: fastSkipReason,
+              method: req.method,
+              path: req.normalized_path,
+            })
+          } else if (ingestDryRun) {
             // Log the prompt that would be sent to LLM — skip actual LLM call
             log.info("ingest dry-run", {
               sessionID,
