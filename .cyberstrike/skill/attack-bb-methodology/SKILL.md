@@ -209,6 +209,13 @@ Preserve useful negative results with the exact identity, object, method, and st
 
 Use public reports and research as sources of hypotheses and reusable preconditions, not as proof about the current target. Preserve source attribution and distinguish the researcher's narrative from independently verified technical facts. Never replay historical payloads blindly against a live target.
 
+## Shared tool catalog
+
+Use the single shared `TOOLING_CATALOG.md` reference exposed by `community-tool-selection` for candidate tools, helper scripts, official project resources, and availability guidance. Do not duplicate its tool inventory here. For each selected executable, verify it with `command -v <tool>` and its documented version/help flags; install only when the evidence gap genuinely requires it, using official project instructions. Tool availability never grants target authorization.
+
+- OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
+- HackerOne quality reports: https://docs.hackerone.com/en/articles/8475116-quality-reports
+
 ## 6. Runtime and tool boundaries
 
 Tool selection is dynamic. Use the shared `community-tool-selection` catalog and actual registered tool schemas for available capabilities. Examples in upstream material do not prove that a command, helper, API, or runtime tool exists. Verify only candidates relevant to the current evidence gap; do not install or preflight the entire catalog, and do not copy a generic tool inventory into this skill.
