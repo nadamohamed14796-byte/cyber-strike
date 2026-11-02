@@ -2128,6 +2128,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
   }
 
   const browser = await Stealth.connect({ cdp: config.cdp, headless: config.headless ?? false, network: config.network })
+  try {
   const health = createBrowserHealth()
   browser.on("disconnected", () => {
     health.dead = true
@@ -2601,6 +2602,11 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
       ),
     ],
     usage: usageAcc,
+  }
+  } finally {
+    // Manual login/MFA waits can now reject immediately on cancellation. Always
+    // close the browser connection on every exceptional or early exit path too.
+    await browser.close().catch(() => {})
   }
 }
 
