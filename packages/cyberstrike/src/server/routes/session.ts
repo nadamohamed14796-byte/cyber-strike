@@ -522,7 +522,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
         // Keep the broker's prior request turns so discoveries can be
         // correlated across captures. The exact current request_id is
         // carried in this new user turn and delegated explicitly by Task.
-        parts: [{ type: "text", text: promptText }],
+        parts: [{ type: "text", text: promptText, synthetic: true }],
       })
       // SessionPrompt.prompt can resolve with an assistant message carrying
       // an error, stuck-abort, or step-cap marker instead of throwing.
@@ -1984,7 +1984,7 @@ export const SessionRoutes = lazy(() =>
                 agent: agentName,
                 model: body.model,
                 excludeHistory: true,
-                parts: [{ type: "text", text: promptText }],
+                parts: [{ type: "text", text: promptText, synthetic: true }],
               })
               const model = body.model ?? (await SessionPrompt.lastModel(brokerSession.id))
               await IngestSummary.write({
