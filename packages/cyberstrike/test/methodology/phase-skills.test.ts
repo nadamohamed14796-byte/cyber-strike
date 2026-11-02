@@ -535,7 +535,7 @@ describe("Methodology phase skill routing", () => {
   test("phase-ranked skills retain the metadata needed for precise loading and chaining", () => {
     const skill: SkillIndex.Entry = {
       name: "attack-javascript-analysis",
-      description: "Analyze authorized JavaScript and source maps",
+      description: "Analyze authorized JavaScript and source maps for endpoint enumeration",
       category: "recon",
       owasp_id: "WSTG-CLNT-01",
       tags: ["javascript", "source-maps", "endpoints"],
