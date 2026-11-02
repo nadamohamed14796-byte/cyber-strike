@@ -587,7 +587,13 @@ export namespace Request {
    * remain independent and retain their own Request ID.
    */
   export function findEquivalentProcessed(request: Info): Info | undefined {
-    if (!request.id || !request.key_hash || !request.credential_id || !request.raw_request) return undefined
+    if (!request.id || !request.key_hash || !request.raw_request) return undefined
+
+    // Anonymous captures may be reused with other anonymous captures, but
+    // authenticated captures are always partitioned by their exact credential.
+    const credentialCondition = request.credential_id === undefined
+      ? isNull(RequestTable.credential_id)
+      : eq(RequestTable.credential_id, request.credential_id)
 
     const current = Database.use((db) =>
       db.select().from(RequestTable)
@@ -604,7 +610,7 @@ export namespace Request {
         eq(RequestTable.session_id, request.session_id),
         eq(RequestTable.status, "processed"),
         eq(RequestTable.key_hash, request.key_hash!),
-        eq(RequestTable.credential_id, request.credential_id!),
+        credentialCondition,
         eq(RequestTable.method, request.method),
         eq(RequestTable.normalized_path, request.normalized_path),
         request.origin ? eq(RequestTable.origin, request.origin) : isNull(RequestTable.origin),
