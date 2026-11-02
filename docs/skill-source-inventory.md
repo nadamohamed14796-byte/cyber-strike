@@ -103,7 +103,7 @@ The following semantic overlaps have been consolidated into canonical responsibi
 | Previous skill/workflow | Canonical destination | Result |
 |---|---|---|
 | `attack-web-recon` | `.cyberstrike/skill/recon-master/SKILL.md` | The seven-step web recon pipeline, iterative source expansion, validation controls, source coverage, endpoint normalization, and recon handoff are represented by the single recon entry point and its conditional chapters. The duplicate skill file and its phase pin are retired. |
-| `bug-bounty-evidence-workflow` | `.cyberstrike/skill/attack-bb-methodology/SKILL.md` | Intake, inventory handoff, hypothesis planning, execution/evidence records, status discipline, deduplication, chaining, reporting, learning, and closeout are consolidated into the canonical methodology. The duplicate skill file and index entry are retired. |
+| `bug-bounty-evidence-workflow` | `.cyberstrike/skill/attack-bb-methodology/SKILL.md` | Intake, inventory handoff, hypothesis planning, execution/evidence records, status discipline, deduplication, chaining, reporting, learning, and closeout are consolidated into the canonical methodology. The duplicate skill file and index entry are retired; the consolidated methodology is now the canonical entry in the curated registry. |
 | Broad workflow and workspace instructions | `.cyberstrike/skill/target-workspace-workflow/SKILL.md` + `packages/cyberstrike/src/agent/prompt/methodology/target-workflow.txt` | The runtime prompt retains global orchestration. The skill is narrowed to workspace identity, canonical paths, artifact persistence, state-ledger ownership, and target isolation. |
 
 The following remain separate by design because they perform different work:
