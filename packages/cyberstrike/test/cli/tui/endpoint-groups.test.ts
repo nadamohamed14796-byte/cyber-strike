@@ -12,9 +12,9 @@ const request = (input: Partial<{
   operation: string
 }> = {}) => ({
   id: input.id ?? "req_1",
-  host: input.host ?? "app.example.com",
+  host: Object.hasOwn(input, "host") ? input.host : "app.example.com",
   port: input.port,
-  origin: input.origin ?? "https://app.example.com",
+  origin: Object.hasOwn(input, "origin") ? input.origin : "https://app.example.com",
   normalized_path: input.normalized_path ?? "/api/users",
   method: input.method ?? "GET",
   protocol: input.protocol,
