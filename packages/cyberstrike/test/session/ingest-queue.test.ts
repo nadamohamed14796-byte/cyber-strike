@@ -1273,7 +1273,7 @@ describe("Request.findEquivalentProcessed - anonymous capture identity", () => {
   test("reuses exact anonymous captures but preserves cookie and response changes", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "request-anonymous-equivalent-test" })
-      const baseRequest = "GET / HTTP/1.1\\r\\nHost: example.test\\r\\nAccept: text/html\\r\\n\\r\\n"
+      const baseRequest = "GET / HTTP/1.1\r\nHost: example.test\r\nAccept: text/html\r\n\r\n"
       const create = (input: {
         rawRequest?: string
         responseBody?: string
@@ -1304,7 +1304,7 @@ describe("Request.findEquivalentProcessed - anonymous capture identity", () => {
       expect(Request.findEquivalentProcessed(exactRepeat)?.id).toBe(first.id)
 
       const changedCookie = create({
-        rawRequest: baseRequest.replace("Accept: text/html", "Cookie: session=other\\r\\nAccept: text/html"),
+        rawRequest: baseRequest.replace("Accept: text/html", "Cookie: session=other\r\nAccept: text/html"),
       })
       expect(Request.findEquivalentProcessed(changedCookie)).toBeUndefined()
 
