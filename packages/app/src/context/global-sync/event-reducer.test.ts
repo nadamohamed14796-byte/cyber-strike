@@ -144,6 +144,20 @@ describe("applyDirectoryEvent", () => {
     })
 
     expect(store.session_queue_status.ses_extension).toEqual({ paused: true, pending: 4 })
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.queue.status",
+        properties: { sessionID: "ses_extension", status: { paused: false, pending: 0 } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session_queue_status.ses_extension).toBeUndefined()
   })
 
   test("inserts root sessions in sorted order and updates sessionTotal", () => {
