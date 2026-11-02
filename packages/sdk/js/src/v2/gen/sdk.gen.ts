@@ -1889,7 +1889,7 @@ export class Session extends HeyApiClient {
   /**
    * Ingest message
    *
-   * Accept captured HTTP requests or plain-text messages from another port or service. HTTP captures are analyzed in independent child sessions so they do not take over the parent chat window; plain-text messages are processed in the supplied session. Creates a session if sessionID is missing or invalid.
+   * Accept captured HTTP requests or plain-text tasks from another port or service. Extension inputs are analyzed in an independent child Agent session so they do not enter or take over the parent chat window. Creates a session if sessionID is missing or invalid.
    */
   public ingest<ThrowOnError extends boolean = false>(
     parameters: {
