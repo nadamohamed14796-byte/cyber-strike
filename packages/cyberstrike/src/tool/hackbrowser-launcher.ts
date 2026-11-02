@@ -40,7 +40,6 @@ import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/wor
 import { Network } from "../network/network"
 import { TargetMemory } from "../target"
 import { checkMatch } from "../target/scope-match"
-import { createWorkerAbortBridge } from "./hackbrowser-abort-bridge"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -334,7 +333,6 @@ async function backgroundRun(
   prepared: PreparedWorker,
   targetUrl: string,
   proc: WorkerHandle["proc"],
-  disposeAbortBridge: () => void,
 ): Promise<void> {
   const { modelInfo } = prepared
   const decoder = new TextDecoder()
@@ -526,10 +524,7 @@ async function backgroundRun(
       log.error("failed to write hackbrowser-error message", { sessionID, err: String(err2) }),
     )
   } finally {
-    // Never retain the caller's AbortSignal listener beyond this worker's
-    // lifecycle, and never let an old worker clear a newer run's slot.
-    disposeAbortBridge()
-    if (activeRuns.get(sessionID)?.proc === proc) activeRuns.delete(sessionID)
+    activeRuns.delete(sessionID)
     try {
       const s = proc.stdin
       if (s && typeof s !== "number") (s as any).end()
@@ -618,49 +613,19 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
     startedAt: Date.now(),
   })
 
-  // Cancellation can race with prepareCrawl(): preserve an already-aborted
-  // signal and deliver its IPC message only after the worker has received start.
-  // The bridge also owns listener cleanup when the worker exits or startup fails.
-  const abortBridge = createWorkerAbortBridge(opts.signal, () => {
-    log.info("ctx.abort received — forwarding to worker", { sessionID: opts.sessionID })
-    try {
+  // Bridge the chat track's ctx.abort (Esc) into an IPC abort message so
+  // pressing Esc on the currently running chat turn also stops the crawl.
+  // The reliable cancellation path is /hackbrowser-stop → stopHackbrowser().
+  if (opts.signal) {
+    opts.signal.addEventListener("abort", () => {
+      log.info("ctx.abort received — forwarding to worker", { sessionID: opts.sessionID })
       workerWrite(proc, JSON.stringify({ type: "abort" } satisfies ParentMessage) + "\n")
-    } catch (error) {
-      log.warn("failed to forward Hackbrowser abort to worker", {
-        sessionID: opts.sessionID,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  })
+    })
+  }
 
-  // Send start message — worker begins crawl on receipt. If IPC setup fails,
-  // release the session slot and terminate the child instead of leaving a
-  // permanently-running sidebar entry that blocks subsequent crawls.
+  // Send start message — worker begins crawl on receipt.
   try {
     workerWrite(proc, JSON.stringify({ type: "start", options: prepared.workerOptions } satisfies ParentMessage) + "\n")
-    abortBridge.markStarted()
-  } catch (error) {
-    abortBridge.dispose()
-    if (activeRuns.get(opts.sessionID)?.proc === proc) activeRuns.delete(opts.sessionID)
-    try {
-      const stdin = proc.stdin
-      if (stdin && typeof stdin !== "number") (stdin as any).end()
-    } catch {}
-    try {
-      proc.kill()
-    } catch {}
-    const message = error instanceof Error ? error.message : String(error)
-    HackbrowserStatus.set(opts.sessionID, {
-      sessionID: opts.sessionID,
-      phase: "failed",
-      targetUrl: opts.target,
-      pagesExplored: 0,
-      capturedEndpoints: 0,
-      errors: ["Failed to start Hackbrowser worker: " + message],
-      startedAt: Date.now(),
-      finishedAt: Date.now(),
-    })
-    throw error
   } finally {
     // Drop the parent-side reference once the single start message has been queued.
     prepared.workerOptions.cyberstrikePassword = undefined
@@ -670,7 +635,7 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
   // loop returns on tool completion, freeing the session for ingest queue
   // tasks to dispatch their own SessionPrompt.prompt() calls in parallel
   // (Faz B.0 / INTEGRATION.md §10.9).
-  void backgroundRun(opts.sessionID, prepared, opts.target, proc, () => abortBridge.dispose())
+  void backgroundRun(opts.sessionID, prepared, opts.target, proc)
 
   return {
     sessionID: opts.sessionID,

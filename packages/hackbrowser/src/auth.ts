@@ -5,6 +5,14 @@ import readline from "readline"
 
 const log = Log.create({ service: "hackbrowser:auth" })
 
+function abortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError")
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError()
+}
+
 // ============================================================
 // Session management
 // ============================================================
@@ -39,11 +47,26 @@ export async function loadSession(context: BrowserContext, filePath: string): Pr
 // Human-in-the-loop: pause and wait for user input
 // ============================================================
 
-export async function waitForHuman(prompt: string): Promise<string> {
-  return new Promise((resolve) => {
+export async function waitForHuman(prompt: string, signal?: AbortSignal): Promise<string> {
+  throwIfAborted(signal)
+  return new Promise((resolve, reject) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-    rl.question(`\n[human] ${prompt} `, (answer) => {
+    let settled = false
+    const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort)
       rl.close()
+    }
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(abortError())
+    }
+    signal?.addEventListener("abort", onAbort, { once: true })
+    rl.question(`\n[human] ${prompt} `, (answer) => {
+      if (settled) return
+      settled = true
+      cleanup()
       resolve(answer.trim())
     })
   })
@@ -52,7 +75,13 @@ export async function waitForHuman(prompt: string): Promise<string> {
 /**
  * Detect if a 2FA / MFA / OTP page is shown and pause for user input.
  */
-export async function handle2FA(page: Page, otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>, siteOrigin?: string): Promise<boolean> {
+export async function handle2FA(
+  page: Page,
+  otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>,
+  siteOrigin?: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  throwIfAborted(signal)
   const mfaSelectors = [
     'input[name*="otp"]',
     'input[name*="mfa"]',
@@ -78,10 +107,10 @@ export async function handle2FA(page: Page, otpProvider?: (siteUrl: string, afte
       }
       if (!code && otpProvider) {
         // Worker stdin is reserved for IPC, so use the visible browser for manual MFA.
-        await waitForManualLogin(page, "MFA")
+        await waitForManualLogin(page, "MFA", undefined, signal)
         return true
       }
-      if (!code) code = await waitForHuman("Enter your 2FA code and press Enter:")
+      if (!code) code = await waitForHuman("Enter your 2FA code and press Enter:", signal)
       await el.fill(code)
       const form = await page.$("form")
       if (form) {
@@ -124,7 +153,20 @@ export async function waitForManualLogin(
   page: Page,
   label?: string,
   progress?: { index: number; total: number },
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal)
+  let rejectAbort!: (reason: unknown) => void
+  const abortPromise = new Promise<never>((_, reject) => {
+    rejectAbort = reject
+  })
+  void abortPromise.catch(() => {})
+  const onAbort = () => rejectAbort(abortError())
+  signal?.addEventListener("abort", onAbort, { once: true })
+
+  let injectButton: (() => Promise<void>) | undefined
+  let cleanupButtonId: string | undefined
+  try {
   let resolveReady: () => void
   const readyPromise = new Promise<void>((resolve) => {
     resolveReady = resolve
@@ -152,9 +194,10 @@ export async function waitForManualLogin(
     : `// ${who}${step} · LOGIN MANUALLY ⟶ CONFIRM & NEXT`
   const buttonText = isFinal ? "START SCAN" : "CONFIRM & NEXT ⟶"
   const buttonId = label ? `__cyberstrike-ready-btn-${label}` : "__cyberstrike-ready-btn"
+  cleanupButtonId = buttonId
   const styleId = "__cyberstrike-ready-btn-style"
 
-  const injectButton = async () => {
+  injectButton = async () => {
     await page
       .evaluate(
         ({ btnId, btnText, topText, cbName, styleElId, posCb, savedPos, isFinal }) => {
@@ -390,22 +433,25 @@ export async function waitForManualLogin(
       .catch(() => {})
   }
 
-  // Inject on current page + re-inject on every navigation
+  // Inject on current page + re-inject on every navigation.
   await injectButton()
   page.on("load", injectButton)
 
   log.info("waiting for manual login", { label: label ?? "default" })
-  await readyPromise
-
-  // Done — stop re-injecting, remove button
-  page.removeListener("load", injectButton)
-  await page
-    .evaluate((btnId) => {
-      document.getElementById(btnId)?.remove()
-    }, buttonId)
-    .catch(() => {})
+  await Promise.race([readyPromise, abortPromise])
 
   log.info("manual login confirmed", { label: label ?? "default" })
+  } finally {
+    signal?.removeEventListener("abort", onAbort)
+    if (injectButton) page.removeListener("load", injectButton)
+    if (cleanupButtonId) {
+      await page
+        .evaluate((btnId) => {
+          document.getElementById(btnId)?.remove()
+        }, cleanupButtonId)
+        .catch(() => {})
+    }
+  }
 }
 
 // ============================================================
@@ -505,7 +551,9 @@ export async function autoLogin(
     usernameSelector?: string
     passwordSelector?: string
   },
+  signal?: AbortSignal,
 ): Promise<AutoLoginResult> {
+  throwIfAborted(signal)
   const passSelector = credentials.passwordSelector ?? 'input[type="password"]'
   try {
     const current = new URL(page.url())
@@ -528,6 +576,7 @@ export async function autoLogin(
       usernameField = await firstVisible(page, [credentials.usernameSelector])
     } else {
       for (let attempt = 0; attempt < 10 && !usernameField; attempt++) {
+        throwIfAborted(signal)
         usernameField = await firstVisible(page, USER_SELECTORS)
         if (!usernameField) await page.waitForTimeout(500)
       }
