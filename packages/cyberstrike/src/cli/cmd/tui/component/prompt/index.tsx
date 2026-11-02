@@ -135,18 +135,18 @@ export function Prompt(props: PromptProps) {
       })
     }).at(-1)
   })
-  // The persistent Extension broker is an existing subagent session. Keep
-  // subsequent TUI replies on that same agent without changing the globally
-  // selected Main Agent in the user's local session selector.
+  // The persistent Extension task session may run different orchestrators.
+  // Keep replies on the agent recorded by its last turn, not a hard-coded Proxy Agent.
   const isProxyAgentSession = createMemo(
     () =>
       !!props.sessionID &&
       !!sync.session.get(props.sessionID)?.parentID &&
-      (sync.session.get(props.sessionID)?.title === "Agent Proxy" ||
+      (sync.session.get(props.sessionID)?.title === "Extension Agent Tasks" ||
+        sync.session.get(props.sessionID)?.title === "Agent Proxy" ||
         sync.session.get(props.sessionID)?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         lastUserMessage()?.agent === "proxy-agent"),
   )
-  const activeAgentName = () => (isProxyAgentSession() ? "proxy-agent" : local.agent.current().id)
+  const activeAgentName = () => (isProxyAgentSession() ? (lastUserMessage()?.agent ?? "proxy-agent") : local.agent.current().id)
   const activeModel = () => {
     if (isProxyAgentSession()) {
       const model = lastUserMessage()?.model
