@@ -32,6 +32,14 @@ describe("reportScopeViolation", () => {
     test("LLM tester, prompt injection category and title", () => {
       expect(reportScopeViolation("proxy-tester-llm", "prompt injection", "Prompt Injection in AI chatbot")).toBeNull()
     })
+
+    test("authn tester may report an authentication-bypass VRT category", () => {
+      expect(reportScopeViolation("proxy-tester-authn", "auth bypass", "Authentication Bypass in login flow")).toBeNull()
+    })
+
+    test("authz tester may report an authorization-bypass VRT category", () => {
+      expect(reportScopeViolation("proxy-tester-authz", "auth bypass", "Authorization Bypass in admin endpoint")).toBeNull()
+    })
   })
 
   describe("out-of-scope category — violation returned", () => {
