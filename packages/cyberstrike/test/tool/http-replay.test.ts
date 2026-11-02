@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { shouldRejectUnauthorized } from "../../src/tool/http-replay"
+import { shouldRejectUnauthorized, replayGovernorsFor } from "../../src/tool/http-replay"
+import { Instance } from "../../src/project/instance"
+import { Session } from "../../src/session"
+import { Batch } from "../../src/replay/batch"
+import { Send } from "../../src/replay/send"
+import { tmpdir } from "../fixture/fixture"
 
 describe("HTTP replay TLS verification", () => {
   test("rejects invalid certificates by default", () => {
@@ -9,5 +14,94 @@ describe("HTTP replay TLS verification", () => {
 
   test("accepts invalid certificates only with explicit opt-in", () => {
     expect(shouldRejectUnauthorized(true)).toBe(false)
+  })
+})
+
+describe("HTTP replay governor lifetime", () => {
+  test("shares the session budget and reuses host governors without crossing session or host boundaries", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const firstSession = await Session.create({})
+        const secondSession = await Session.create({})
+        try {
+          const first = replayGovernorsFor(firstSession.id, "https://api.example.test")
+          const repeated = replayGovernorsFor(firstSession.id, "https://api.example.test")
+          const otherHost = replayGovernorsFor(firstSession.id, "https://www.example.test")
+          const otherSession = replayGovernorsFor(secondSession.id, "https://api.example.test")
+
+          expect(repeated.budget).toBe(first.budget)
+          expect(repeated.breaker).toBe(first.breaker)
+          expect(repeated.limiter).toBe(first.limiter)
+
+          expect(otherHost.budget).toBe(first.budget)
+          expect(otherHost.breaker).not.toBe(first.breaker)
+          expect(otherHost.limiter).not.toBe(first.limiter)
+
+          expect(first.budget.tryConsume()).toBe(true)
+          expect(otherHost.budget.consumed).toBe(1)
+
+          expect(otherSession.budget).not.toBe(first.budget)
+          expect(otherSession.breaker).not.toBe(first.breaker)
+          expect(otherSession.limiter).not.toBe(first.limiter)
+
+          await Session.remove(firstSession.id)
+          const afterDelete = replayGovernorsFor(firstSession.id, "https://api.example.test")
+          expect(afterDelete.budget).not.toBe(first.budget)
+          expect(afterDelete.breaker).not.toBe(first.breaker)
+        } finally {
+          await Session.remove(secondSession.id)
+        }
+      },
+    })
+  })
+
+  test("Batch.run reads the shared AIMD limiter and Send.governed feeds it", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.create({})
+        try {
+          const governors = replayGovernorsFor(session.id, "https://api.example.test")
+          let active = 0
+          let maxActive = 0
+          const results = await Batch.run(
+            Array.from({ length: 16 }, (_, index) => index),
+            async () => {
+              active++
+              maxActive = Math.max(maxActive, active)
+              await new Promise<void>((resolve) => setTimeout(resolve, 2))
+              const result = await Send.governed(
+                async () => ({
+                  response: {
+                    version: "HTTP/1.1",
+                    status: 200,
+                    reason: "OK",
+                    headers: [],
+                    body: new Uint8Array(0),
+                  },
+                  timing: { totalMs: 1 },
+                }),
+                "GET",
+                governors,
+                { maxRetries: 0 },
+              )
+              active--
+              return result.response?.status
+            },
+            { concurrency: () => governors.limiter.value },
+          )
+
+          expect(results.every((status) => status === 200)).toBe(true)
+          expect(maxActive).toBeGreaterThan(1)
+          expect(governors.limiter.value).toBeGreaterThan(2)
+          expect(governors.budget.consumed).toBe(16)
+        } finally {
+          await Session.remove(session.id)
+        }
+      },
+    })
   })
 })
