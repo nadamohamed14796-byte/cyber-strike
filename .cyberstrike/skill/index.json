@@ -266,7 +266,8 @@
       ],
       "cwe_ids": [],
       "files": [
-        "SKILL.md"
+        "SKILL.md",
+        "RECON_PHASE_TOOL_MATRIX.md"
       ],
       "category": "information-gathering"
     },
