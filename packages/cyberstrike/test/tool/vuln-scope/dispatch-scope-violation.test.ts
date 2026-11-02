@@ -33,6 +33,19 @@ describe("dispatchScopeViolation", () => {
       expect(dispatchScopeViolation("proxy-tester-authn", "Test brute force on login")).toBeNull()
     })
 
+    test("authn tester accepts authentication-bypass objective", () => {
+      expect(dispatchScopeViolation("proxy-tester-authn", "Test Authentication Bypass on login")).toBeNull()
+    })
+
+    test("authz tester accepts authorization-bypass objective", () => {
+      expect(dispatchScopeViolation("proxy-tester-authz", "Test Authorization Bypass on admin action")).toBeNull()
+    })
+
+    test("generic auth-bypass objective remains unclassified", () => {
+      expect(dispatchScopeViolation("proxy-tester-authn", "Test Auth Bypass")).toBeNull()
+      expect(dispatchScopeViolation("proxy-tester-authz", "Test Auth Bypass")).toBeNull()
+    })
+
     test("LLM tester dispatched for prompt-injection objective", () => {
       expect(dispatchScopeViolation("proxy-tester-llm", "Test indirect prompt injection in chatbot")).toBeNull()
     })
