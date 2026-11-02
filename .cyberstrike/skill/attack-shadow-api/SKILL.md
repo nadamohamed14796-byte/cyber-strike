@@ -6,7 +6,7 @@ version: "1.0.0"
 author: "CyberStrike contributors"
 tags: [api, shadow-api, zombie-api, versioning, inventory, authorization]
 tech_stack: [rest, graphql, openapi, swagger, gateway, mobile]
-chains_with: [attack-web-recon, attack-api-noauth-hunt, attack-schema-enumeration, attack-idor-automation, attack-triage-validation]
+chains_with: [recon-master, attack-api-noauth-hunt, attack-schema-enumeration, attack-idor-automation, attack-triage-validation]
 sources:
   - "https://owasp.org/www-project-api-security/"
   - "https://owasp.org/www-project-web-security-testing-guide/"
