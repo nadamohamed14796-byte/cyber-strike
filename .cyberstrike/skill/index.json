@@ -143,25 +143,6 @@
       "category": "source-code-review"
     },
     {
-      "name": "bug-bounty-evidence-workflow",
-      "description": "Orchestrate evidence-led bug bounty work from inventory through hypotheses, verification, deduplication, triage, and reporting.",
-      "verified": "unverified",
-      "tags": [
-        "bug-bounty",
-        "evidence",
-        "triage",
-        "reporting",
-        "deduplication",
-        "source-review"
-      ],
-      "tech_stack": [],
-      "cwe_ids": [],
-      "files": [
-        "SKILL.md"
-      ],
-      "category": "bug-bounty-methodology"
-    },
-    {
       "name": "bun-file-io",
       "description": "Use the repository’s preferred Bun file APIs and safe patterns for reading, writing, scanning, and deleting files.",
       "verified": "unverified",
