@@ -96,6 +96,13 @@ Use `runs/index.json` only through its structured runtime API; the generic artif
 - `target_notes_read` returns note content to the agent/model context. Local disk storage alone does not guarantee that a value remains local to the machine; do not claim provider isolation unless the runtime/provider configuration proves it.
 - Redact model-facing previews, exports, and reports; preserve the minimum information needed to reproduce the observation.
 
+## Shared tool catalog
+
+Tool choice and installation are outside this skill's responsibility. Consult the single shared `TOOLING_CATALOG.md` reference exposed by `community-tool-selection` when a concrete persistence/validation task needs an external executable or helper; do not reproduce its inventory here. Verify any selected local utility with `command -v <tool>` and its documented version/help flags. Prefer the structured target APIs described above over generic CLI output.
+
+- Python CLI documentation: https://docs.python.org/3/
+- OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
+
 ## 8. Workspace handoff checklist
 
 Before a delegated worker returns or a run closes, verify:
