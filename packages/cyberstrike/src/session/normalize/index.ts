@@ -18,6 +18,25 @@ import type { Method, NormSource, ParamSlot } from "./types"
 
 export type { ParsedRequest, NormalizeResult, EndpointTemplate, Method, NormSource } from "./types"
 
+/**
+ * Defer provider/model setup until Tier 3 actually needs an LLM classification.
+ * Most ordinary paths resolve in deterministic Tier 1 or cached Tier 2 and
+ * should not pay provider initialization latency.
+ */
+export function createLazyProviderClient(
+  input: { providerID: string; modelID: string },
+  createClient = createProviderClient,
+): Tier3Client {
+  let clientPromise: Promise<Tier3Client> | undefined
+  return {
+    async classify(classifyInput) {
+      clientPromise ??= createClient(input)
+      const client = await clientPromise
+      return client.classify(classifyInput)
+    },
+  }
+}
+
 const REST_DISPATCH_PARAMS = ["type", "action", "kind", "op", "operation", "view", "mode", "method"]
 // Promote a low-cardinality REST query discriminator value into the key.
 function restDispatcher(query: string | undefined): string {
@@ -99,15 +118,10 @@ export namespace Normalize {
     // provider client before parsing forced every captured request — including
     // simple routes such as "/" — through model/provider resolution even when
     // deterministic normalization had already solved the path.
-    const client: Tier3Client = input.client ?? {
-      async classify(classifyInput) {
-        const providerClient = await createProviderClient({
-          providerID: input.providerID,
-          modelID: input.modelID,
-        })
-        return providerClient.classify(classifyInput)
-      },
-    }
+    const client: Tier3Client = input.client ?? createLazyProviderClient({
+      providerID: input.providerID,
+      modelID: input.modelID,
+    })
 
     const orchestrateInput: OrchestrateInput = {
       raw: input.raw,
