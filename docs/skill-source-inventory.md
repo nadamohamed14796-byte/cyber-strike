@@ -6,7 +6,7 @@ Consolidate the original CyberStrike skills with relevant material from:
 - https://github.com/elementalsouls/Claude-BugHunter
 - https://github.com/uphiago/recon-skills
 
-**Canonical-only rule:** use existing CyberStrike skill paths and names. Do not create a parallel top-level skill just because an upstream repository has a different name. Map each upstream skill to the closest existing CyberStrike skill or existing OWASP WSTG/standards skill; if no safe semantic match exists, document it as unmapped rather than inventing a runtime skill.
+**Canonical skill rule:** prefer existing CyberStrike skill paths and names and avoid parallel duplicates. Reconnaissance is the explicit umbrella exception: `recon-master` is the single canonical recon entry point, and its specialist procedures live as chapters rather than separately registered skills. For other topics, map each upstream skill to the closest existing CyberStrike or OWASP WSTG/standards skill; if no safe semantic match exists, document it as unmapped.
 
 ## Source inventory
 
