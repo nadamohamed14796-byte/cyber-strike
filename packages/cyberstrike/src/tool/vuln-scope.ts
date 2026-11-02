@@ -106,6 +106,9 @@ export function vrtScopeViolation(
 // Best-effort: infer a vuln class from a free-text finding title (for
 // report_vulnerability, which carries no explicit category). Order matters —
 // the most specific signatures first. Returns null when uncertain.
+// The generic legacy VRT label "auth bypass" is allowed by both auth lanes.
+// Do not infer a lane from that ambiguous phrase; only explicit authentication
+// or authorization wording should drive title-based routing.
 const TITLE_SIGNATURES: [string, RegExp][] = [
   ["injection", /sql injection|sqli|nosql|\bxss\b|cross-site script|ssti|\bxxe\b|command inj|ldap inj/i],
   ["llm", /prompt injection|indirect prompt|encoding bypass|evasion bypass|guardrail bypass|sensitive data disclosure|data exfiltration|pii (?:leak|disclosure)|token exhaustion|system prompt|prompt leakage|model extraction|training data extraction|insecure output handling|excessive agency|jailbreak|\bllm\b|large language model|ai chatbot|ai agent/i],
@@ -113,8 +116,8 @@ const TITLE_SIGNATURES: [string, RegExp][] = [
   ["ssrf", /\bssrf\b|server-side request forgery/i],
   ["file-attacks", /path traversal|directory traversal|\blfi\b|\brfi\b|arbitrary file (read|upload)|zip slip/i],
   ["mass-assignment", /mass assignment|over-?posting/i],
-  ["authn", /default.*cred|brute[- ]?force|rate limit|password policy|account lockout|session fixation|weak password/i],
-  ["authz", /broken access control|privilege escalation|unauthenticated access to/i],
+  ["authn", /authentication[- ]bypass|login[- ]bypass|multi[- ]factor[- ]bypass|mfa[- ]bypass|otp[- ]bypass|default.*cred|brute[- ]?force|rate limit|password policy|account lockout|session fixation|weak password/i],
+  ["authz", /authorization[- ]bypass|access[- ]control[- ]bypass|function[- ]level authorization|broken access control|privilege escalation|unauthenticated access to/i],
   ["business-logic", /race condition|negative amount|workflow bypass/i],
 ]
 export function classifyFindingTitle(title: string): string | null {
