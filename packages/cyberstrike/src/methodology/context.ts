@@ -15,7 +15,7 @@ import { Skill } from "../skill"
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   // The canonical recon workflow owns phase ordering. Skills provide detailed, conditional sub-workflows.
   scope_analysis: [
-    "target-workspace-workflow", "attack-bb-methodology", "recon-master", "community-tool-selection", "bug-bounty-evidence-workflow",
+    "target-workspace-workflow", "attack-bb-methodology", "recon-master", "community-tool-selection",
     "scope analysis", "scope validation", "wildcard scope", "program policy",
   ],
   mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
@@ -23,7 +23,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "recon-master", "community-tool-selection", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
-    "recon-master", "community-tool-selection", "attack-web-recon", "attack-shadow-api",
+    "recon-master", "community-tool-selection", "attack-shadow-api",
     "attack-javascript-analysis", "attack-subdomain-takeover", "attack-database-service-exposure",
     "endpoint enumeration", "parameter discovery", "JavaScript analysis",
   ],
@@ -84,7 +84,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
   reporting: [
     "community-tool-selection", "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
-    "bugcrowd-reporting", "bug-bounty-evidence-workflow", "attack-variant-analysis", "attack-metrics-exposure", "triage-validation", "evidence-hygiene", "report-writing",
+    "bugcrowd-reporting", "attack-bb-methodology", "attack-variant-analysis", "attack-metrics-exposure", "triage-validation", "evidence-hygiene", "report-writing",
   ],
 }
 
@@ -94,7 +94,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-master"],
   passive_recon: ["recon-master", "attack-javascript-analysis"],
-  active_recon: ["recon-master", "attack-web-recon", "attack-javascript-analysis"],
+  active_recon: ["recon-master", "attack-javascript-analysis"],
   authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-account-lifecycle-verification"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
@@ -112,7 +112,7 @@ export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
     "attack-graphql", "attack-grpc", "attack-websocket", "attack-schema-enumeration", "attack-cors", "attack-rate-limit-bypass",
   ],
   infrastructure: ["attack-cloud-misconfig"],
-  reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
+  reporting: ["attack-report-writing", "attack-bb-methodology"],
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
