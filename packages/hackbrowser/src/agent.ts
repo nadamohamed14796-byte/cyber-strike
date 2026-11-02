@@ -1707,7 +1707,7 @@ async function aiLogin(
     if (!acted) break
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    await handle2FA(page, credentials.otpProvider, credentials.origin, config.signal)
+    await handle2FA(page, credentials.otpProvider, credentials.origin, signal)
     await page.waitForTimeout(750)
     if (!(await stillOnLogin())) return { success: true }
   }
