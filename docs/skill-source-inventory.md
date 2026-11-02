@@ -36,7 +36,7 @@ Existing CyberStrike canonical files expanded (no new parallel skill names):
 - `.cyberstrike/skill/attack-subdomain-takeover/SKILL.md`
 - `.cyberstrike/skill/attack-websocket/SKILL.md`
 - `.cyberstrike/skill/attack-xxe/SKILL.md`
-- `.cyberstrike/skill/recon-methodology/SKILL.md`
+- `.cyberstrike/skill/recon-master/SKILL.md`
 - `.cyberstrike/skill/cloud-assessment/SKILL.md`
 - `.cyberstrike/skill/ci-assessment/SKILL.md`
 - `.cyberstrike/skill/cicd-attacks/SKILL.md`
@@ -70,7 +70,7 @@ This is the first canonical consolidation batch: 29 existing skill files expande
 |---|---|
 | IDOR/BOLA, object/tenant authorization | `attack-idor-automation`; existing WSTG authorization/API testing skills |
 | CORS, GraphQL, JWT, redirects, cache/host header, prototype pollution, race conditions, rate limits, request smuggling, SSRF, SSTI, subdomain takeover, WebSocket, XXE | Matching existing `attack-*` skill with the same CyberStrike name |
-| Recon playbooks, subdomains, ports, web/API enumeration, JavaScript endpoints, source leaks, origin discovery | `recon-methodology`; existing WSTG reconnaissance/configuration skills |
+| Recon playbooks, subdomains, ports, web/API enumeration, JavaScript endpoints, source leaks, origin discovery | `recon-master`; existing WSTG reconnaissance/configuration skills |
 | API no-auth, API misconfiguration, mass assignment, GraphQL and gRPC testing | Existing WSTG API skills plus `attack-graphql` and `attack-idor-automation` where semantically appropriate |
 | Authentication, ATO, password reset, MFA, OAuth/SAML/session | Existing WSTG authentication/authorization/session skills and `attack-jwt` where relevant |
 | Business logic and workflow integrity | Existing WSTG business-logic skills; `attack-race-condition` only for concurrency hypotheses |
