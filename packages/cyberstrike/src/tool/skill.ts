@@ -442,10 +442,10 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           `Routing metadata: category=${skill.category ?? "unspecified"}; tags=${skill.tags?.join(", ") || "none declared"}; signals=${SkillIndex.get(skill.name)?.signals.join(", ") || skill.signals?.join(", ") || skill.tags?.join(", ") || "none declared"}; tech_stack=${skill.tech_stack?.join(", ") || "none declared"}; CWE=${skill.cwe_ids?.join(", ") || "none"}; OWASP=${skill.owasp_id ?? "none"}`,
           "",
-          skill.content.trim(),
-          "",
           `Base directory for this skill: ${base}`,
           "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
+          "",
+          skill.content.trim(),
           companionFileListComplete
             ? "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill."
             : "Companion-file listing failed; only the SKILL.md content was loaded. Do not assume missing companion paths are absent.",
