@@ -12,6 +12,16 @@ test("reuses an existing specialist for the same request instead of dispatching 
   expect(result).toEqual({ allowed: false, reason: "duplicate", existingTaskID: "ses_existing" })
 })
 
+test("blocks a second concurrent dispatch of the same specialist lane", () => {
+  const result = evaluateProxyRequestDispatch({
+    requestID: "req_inflight",
+    agentID: "proxy-tester-idor",
+    children: [],
+    reservedAgentIDs: ["proxy-tester-idor"],
+  })
+  expect(result).toEqual({ allowed: false, reason: "duplicate" })
+})
+
 test("allows the same specialist for a different captured request", () => {
   const result = evaluateProxyRequestDispatch({
     requestID: "req_two",
