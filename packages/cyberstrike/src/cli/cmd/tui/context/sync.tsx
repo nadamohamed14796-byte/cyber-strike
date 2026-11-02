@@ -869,7 +869,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               const match = Binary.search(draft.session, sessionID, (s) => s.id)
               if (match.found) draft.session[match.index] = session.data!
               if (!match.found) draft.session.splice(match.index, 0, session.data!)
-              draft.todo[sessionID] = todo.data ?? []
+              // Do not let a late initial HTTP snapshot replace a newer live todo.updated event.
+              if (draft.todo[sessionID] === undefined) draft.todo[sessionID] = todo.data ?? []
               draft.vulnerability[sessionID] = vuln?.data ?? []
               draft.request[sessionID] = req?.data ?? []
               draft.web_credential[sessionID] = wCred?.data ?? []
