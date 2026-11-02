@@ -1154,6 +1154,40 @@ describe("captured request HTTP route scope gate", () => {
     })
   })
 
+  test("routes plain-text extension tasks into the Extension Agent Tasks child, not the parent chat", async () => {
+    await withInstance(async () => {
+      const previousDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN
+      delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
+      const parent = await Session.create({ title: "extension-text-task-parent-test" })
+      try {
+        const response = await Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionID: parent.id,
+              text: "Inspect the captured page context and identify the most relevant next analysis task.",
+            }),
+          },
+        )
+
+        expect(response.status, await response.clone().text()).toBe(202)
+        const children = await Session.children(parent.id)
+        const taskSessions = children.filter((child) => child.title === "Extension Agent Tasks")
+        expect(taskSessions).toHaveLength(1)
+        expect(taskSessions[0]?.parentID).toBe(parent.id)
+        expect(await Session.messages({ sessionID: parent.id })).toHaveLength(0)
+      } finally {
+        const children = await Session.children(parent.id).catch(() => [])
+        for (const child of children) await Session.remove(child.id).catch(() => {})
+        await Session.remove(parent.id).catch(() => {})
+        if (previousDryRun === undefined) delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
+        else process.env.CYBERSTRIKE_INGEST_DRY_RUN = previousDryRun
+      }
+    })
+  })
+
   test("rejects an out-of-scope request before creating a request record or proxy broker", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "ingest-scope-gate-test" })
