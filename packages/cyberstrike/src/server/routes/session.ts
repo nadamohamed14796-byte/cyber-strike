@@ -370,6 +370,17 @@ const EXTENSION_TASKS_TITLE = "Extension Agent Tasks"
 const LEGACY_EXTENSION_TASKS_TITLE = new Set(["Agent Proxy", "Extension Proxy Broker (@proxy-agent subagent)"])
 const extensionTaskSessionCreation = new Map<string, Promise<Session.Info>>()
 
+function isExtensionTaskSession(session: Session.Info): boolean {
+  return Boolean(
+    session.parentID &&
+      (session.title === EXTENSION_TASKS_TITLE || LEGACY_EXTENSION_TASKS_TITLE.has(session.title ?? "")),
+  )
+}
+
+function isLegacyProxyAgentSession(session: Session.Info): boolean {
+  return Boolean(session.parentID && LEGACY_EXTENSION_TASKS_TITLE.has(session.title ?? ""))
+}
+
 /**
  * Reuse one persistent Proxy Agent child under the active main session.
  * Concurrent Extension captures must share this same child before reserving
@@ -2602,18 +2613,17 @@ export const SessionRoutes = lazy(() =>
         const sessionID = c.req.valid("param").sessionID
         const body = c.req.valid("json")
         const targetSession = await Session.get(sessionID)
-        const isProxyBroker =
-          (targetSession.title === EXTENSION_TASKS_TITLE || targetSession.title === LEGACY_EXTENSION_TASKS_TITLE) &&
-          !!targetSession.parentID
+        const isExtensionTask = isExtensionTaskSession(targetSession)
+        const forceProxyAgent = isLegacyProxyAgentSession(targetSession)
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
           const promptInput = {
             ...body,
             sessionID,
-            ...(isProxyBroker ? { agent: "proxy-agent" } : {}),
+            ...(forceProxyAgent ? { agent: "proxy-agent" } : {}),
           }
-          const msg = isProxyBroker
+          const msg = isExtensionTask
             ? await new Promise<MessageV2.WithParts | undefined>((resolve, reject) => {
                 IngestQueue.enqueue(
                   targetSession.id,
@@ -2667,9 +2677,8 @@ export const SessionRoutes = lazy(() =>
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
           const targetSession = await Session.get(sessionID)
-          const isProxyBroker =
-            (targetSession.title === EXTENSION_TASKS_TITLE || targetSession.title === LEGACY_EXTENSION_TASKS_TITLE) &&
-            !!targetSession.parentID
+          const isExtensionTask = isExtensionTaskSession(targetSession)
+          const forceProxyAgent = isLegacyProxyAgentSession(targetSession)
           if (body.agent === "impact-hunter") {
             if (!targetSession.parentID || !targetSession.title.startsWith("Impact Hunter")) {
               throw new Error("Manual Impact Hunter prompts must run in a dedicated child session under the active root.")
@@ -2706,7 +2715,7 @@ export const SessionRoutes = lazy(() =>
               await SessionPrompt.prompt({
                 ...body,
                 sessionID,
-                ...(isProxyBroker ? { agent: "proxy-agent" } : {}),
+                ...(forceProxyAgent ? { agent: "proxy-agent" } : {}),
               })
             } catch (error) {
               // prompt_async deliberately returns before the model finishes. Never
@@ -2723,9 +2732,9 @@ export const SessionRoutes = lazy(() =>
               })
             }
           }
-          if (isProxyBroker) {
-            // Manual broker follow-ups share the same FIFO as Extension captures.
-            // This closes the UI polling race and keeps every turn on proxy-agent.
+          if (isExtensionTask) {
+            // Manual Extension Agent follow-ups share the same FIFO as Extension captures.
+            // Preserve the selected agent while keeping task and capture turns serialized.
             IngestQueue.enqueue(
               targetSession.id,
               runPrompt,
