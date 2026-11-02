@@ -311,9 +311,10 @@ export interface AgentConfig {
   cdp?: string
   /** Explicit destination proxy/TLS policy resolved by the CyberStrike parent. */
   network?: BrowserNetworkOptions
-  // Cancellation signal — agent BFS loop checks signal.aborted at each
-  // iteration boundary; browser closes via existing finally block.
-  // Wired by api.ts from CrawlOptions.signal (Faz B.5).
+  // Cancellation signal — manual-login/MFA/re-auth waits observe it immediately.
+  // During normal exploration, the current page/LLM step may finish before the
+  // BFS loop exits. Captured requests are drained and the browser closes in finally.
+  // Wired by api.ts from CrawlOptions.signal.
   signal?: AbortSignal
 }
 

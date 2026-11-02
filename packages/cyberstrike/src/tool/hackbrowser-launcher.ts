@@ -92,9 +92,8 @@ export interface LauncherOptions {
   //                    captures tagged per identity (role-based access tests)
   // ANY non-empty value forces headless: false because every credentialed
   // crawl uses manual login (auto-login is intentionally not exposed).
-  // Library limit (INTEGRATION.md §10.10): manual-login wait does not
-  // honor the abort signal yet, so Esc / /hackbrowser-stop cannot cancel
-  // during the login wait phase.
+  // Manual login, MFA, and re-authentication waits all honor the worker abort
+  // signal; cancellation still drains captured requests before browser cleanup.
   credentials?: string[]
   /** Decrypted only for the lifetime of this local crawl; never log this object. */
   savedLogin?: { username: string; password: string; origin: string }

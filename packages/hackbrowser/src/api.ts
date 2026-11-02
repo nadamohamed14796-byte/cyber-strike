@@ -89,10 +89,11 @@ export interface CrawlOptions {
   // Parent-resolved outbound proxy/TLS policy for Playwright.
   network?: BrowserNetworkOptions
 
-  // Cancellation — when fired, the agent finishes the current step and
-  // gracefully exits the BFS loop. The browser closes via the existing
-  // finally block. LLM calls in progress are NOT cancelled at the SDK
-  // layer (next iteration check is the granularity). Faz B.5 /
+  // Cancellation semantics:
+  // - Manual-login, MFA, and re-authentication waits observe the signal immediately.
+  // - During normal page exploration, the current page/LLM step may finish before
+  //   the BFS loop exits; the SDK request itself is not forcibly interrupted.
+  // Already-captured requests are final-drained and the browser closes in finally.
   // INTEGRATION.md §13.7.
   signal?: AbortSignal
 }
