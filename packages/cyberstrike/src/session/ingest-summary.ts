@@ -74,7 +74,7 @@ export namespace IngestSummary {
 
   /**
    * Extension request status lives in the parent request inventory and the
-   * dedicated Agent Proxy child session. Never append intake, queue, or failure
+   * dedicated Extension Agent Tasks child session. Never append intake, queue, or failure
    * chatter to the Main Agent conversation.
    *
    * Kept as a no-op for existing route call sites and older integrations.
