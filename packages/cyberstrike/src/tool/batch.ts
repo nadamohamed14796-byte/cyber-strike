@@ -129,6 +129,14 @@ export const BatchTool = Tool.define("batch", async () => {
             { tool: call.tool, sessionID: ctx.sessionID, callID: partID },
             { args: validatedParams },
           )
+          // Match the normal SessionPrompt tool wrapper: a batched tool must
+          // still pass the session/agent permission gate before it can execute.
+          await nestedContext.ask({
+            permission: call.tool,
+            metadata: {},
+            patterns: ["*"],
+            always: ["*"],
+          })
           const result = await tool.execute(validatedParams, nestedContext)
           await Plugin.trigger(
             "tool.execute.after",
