@@ -372,13 +372,14 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   }
 
   return (
-    <div
-      data-component="user-message"
-      data-expanded={expanded()}
-      data-can-expand={canExpand()}
-      data-agent-color={!!color()}
-      style={{ "border-left": color() ? `3px solid ${color()}` : undefined }}
-    >
+    <Show when={text() || attachments().length > 0}>
+      <div
+        data-component="user-message"
+        data-expanded={expanded()}
+        data-can-expand={canExpand()}
+        data-agent-color={!!color()}
+        style={{ "border-left": color() ? `3px solid ${color()}` : undefined }}
+      >
       <Show when={attachments().length > 0}>
         <div data-slot="user-message-attachments">
           <For each={attachments()}>
@@ -446,7 +447,8 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
           </div>
         </div>
       </Show>
-    </div>
+      </div>
+    </Show>
   )
 }
 
