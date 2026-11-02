@@ -12,7 +12,7 @@ import { useKeybind } from "../../context/keybind"
 import { useDirectory } from "../../context/directory"
 import { useKV } from "../../context/kv"
 import { TodoItem } from "../../component/todo-item"
-import { formatEndpointHost } from "@tui/util/format"
+import { groupCapturedRequests } from "@tui/util/endpoint-groups"
 
 const fmtTokens = (n: number) =>
   n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + "M" : n >= 1_000 ? Math.round(n / 1_000) + "K" : String(n)
@@ -98,19 +98,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
       failed: all.filter((r) => r.status === "failed").length,
     }
   })
-  // Group endpoints by host for sidebar — narrow column can't fit
-  // method+host+path on one line, so we render the host once per group
-  // and let each row use the full width for its path.
-  const requestsByHost = createMemo(() => {
-    const groups = new Map<string, ReturnType<typeof requests>>()
-    for (const r of requests()) {
-      const key = formatEndpointHost(r.host, r.port) || "(unknown host)"
-      const existing = groups.get(key)
-      if (existing) existing.push(r)
-      else groups.set(key, [r])
-    }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
-  })
+  // Restore the full domain → endpoint → HTTP operation hierarchy.
+  // Each captured transaction remains an independent row under its operation.
+  const requestsByDomain = createMemo(() => groupCapturedRequests(requests()))
   const credentials = createMemo(() => sync.data.web_credential[props.sessionID] ?? [])
   const roles = createMemo(() => sync.data.web_role[props.sessionID] ?? [])
   const objects = createMemo(() => sync.data.web_object[props.sessionID] ?? [])
@@ -624,95 +614,102 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   {requestStatusCounts().queued} queued · {requestStatusCounts().processing} analyzing · {requestStatusCounts().processed} done · {requestStatusCounts().failed} failed
                 </text>
                 <Show when={requests().length <= 2 || expanded.requests}>
-                  <For each={requestsByHost()}>
-                    {([host, rows]) => (
-                      <box>
-                        <text fg={theme.textMuted} wrapMode="none">
-                          {host} ({rows.length})
+                  <For each={requestsByDomain()}>
+                    {(domain) => (
+                      <box flexDirection="column" gap={1}>
+                        <text fg={theme.accent} wrapMode="none">
+                          {domain.label} ({domain.requestCount})
                         </text>
-                        <For each={rows}>
-                          {(r) => (
-                            <box flexDirection="column">
-                              <box flexDirection="row" gap={1} paddingLeft={1} onMouseDown={() => toggleEndpoint(r)}>
-                                <text fg={theme.textMuted} flexShrink={0}>
-                                  {expandedEp[r.id] ? "▼" : "▶"}
-                                </text>
-                                <text
-                                  flexShrink={0}
-                                  style={{
-                                    fg:
-                                      {
-                                        queued: theme.textMuted,
-                                        processing: theme.warning,
-                                        processed: theme.success,
-                                        failed: theme.error,
-                                      }[r.status] ?? theme.text,
-                                  }}
-                                >
-                                  {r.status === "queued" ? "◌" : r.status === "processing" ? "●" : r.status === "processed" ? "✓" : "✗"}
-                                </text>
-                                <text fg={theme.accent} flexShrink={0}>
-                                  {r.method}
-                                </text>
-                                <text fg={theme.text} wrapMode="none">
-                                  {r.normalized_path}
-                                </text>
-                                <Show when={r.operation}>
-                                  <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
-                                    · {r.operation}
-                                  </text>
-                                </Show>
-                              </box>
-                              <text
-                                fg={
-                                  {
-                                    queued: theme.textMuted,
-                                    processing: theme.warning,
-                                    processed: theme.success,
-                                    failed: theme.error,
-                                  }[r.status] ?? theme.text
-                                }
-                                wrapMode="none"
-                                style={{ paddingLeft: 4 }}
-                              >
-                                {r.status === "queued" ? "Queued" : r.status === "processing" ? "Analyzing" : r.status === "processed" ? "Processed" : "Failed"}
+                        <For each={domain.endpoints}>
+                          {(endpoint) => (
+                            <box flexDirection="column" paddingLeft={1} gap={1}>
+                              <text fg={theme.text} wrapMode="none">
+                                {endpoint.path} ({endpoint.requestCount})
                               </text>
-                              {/* Observed values tree — fetched on expand */}
-                              <Show when={expandedEp[r.id] && r.key_hash}>
-                                <For each={sync.data.request_observation[r.key_hash!]?.params ?? []}>
-                                  {(p) => (
-                                    <box flexDirection="column" paddingLeft={3}>
-                                      <text fg={theme.textMuted} wrapMode="none">
-                                        {p.name}
-                                      </text>
-                                      <For each={p.byCredential}>
-                                        {(bc) => (
-                                          <box flexDirection="row" gap={1} paddingLeft={2}>
-                                            <text fg={theme.accent} flexShrink={0} wrapMode="none">
-                                              {credLabel(bc.credentialID)}
+                              <For each={endpoint.operations}>
+                                {(operation) => (
+                                  <box flexDirection="column" paddingLeft={1} gap={1}>
+                                    <text fg={theme.accent} wrapMode="none">
+                                      {operation.method}
+                                      {operation.protocol ? " · " + operation.protocol.toUpperCase() : ""}
+                                      {operation.operation ? " · " + operation.operation : ""}
+                                      {" (" + operation.requests.length + ")"}
+                                    </text>
+                                    <For each={operation.requests}>
+                                      {(r) => (
+                                        <box flexDirection="column">
+                                          <box
+                                            flexDirection="row"
+                                            gap={1}
+                                            paddingLeft={1}
+                                            onMouseDown={() => toggleEndpoint(r)}
+                                          >
+                                            <text fg={theme.textMuted} flexShrink={0}>
+                                              {expandedEp[r.id] ? "▼" : "▶"}
                                             </text>
-                                            <text fg={theme.text} wrapMode="none">
-                                              → {bc.redacted ? "[redacted]" : bc.values.join(", ")}
+                                            <text
+                                              flexShrink={0}
+                                              style={{
+                                                fg:
+                                                  {
+                                                    queued: theme.textMuted,
+                                                    processing: theme.warning,
+                                                    processed: theme.success,
+                                                    failed: theme.error,
+                                                  }[r.status] ?? theme.text,
+                                              }}
+                                            >
+                                              {r.status === "queued" ? "◌" : r.status === "processing" ? "●" : r.status === "processed" ? "✓" : "✗"}
+                                            </text>
+                                            <text fg={theme.textMuted} wrapMode="none">
+                                              {r.id.slice(-8)}
+                                            </text>
+                                            <text fg={theme.textMuted} wrapMode="none">
+                                              {r.status === "queued" ? "Queued" : r.status === "processing" ? "Analyzing" : r.status === "processed" ? "Processed" : "Failed"}
                                             </text>
                                           </box>
-                                        )}
-                                      </For>
-                                    </box>
-                                  )}
-                                </For>
-                                <Show when={(sync.data.request_observation[r.key_hash!]?.params ?? []).length === 0}>
-                                  <text fg={theme.textMuted} wrapMode="none" style={{ paddingLeft: 3 }}>
-                                    (no observed values)
-                                  </text>
-                                </Show>
-                              </Show>
+                                          {/* Observed values are fetched lazily for this endpoint identity. */}
+                                          <Show when={expandedEp[r.id] && r.key_hash}>
+                                            <For each={sync.data.request_observation[r.key_hash!]?.params ?? []}>
+                                              {(p) => (
+                                                <box flexDirection="column" paddingLeft={3}>
+                                                  <text fg={theme.textMuted} wrapMode="none">
+                                                    {p.name}
+                                                  </text>
+                                                  <For each={p.byCredential}>
+                                                    {(bc) => (
+                                                      <box flexDirection="row" gap={1} paddingLeft={2}>
+                                                        <text fg={theme.accent} flexShrink={0} wrapMode="none">
+                                                          {credLabel(bc.credentialID)}
+                                                        </text>
+                                                        <text fg={theme.text} wrapMode="none">
+                                                          → {bc.redacted ? "[redacted]" : bc.values.join(", ")}
+                                                        </text>
+                                                      </box>
+                                                    )}
+                                                  </For>
+                                                </box>
+                                              )}
+                                            </For>
+                                            <Show when={(sync.data.request_observation[r.key_hash!]?.params ?? []).length === 0}>
+                                              <text fg={theme.textMuted} wrapMode="none" style={{ paddingLeft: 3 }}>
+                                                (no observed values)
+                                              </text>
+                                            </Show>
+                                          </Show>
+                                        </box>
+                                      )}
+                                    </For>
+                                  </box>
+                                )}
+                              </For>
                             </box>
                           )}
                         </For>
                       </box>
                     )}
                   </For>
-                </Show>
+                </Show>         </Show>
               </box>
             </Show>
             <Show when={roles().length > 0}>
