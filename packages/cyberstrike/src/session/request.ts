@@ -7,6 +7,7 @@ import { Identifier } from "../id/id"
 import { createHash } from "crypto"
 import { processResponse, type ResponseInput } from "./response-processor"
 import { isConfirmedEmptyStaticHTML } from "./captured-request-triage"
+import { Session } from "./index"
 
 function requestResponseURL(input: {
   normalizedPath: string
@@ -426,14 +427,20 @@ export namespace Request {
     return rows.map(rowToInfo)
   }
 
-  /** Find one captured request by ID, restricted to its owning session. */
+  /**
+   * Find a captured request by ID within the session tree that owns the ledger.
+   * Verification ledgers are rooted at the parent session, while captured
+   * requests may belong to child sessions created for delegated agents.
+   */
   export function findById(sessionID: string, requestID: string): Info | undefined {
     const row = Database.use((db) =>
       db.select().from(RequestTable)
-        .where(and(eq(RequestTable.session_id, sessionID), eq(RequestTable.id, requestID)))
+        .where(eq(RequestTable.id, requestID))
         .get(),
     )
-    return row ? rowToInfo(row) : undefined
+    if (!row) return undefined
+    if (Session.root(row.session_id) !== Session.root(sessionID)) return undefined
+    return rowToInfo(row)
   }
 
   /**
