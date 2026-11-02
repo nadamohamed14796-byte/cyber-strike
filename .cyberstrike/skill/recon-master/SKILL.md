@@ -6,7 +6,7 @@ version: "2.1.0"
 author: "CyberStrike contributors"
 tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, asn, cidr, origin-ip, vhost, ports, services, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, error-logs, asset-inventory, scope, evidence, tool-selection]
 tech_stack: [dns, http, tls, tcp, javascript, api, cloud, browser, git, smtp]
-prerequisites: ["Persisted written authorization, scope rules, exclusions, and permitted testing intensity"]
+prerequisites: []
 chains_with: [community-tool-selection, attack-web-recon, attack-javascript-analysis, attack-shadow-api, attack-subdomain-takeover, attack-api-contract-testing]
 ---
 
