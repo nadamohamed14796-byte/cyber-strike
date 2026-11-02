@@ -78,6 +78,24 @@ describe("runtime agent integration contracts", () => {
     })
   })
 
+  test("every skill-enabled runtime agent receives shared runtime discovery guidance", async () => {
+    await Instance.provide({
+      directory: repoRoot,
+      fn: async () => {
+        const entries = await Agent.entries()
+        for (const entry of entries) {
+          const info = await Agent.get(entry.id)
+          expect(info, "missing agent info for " + entry.id).toBeDefined()
+          if (PermissionNext.evaluate("skill", "*", info!.permission).action === "deny") continue
+          expect(
+            info!.prompt,
+            entry.id + " has skill access but is missing the shared runtime skill/tool discovery guidance",
+          ).toContain("Runtime capability, skill, and signal routing")
+        }
+      },
+    })
+  })
+
   test("vulnerability testers receive skill discovery and obey the structural off-lane handoff", async () => {
     await Instance.provide({
       directory: repoRoot,
