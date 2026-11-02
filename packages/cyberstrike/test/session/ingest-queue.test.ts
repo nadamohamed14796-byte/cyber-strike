@@ -1094,7 +1094,7 @@ describe("captured request payload preservation", () => {
 })
 
 describe("captured request HTTP route scope gate", () => {
-  test("creates exactly one Agent Proxy child under the selected parent and reuses it for later captures", async () => {
+  test("creates exactly one Extension Agent Tasks child under the selected parent and reuses it for later captures", async () => {
     await withInstance(async () => {
       const previousDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN
       delete process.env.CYBERSTRIKE_INGEST_DRY_RUN
@@ -1122,12 +1122,12 @@ describe("captured request HTTP route scope gate", () => {
         const first = await capture("/profile")
         expect(first.status, await first.clone().text()).toBe(202)
         let children = await Session.children(parent.id)
-        for (let attempt = 0; attempt < 30 && !children.some((child) => child.title === "Agent Proxy"); attempt++) {
+        for (let attempt = 0; attempt < 30 && !children.some((child) => child.title === "Extension Agent Tasks"); attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 10))
           children = await Session.children(parent.id)
         }
-        const broker = children.find((child) => child.title === "Agent Proxy")
-        if (!broker) throw new Error("The ingest route did not create the Agent Proxy child session")
+        const broker = children.find((child) => child.title === "Extension Agent Tasks")
+        if (!broker) throw new Error("The ingest route did not create the Extension Agent Tasks child session")
         expect(broker.parentID).toBe(parent.id)
 
         // Concurrent captures must share the same child, not race into duplicate
@@ -1137,7 +1137,7 @@ describe("captured request HTTP route scope gate", () => {
           expect(response.status, await response.clone().text()).toBe(202)
         }
         const afterConcurrent = await Session.children(parent.id)
-        const brokers = afterConcurrent.filter((child) => child.title === "Agent Proxy")
+        const brokers = afterConcurrent.filter((child) => child.title === "Extension Agent Tasks")
         expect(brokers).toHaveLength(1)
         expect(brokers[0]?.id).toBe(broker.id)
         expect(brokers[0]?.parentID).toBe(parent.id)
