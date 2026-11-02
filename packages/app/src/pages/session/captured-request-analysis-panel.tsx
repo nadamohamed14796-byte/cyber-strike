@@ -61,8 +61,8 @@ export function CapturedRequestAnalysisPanel() {
     navigate(`/${params.dir}/session/${id}`)
   })
 
-  // Cumulative number of all requests received by this parent session.
-  const requestCount = createMemo(() => sync.data.request[parentID()]?.length ?? 0)
+  // Each extension turn is one task, regardless of whether it originated as HTTP or plain text.
+  const taskCount = createMemo(() => brokerMessages().filter((message) => message.role === "user").length)
 
   // New extension captures/tasks should open the Agent execution view automatically.
   // Keep the initial count as a baseline so reopening an old session does not
@@ -75,7 +75,7 @@ export function CapturedRequestAnalysisPanel() {
 
   createEffect(() => {
     const ready = requestsReady()
-    const count = requestCount()
+    const count = taskCount()
     const broker = brokerSession()
 
     if (!ready) return
@@ -113,10 +113,10 @@ export function CapturedRequestAnalysisPanel() {
           <div class="flex min-w-0 items-center gap-2">
             <h2 class="shrink-0 text-13-semibold text-text-strong">Extension Agent Tasks</h2>
             <span
-              aria-label={`${requestCount()} captured requests`}
+              aria-label={`${taskCount()} extension tasks`}
               class="inline-flex min-w-6 items-center justify-center rounded bg-surface-base px-2 py-1 text-11-semibold tabular-nums text-text-weak"
             >
-              {requestCount()}
+              {taskCount()}
             </span>
           </div>
 
