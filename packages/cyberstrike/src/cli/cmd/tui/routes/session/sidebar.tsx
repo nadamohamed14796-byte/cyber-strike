@@ -154,7 +154,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const toggleEndpoint = (r: { id: string; key_hash?: string }) => {
     const open = !expandedEp[r.id]
     setExpandedEp(r.id, open)
-    if (open && r.key_hash) void sync.fetchObservations(props.sessionID, r.key_hash)
+    if (open) void sync.fetchObservations(props.sessionID, r.key_hash, r.id)
   }
 
   // Sort MCP servers alphabetically for consistent display order
@@ -669,8 +669,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                                             </text>
                                           </box>
                                           {/* Observed values are fetched lazily for this endpoint identity. */}
-                                          <Show when={expandedEp[r.id] && r.key_hash}>
-                                            <For each={sync.data.request_observation[r.key_hash!]?.params ?? []}>
+                                          <Show when={expandedEp[r.id]}>
+                                            <For each={sync.data.request_observation[r.key_hash ?? r.id]?.params ?? []}>
                                               {(p) => (
                                                 <box flexDirection="column" paddingLeft={3}>
                                                   <text fg={theme.textMuted} wrapMode="none">
@@ -691,7 +691,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                                                 </box>
                                               )}
                                             </For>
-                                            <Show when={(sync.data.request_observation[r.key_hash!]?.params ?? []).length === 0}>
+                                            <Show when={(sync.data.request_observation[r.key_hash ?? r.id]?.params ?? []).length === 0}>
                                               <text fg={theme.textMuted} wrapMode="none" style={{ paddingLeft: 3 }}>
                                                 (no observed values)
                                               </text>
