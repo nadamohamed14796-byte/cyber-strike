@@ -1309,7 +1309,7 @@ describe("Request.findEquivalentProcessed - anonymous capture identity", () => {
       expect(Request.findEquivalentProcessed(changedCookie)).toBeUndefined()
 
       const changedUserID = create({
-        rawRequest: baseRequest.replace("Accept: text/html", "X-User-ID: user-2\\r\\nAccept: text/html"),
+        rawRequest: baseRequest.replace("Accept: text/html", "X-User-ID: user-2\r\nAccept: text/html"),
       })
       expect(Request.findEquivalentProcessed(changedUserID)).toBeUndefined()
 
