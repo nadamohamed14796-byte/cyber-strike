@@ -10,6 +10,9 @@
 //
 // Non-tester agents (cyberstrike, web-application, …) are unrestricted.
 
+// "auth bypass" is a generic legacy category accepted by both auth lanes.
+// Title-based inference below distinguishes authentication from authorization
+// only when the title provides an explicit boundary qualifier.
 export const TESTER_VRT_SCOPE: Record<string, string[]> = {
   idor: ["idor", "bola"],
   authz: [
