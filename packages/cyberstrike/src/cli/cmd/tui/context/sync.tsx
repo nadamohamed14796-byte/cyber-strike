@@ -134,8 +134,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           method: string
           host?: string
           port?: number
+          origin?: string
           normalized_path: string
-          status: string
+          status: "queued" | "processing" | "processed" | "failed"
           protocol?: string
           operation?: string
           key_hash?: string
@@ -284,13 +285,19 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
     }
 
-    // Fetch per-endpoint observed values on demand (when the user expands an
-    // endpoint in the sidebar). Stored by key_hash. Raw facts; no interpretation.
-    async function fetchObservations(sessionID: string, keyHash: string) {
+    // Fetch endpoint observations on demand. Prefer the structural key, but
+    // fall back to the captured request ID for legacy rows without key_hash.
+    // Cache under the same lookup key used by the sidebar so the UI remains
+    // consistent while the server resolves the request ID to its endpoint key.
+    async function fetchObservations(sessionID: string, keyHash: string | undefined, requestID: string) {
       try {
-        const r = await sdk.fetch(`${sdk.url}/session/${sessionID}/observations?keyHash=${encodeURIComponent(keyHash)}`)
+        const lookup = keyHash
+          ? `keyHash=${encodeURIComponent(keyHash)}`
+          : `id=${encodeURIComponent(requestID)}`
+        const r = await sdk.fetch(`${sdk.url}/session/${sessionID}/observations?${lookup}`)
         const tree = (await r.json()) as (typeof store)["request_observation"][string]
-        if (tree && Array.isArray(tree.params)) setStore("request_observation", keyHash, tree)
+        const cacheKey = keyHash ?? requestID
+        if (tree && Array.isArray(tree.params)) setStore("request_observation", cacheKey, tree)
       } catch {
         /* ignore — expanded row simply shows nothing */
       }
