@@ -113,6 +113,21 @@ describe("Phase-critical skill pinning", () => {
     })
   })
 
+  test("consolidated workflow skills load from their canonical entries only", async () => {
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const methodology = await Skill.get("attack-bb-methodology")
+        expect(methodology, "attack-bb-methodology must remain loadable").toBeDefined()
+        expect(methodology!.content).toContain("Evidence-led lifecycle")
+        expect(methodology!.content).toContain("Maintain the execution and evidence ledger")
+        expect(methodology!.content).toContain("Coverage, learning, and closeout")
+        expect(await Skill.get("bug-bounty-evidence-workflow")).toBeUndefined()
+        expect(await Skill.get("attack-web-recon")).toBeUndefined()
+      },
+    })
+  })
+
   test("triage skill includes explicit counterevidence closure and severity calibration", async () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
@@ -184,7 +199,7 @@ describe("Phase-critical skill pinning", () => {
   test("recon phases pin the master skill and keep specialist fan-out optional", () => {
     expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
     expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
-    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
     const retiredReconSkills = [
       "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
       "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
@@ -219,7 +234,7 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("passive_recon")).not.toContain("recon-asn-infrastructure")
     expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
     expect(skillQueriesForPhase("active_recon")).not.toContain("recon-port-service-discovery")
-    expect(skillQueriesForPhase("active_recon")).toContain("attack-web-recon")
+    expect(skillQueriesForPhase("active_recon")).not.toContain("attack-web-recon")
     expect(skillQueriesForPhase("authorization_testing")).toContain("attack-idor-automation")
     expect(skillQueriesForPhase("input_validation")).toContain("attack-ssrf")
     expect(skillQueriesForPhase("input_validation")).toContain("attack-sqli")
@@ -239,6 +254,8 @@ describe("Methodology phase skill routing", () => {
     ]))
     expect(skillQueriesForPhase("infrastructure")).toContain("attack-cloud-misconfig")
     expect(skillQueriesForPhase("reporting")).toContain("attack-report-writing")
+    expect(skillQueriesForPhase("reporting")).toContain("attack-bb-methodology")
+    expect(skillQueriesForPhase("reporting")).not.toContain("bug-bounty-evidence-workflow")
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
   })
@@ -287,7 +304,7 @@ describe("Methodology phase skill routing", () => {
         "kerberos-attacks", "mitre_attack", "mitre_attack_ics", "CIS benchmarks", "NIST controls",
       ],
       reporting: [
-        "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing", "bug-bounty-evidence-workflow", "attack-variant-analysis", "attack-metrics-exposure",
+        "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing", "attack-bb-methodology", "attack-variant-analysis", "attack-metrics-exposure",
         "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
       ],
     }
@@ -356,11 +373,11 @@ describe("Methodology phase skill routing", () => {
       severity_boost: {},
     })
     const ranked = rankSkillsForPhase("active_recon", [
-      "recon-master", "attack-web-recon",
+      "recon-master", "attack-javascript-analysis",
     ].map(makeSkill))
     const names = ranked.map((skill) => skill.name)
     expect(names).toContain("recon-master")
-    expect(names).toContain("attack-web-recon")
+    expect(names).toContain("attack-javascript-analysis")
   })
 
   test("phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
@@ -378,7 +395,7 @@ describe("Methodology phase skill routing", () => {
     const ranked = rankSkillsForPhase("active_recon", [
       makeSkill("generic-recon-tool"),
       makeSkill("recon-master"),
-      makeSkill("attack-web-recon"),
+
       
       makeSkill("attack-javascript-analysis"),
       makeSkill("community-tool-selection"),
@@ -481,7 +498,7 @@ describe("Methodology phase skill routing", () => {
       tech_stack: ["browser", "javascript"],
       cwe_ids: ["CWE-79"],
       chains_with: ["attack-dom-xss"],
-      prerequisites: ["attack-web-recon"],
+      prerequisites: ["recon-master"],
       severity_boost: {},
     }
     const ranked = rankSkillsForPhase("active_recon", [skill], 1)
@@ -494,7 +511,7 @@ describe("Methodology phase skill routing", () => {
       tech_stack: ["browser", "javascript"],
       cwe_ids: ["CWE-79"],
       chains_with: ["attack-dom-xss"],
-      prerequisites: ["attack-web-recon"],
+      prerequisites: ["recon-master"],
     }))
   })
 
