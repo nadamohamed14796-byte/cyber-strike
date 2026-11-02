@@ -6,16 +6,16 @@ Merge the useful methods from CyberStrike's existing skills and the two upstream
 - https://github.com/elementalsouls/Claude-BugHunter
 - https://github.com/uphiago/recon-skills
 
-The expected result is one comprehensive, CyberStrike-native file per existing canonical skill name—not parallel files named after upstream skills.
+The expected result is one comprehensive, CyberStrike-native file per canonical skill area—not parallel files named after upstream skills. Reconnaissance is the approved umbrella exception: one `recon-master` entry contains the eleven ordered specialist chapters.
 
 ## Non-negotiable rules
 
-1. Preserve the existing CyberStrike skill name/path and frontmatter contract.
+1. Preserve existing canonical skill names and frontmatter contracts; the explicitly approved `recon-master` umbrella is the sole recon consolidation exception.
 2. Compare all three inputs: current CyberStrike file, relevant Claude-BugHunter skill(s), and relevant recon-skills skill(s).
 3. Merge complementary material into the existing canonical destination. Do not duplicate a topic in a newly invented root skill.
 4. When multiple upstream files cover one topic, synthesize them into one coherent procedure and retain all relevant source links.
 5. Where a topic is already represented by a nested OWASP WSTG or standards skill, merge into that existing destination rather than creating a parallel `attack-*` file.
-6. If no existing skill semantically fits, record the source as `unmapped` and explain the gap. Do not create a new skill unless the owner explicitly changes this canonical-only rule.
+6. If no existing skill semantically fits, record the source as `unmapped` and explain the gap. Do not create a new runtime skill unless the owner explicitly approves a domain umbrella like `recon-master`.
 7. Remove unverified commands and dangerous production examples. Any CLI/tool reference must be verified against CyberStrike's real registry and runtime before being presented as executable.
 8. Include scope, authorization, safe preconditions, baseline, bounded procedure, impact validation, false positives, evidence requirements, remediation, cleanup, output contract, and related-skill links where relevant.
 9. Preserve license notices and attribution. Do not copy secrets, tokens, target-specific artifacts, or private program data.
