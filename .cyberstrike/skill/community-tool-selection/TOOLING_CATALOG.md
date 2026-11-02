@@ -204,3 +204,52 @@ These are official GitHub `releases/latest` tags checked on 2026-11-02. They are
 | OWASP Amass | v5.1.3 | 2026-10-25 | https://github.com/owasp-amass/amass/releases/tag/v5.1.3 |
 
 Recheck this table during maintenance; never assume it remains current. Amass v5 is a major CLI generation change: do not reuse v3/v4 command recipes without checking v5 help and migration documentation. Nuclei is not part of default recon; it remains an explicitly requested vulnerability-testing tool.
+
+## Verified per-tool recon flag guide (2026-11-02)
+
+The following option names were checked against each project's README at the exact upstream release tag listed in the release snapshot above. They are decision examples, not a universal command line and not proof that the local binary has that version. Before execution, compare the installed binary's own `--help` output; if it differs, the installed help wins and the mismatch is recorded.
+
+| Tool / capability | Use these verified flags when | Decision and safety notes |
+|---|---|---|
+| **subfinder v2.17.0** — broad passive source coverage | `-all` | Queries all configured sources and is explicitly documented as slow. Use for broad authorized root/wildcard coverage when provider configuration and time budget justify it; not the urgent first pass. |
+| **subfinder v2.17.0** — recursive-capable passive sources | `-recursive` | Restricts source selection to sources that support recursive subdomain discovery. Use when evidence suggests nested names; it is not equivalent to `-all`. |
+| **subfinder v2.17.0** — rate and completeness | `-rl`, `-rls`, `-mr 0`, `-oJ`, `-cs` | Set a policy-appropriate request rate; use per-provider limits when needed. `-mr 0` means unlimited results per source in this release. Use JSON plus source collection when per-source attribution is required. Do not silently accept a nonzero result cap. |
+| **httpx v1.12.0** — live-host fingerprinting | `-l`, `-sc`, `-title`, `-ct`, `-td`, `-json` | Feed only the normalized scope-checked host list. Add only fields that answer the current evidence question; keep JSONL provenance. |
+| **httpx v1.12.0** — request budget | `-rl`, `-rlm`, `-t` | Set rate and concurrency to the program's limits; lower both for fragile targets. Do not rely on defaults as authorization. |
+| **httpx v1.12.0** — multi-address validation | `-pa`, `-allow` | `-pa` probes all IPs associated with a host. Use only after each resolved address is independently scope-checked; restrict candidates with `-allow` where suitable. |
+| **dnsx v1.3.1** — selected DNS records | `-l`, `-a`, `-aaaa`, `-cname`, `-mx`, `-ns`, `-txt`, `-j` | Prefer explicit record types that answer the question. Keep raw/JSON evidence and distinguish NXDOMAIN, NODATA, SERVFAIL, and timeout. |
+| **dnsx v1.3.1** — wildcard handling | `-aw` or `-wd` | Use automatic wildcard detection for mixed/multiple candidate domains, or a known parent with `-wd`. The manual `-wd` mode is mutually exclusive with `-aw` and the help warns that other flags are ignored; inspect output accordingly. |
+| **dnsx v1.3.1** — broad record query | `-recon` | Queries all documented record types and includes AXFR. Do not use as a casual default; select only when the complete record set is justified and zone-transfer attempts are within the engagement's explicit permission. |
+| **naabu v2.7.0** — narrow service discovery | `-p 80,443,8080` or `-tp 100` | Use explicit service ports or the documented top-port set for an authorized host/IP. Prefer evidence-derived ports and avoid broad scans of shared/CDN infrastructure. |
+| **naabu v2.7.0** — expanded port coverage | `-tp 1000`, `-tp full`, or explicit `-p` ranges | Only for explicitly authorized IP/CIDR targets with a documented reason and rate budget. `full` is a broader predefined port set; it is not a substitute for understanding the target list or scope. |
+| **naabu v2.7.0** — CDN and rate controls | `-ec`, `-rate`, `-c`, `-j` | Use `-ec` to avoid full port scans against detected CDN/WAF hosts; tune packet rate and concurrency to policy. Record JSON output and skipped hosts. |
+| **katana v1.8.0** — normal crawl | `-u`, `-d`, `-rl`, `-c`, `-jsonl` | Use explicit in-scope URL inputs, bounded depth, and policy rate/concurrency. Merge crawl results with other URL sources; do not let one crawler replace the inventory. |
+| **katana v1.8.0** — JavaScript and browser traffic | `-jc`, `-xhr`, optionally `-hl` | Enable JS endpoint parsing and XHR URL/method extraction when app bundles or browser behavior justify it. Headless mode is optional and more expensive; it is not needed for every host. |
+| **katana v1.8.0** — known files | `-kf all` | Use when robots/sitemap and other supported known-file discovery is relevant. The release help requires a minimum depth of 3 for complete known-file crawling. |
+| **katana v1.8.0** — deeper JS parsing | `-jsl` | Uses jsluice parsing and is documented as memory-intensive. Enable for high-value JS-rich apps when available memory and runtime budget support it; process outputs incrementally. |
+| **katana v1.8.0** — page-volume behavior | `-mdp` | The documented default is unlimited pages per domain. Do not introduce arbitrary page caps; use explicit program time/rate controls and checkpoint/resume instead. |
+| **ffuf v2.3.0** — routine path discovery | `-w`, `-u`, `-rate`, `-t`, `-of json` | Only when directory/content discovery is allowed. Choose a justified wordlist, bounded request rate/concurrency, and JSON output. Keep response filters tied to a measured baseline. |
+| **ffuf v2.3.0** — recursive path discovery | `-recursion`, `-recursion-depth N` | Use only when directory structure suggests nested paths and the URL ends with the `FUZZ` keyword, as required by the tool. Always set a deliberate finite depth and rate budget; default recursion depth is zero. |
+| **ffuf v2.3.0** — HTTP method/body | `-X METHOD`, `-d DATA`, or `-request FILE` | GET is the normal default; do not set a method override unnecessarily. POST only for a documented read-only operation or safe test fixture explicitly permitted by policy. Use a reviewed raw request file when headers/body/auth context must be preserved. Never use PUT/PATCH/DELETE in routine recon. |
+| **OWASP Amass v5.1.3** — version compatibility | Installed `amass --help` and v5 documentation | v5 is a major CLI generation. Do not copy v3/v4 recipes or flags from old skills. Verify the installed v5 command syntax and configuration against the official release before use. |
+| **Nuclei v3.11.1** — boundary reminder | No default recon invocation | Nuclei template execution is vulnerability testing, not baseline recon. Use only when separately requested and explicitly authorized, after endpoint inventory and template review; record template/version and validate alerts manually. |
+
+### Method selection: GET vs HEAD vs POST
+
+| Method | Default decision | Use when | Do not use when |
+|---|---|---|---|
+| GET | **Default** | Read-only page, asset, robots/sitemap, API documentation, ordinary crawl, or documented read-only API query | A GET would trigger a state change or destructive workflow |
+| HEAD | Optional optimization | The service is known to return reliable metadata and a lower-cost check is useful | HEAD is unsupported, returns materially different behavior, or hides the needed evidence; fall back to GET |
+| POST | Explicit exception | The documented application/API requires POST for a read-only query, or a safe test fixture is available and policy explicitly permits it | Arbitrary request bodies, account creation, OTP/email/SMS sends, payment, uploads, state changes, or unapproved brute force |
+| PUT / PATCH / DELETE | Not routine recon | Only in a separate, explicitly authorized test with a controlled test object and cleanup plan | Any default recon workflow |
+
+### Selection examples
+
+- **Urgent / limited window:** use configured high-signal passive sources, then validate known eligible hosts with low request budgets; do not start with subfinder `-all`, large wordlists, full port ranges, or headless crawling unless the evidence gap demands them.
+- **Large wildcard scope:** run independent configured passive sources; consider subfinder `-all` and `-mr 0` for completeness, then batch DNS/HTTP validation. Add `-recursive` only if nested naming is useful. Keep source-specific limits and persist checkpoints.
+- **JS/API-rich application:** use katana `-jc` and `-xhr`; consider `-jsl` if memory permits. Download and analyze every unique JS asset in the dedicated JS pipeline; do not replace the JS analysis stage with crawler output.
+- **Potential nested content:** enable ffuf recursion only when the URL ends in `FUZZ`, set `-recursion-depth`, and compare against a random-path/soft-404 baseline.
+- **Port inventory:** use naabu only when network scanning is explicitly allowed; start with justified ports/top ports and avoid CDN/shared IPs. Escalate to `-tp full` only with explicit IP/CIDR authorization and justification.
+- **POST-only API route:** preserve a captured/documented request and use POST only if its operation is read-only or safely isolated. The HTTP method is evidence attached to the endpoint operation, not an assumption based on route names.
+
+All examples above are subordinate to the persisted scope resolver, runtime request gate, installed binary help, and current engagement policy. A flag never grants authorization.
