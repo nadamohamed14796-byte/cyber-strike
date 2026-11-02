@@ -40,13 +40,13 @@ describe("TUI captured request grouping", () => {
     expect(groups.find((group) => group.label === "api.example.net")?.endpoints[0]?.path).toBe("/v1/items")
   })
 
-  test("keeps different origins separate even when host labels match", () => {
+  test("groups HTTP and HTTPS captures under one host domain", () => {
     const groups = groupCapturedRequests([
       request({ id: "http", origin: "http://app.example.com" }),
       request({ id: "https", origin: "https://app.example.com" }),
     ])
-    expect(groups).toHaveLength(2)
-    expect(groups.map((group) => group.requestCount)).toEqual([1, 1])
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.requestCount).toBe(2)
   })
 
   test("preserves independent captures for the same operation and separates GraphQL operations", () => {
