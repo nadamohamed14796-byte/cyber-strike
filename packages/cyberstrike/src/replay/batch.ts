@@ -60,7 +60,12 @@ export namespace Batch {
     }
 
     while (next < items.length || active.size > 0) {
-      if (opts.signal?.aborted) break
+      if (opts.signal?.aborted) {
+        // Do not launch more work, but let every worker already in flight settle
+        // before returning so callers can safely tear down session resources.
+        await Promise.all(active)
+        break
+      }
 
       // Fill free slots, subject to the (possibly dynamic) cap and rate bucket.
       while (next < items.length && active.size < Math.max(1, cap())) {
