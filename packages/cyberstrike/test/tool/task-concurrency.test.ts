@@ -57,3 +57,38 @@ test("releases a scheduler slot after a failed task and preserves FIFO within a 
   expect(order).toEqual(["first", "second"])
   expect(scheduler.stats()).toMatchObject({ active: 0, pending: 0 })
 })
+
+test("completes every queued sibling in batches of two without a total-dispatch cap", async () => {
+  const scheduler = createTaskScheduler({
+    maxConcurrent: 4,
+    maxPerLane: 2,
+    reservedLaneSuffixes: ["impact"],
+  })
+  const releases: Array<() => void> = []
+  const started: number[] = []
+  const finished: number[] = []
+  const work = Array.from({ length: 9 }, (_, index) =>
+    scheduler.enqueue("root:extension", async () => {
+      started.push(index)
+      await new Promise<void>((resolve) => releases.push(resolve))
+      finished.push(index)
+    }),
+  )
+
+  expect(work).toEqual(["started", "started", ...Array(7).fill("queued")])
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(started).toHaveLength(2)
+  expect(scheduler.stats()).toMatchObject({ active: 2, pending: 7 })
+
+  while (finished.length < 9) {
+    const release = releases.shift()
+    expect(release).toBeDefined()
+    release?.()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(scheduler.stats().active).toBeLessThanOrEqual(2)
+  }
+
+  expect(started.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8])
+  expect(finished.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8])
+  expect(scheduler.stats()).toMatchObject({ active: 0, pending: 0 })
+})
