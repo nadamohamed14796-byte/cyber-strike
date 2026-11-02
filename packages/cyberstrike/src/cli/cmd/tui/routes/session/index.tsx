@@ -2296,12 +2296,17 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
 }
 
 function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
+  const sync = useSync()
+  const todos = createMemo(
+    () => sync.data.todo[props.part.sessionID] ?? props.metadata.todos ?? props.input.todos ?? [],
+  )
+
   return (
     <Switch>
-      <Match when={props.metadata.todos?.length}>
+      <Match when={todos().length}>
         <BlockTool title="# Todos" part={props.part}>
           <box>
-            <For each={props.input.todos ?? []}>
+            <For each={todos()}>
               {(todo) => <TodoItem status={todo.status} content={todo.content} />}
             </For>
           </box>
