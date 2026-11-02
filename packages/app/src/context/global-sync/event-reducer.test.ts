@@ -71,6 +71,7 @@ const baseState = (input: Partial<State> = {}) =>
     session: [],
     sessionTotal: 0,
     session_status: {},
+    session_queue_status: {},
     session_diff: {},
     todo: {},
     vulnerability: {},
@@ -127,6 +128,24 @@ describe("applyGlobalEvent", () => {
 })
 
 describe("applyDirectoryEvent", () => {
+  test("stores live ingest queue status per session", () => {
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.queue.status",
+        properties: { sessionID: "ses_extension", status: { paused: true, pending: 4 } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session_queue_status.ses_extension).toEqual({ paused: true, pending: 4 })
+  })
+
   test("inserts root sessions in sorted order and updates sessionTotal", () => {
     const [store, setStore] = createStore(
       baseState({
@@ -173,6 +192,7 @@ describe("applyDirectoryEvent", () => {
         permission: { ses_1: [] },
         question: { ses_1: [] },
         session_status: { ses_1: { type: "busy" } },
+        session_queue_status: { ses_1: { paused: true, pending: 3 } },
       }),
     )
 
@@ -195,6 +215,7 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission.ses_1).toBeUndefined()
     expect(store.question.ses_1).toBeUndefined()
     expect(store.session_status.ses_1).toBeUndefined()
+    expect(store.session_queue_status.ses_1).toBeUndefined()
   })
 
   test("cleans session caches when deleted and decrements only root totals", () => {
