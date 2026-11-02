@@ -56,6 +56,10 @@ export function CapturedRequestAnalysisPanel() {
 
   // Each extension turn is one task, regardless of whether it originated as HTTP or plain text.
   const taskCount = createMemo(() => brokerMessages().filter((message) => message.role === "user").length)
+  const queueStatus = createMemo(() => {
+    const id = brokerSession()?.id
+    return id ? sync.data.session_queue_status[id] : undefined
+  })
 
   function enterExtensionTasks() {
     const childID = brokerSession()?.id
@@ -79,6 +83,14 @@ export function CapturedRequestAnalysisPanel() {
               {taskCount()}
             </span>
           </div>
+
+          <Show when={queueStatus()} keyed>
+            {(status) => (
+              <span class="text-11-medium text-text-weak" aria-live="polite">
+                {status.paused ? "Paused" : "Queue active"} · {status.pending} pending
+              </span>
+            )}
+          </Show>
 
           <button
             type="button"
