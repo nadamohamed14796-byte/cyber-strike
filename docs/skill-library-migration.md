@@ -47,7 +47,7 @@ The expected result is one comprehensive, CyberStrike-native file per existing c
 - Subdomain takeover: `attack-subdomain-takeover`
 - WebSocket: `attack-websocket`
 - XXE: `attack-xxe`
-- Recon: `recon-methodology`
+- Recon: `recon-master`
 - Cloud assessment: `cloud-assessment`
 - CI/CD review: `ci-assessment` and `cicd-attacks`
 - LLM application security: `llm-security`
