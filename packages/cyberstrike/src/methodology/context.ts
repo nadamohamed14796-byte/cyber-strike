@@ -94,8 +94,8 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
 export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-master"],
-  passive_recon: ["recon-master", "recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"],
-  active_recon: ["recon-master", "attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"],
+  passive_recon: ["recon-master", "attack-javascript-analysis"],
+  active_recon: ["recon-master", "attack-web-recon", "attack-javascript-analysis"],
   authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-account-lifecycle-verification"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
