@@ -168,7 +168,7 @@ describe("Phase-critical skill pinning", () => {
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
   })
 
-  test("recon phases pin specialist skills and keep generic guidance optional", () => {
+  test("recon phases pin the master skill and keep specialist fan-out optional", () => {
     expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
     expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
     expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "attack-javascript-analysis"]))
@@ -530,30 +530,21 @@ describe("Methodology phase skill routing", () => {
     expect(ranked[0]?.name).toBe("z-react-framework-check")
   })
 
-  test("recon skill ranking preserves the canonical workflow while surfacing applicable procedures", () => {
+  test("recon skill ranking keeps the master workflow and does not fan out to every specialist", () => {
     const makeSkill = (name: string, description: string, tags: string[] = []): SkillIndex.Entry => ({
-      name,
-      description,
-      tags,
-      signals: [],
-      tech_stack: [],
-      cwe_ids: [],
-      chains_with: [],
-      prerequisites: [],
-      severity_boost: {},
+      name, description, tags, signals: [], tech_stack: [], cwe_ids: [], chains_with: [], prerequisites: [], severity_boost: {},
     })
-
     const ranked = rankSkillsForPhase("active_recon", [
       makeSkill("generic-web-testing", "General web application testing", ["web"]),
+      makeSkill("recon-master", "Unified scope-aware reconnaissance playbook", ["recon", "active-recon"]),
       makeSkill("recon-port-service-discovery", "Active reconnaissance and service enumeration", ["active-recon", "port-scan"]),
       makeSkill("http-fingerprint", "HTTP technology fingerprinting", ["technology", "framework"]),
     ], 2)
-
     const names = ranked.map((skill) => skill.name)
+    expect(names).toContain("recon-master")
     expect(names).not.toContain("recon-port-service-discovery")
     expect(names).not.toContain("generic-web-testing")
   })
-
   test("scope detection distinguishes mobile artifacts from domain names", () => {
     expect(Phase.detectScopeType(["app.apk"])).toBe("mobile")
     expect(Phase.detectScopeType(["package:com.example.app"])).toBe("mobile")
