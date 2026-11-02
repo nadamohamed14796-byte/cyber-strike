@@ -1,6 +1,7 @@
 import { chromium, type Page, type BrowserContext } from "playwright"
 import * as Stealth from "./stealth.ts"
 import { Log } from "./log.ts"
+import { closeBrowserOnSetupFailure } from "./browser-lifecycle.ts"
 import { drainCaptureQueue, permanentlyRejectedCaptureCount, permanentlyRejectedCaptureDetails } from "./capture-queue.ts"
 import type {
   AgentConfig,
@@ -2688,18 +2689,21 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
   }
 
   const browser = await Stealth.connect({ cdp: config.cdp, headless: config.headless ?? false, network: config.network })
-  const health = createBrowserHealth()
-  const context: BrowserContext = await browser.newContext(Stealth.contextOptions(config.headless ?? false, config.network))
-  await context.addInitScript(Stealth.INIT_SCRIPT)
-  if (panelOn) await context.addInitScript(PANEL_INIT_SCRIPT)
-  const page = await context.newPage()
-  attachLifecycleHandlers(browser, page, health)
-  attachDialogAutoAccept(page)
-  attachFileChooserAutoFill(page)
+  const { health, context, page } = await closeBrowserOnSetupFailure(browser, async () => {
+    const health = createBrowserHealth()
+    const context: BrowserContext = await browser.newContext(Stealth.contextOptions(config.headless ?? false, config.network))
+    await context.addInitScript(Stealth.INIT_SCRIPT)
+    if (panelOn) await context.addInitScript(PANEL_INIT_SCRIPT)
+    const page = await context.newPage()
+    attachLifecycleHandlers(browser, page, health)
+    attachDialogAutoAccept(page)
+    attachFileChooserAutoFill(page)
 
-  if (config.auth.sessionFile) {
-    await loadSession(context, config.auth.sessionFile)
-  }
+    if (config.auth.sessionFile) {
+      await loadSession(context, config.auth.sessionFile)
+    }
+    return { health, context, page }
+  })
 
   // Wire up capture pipeline with header sync. Mirrors the per-credential
   // pattern in runMultiCredential (agent.ts:1459-1471): each captured request
