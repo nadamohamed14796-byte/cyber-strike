@@ -265,7 +265,7 @@ test("full repository skill catalog has no unresolved chain or prerequisite refe
             unreadable.push(skill.name + ": missing file at " + skill.location)
           }
         }
-        for (const name of ["community-tool-selection", "recon-methodology", "attack-javascript-analysis", "src-hunter-compliance"]) {
+        for (const name of ["community-tool-selection", "recon-master", "attack-javascript-analysis", "src-hunter-compliance"]) {
           const retrieved = await Skill.get(name)
           if (!retrieved || retrieved.name !== name || !retrieved.content.trim()) {
             unreadable.push(name + ": selected skill failed on-demand hydration")
