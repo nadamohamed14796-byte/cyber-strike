@@ -67,6 +67,10 @@ import type { RawElement } from "./types.ts"
 
 const log = Log.create({ service: "hackbrowser:agent" })
 
+function isExpectedAbort(error: unknown, signal?: AbortSignal): boolean {
+  return Boolean(signal?.aborted && error instanceof Error && error.name === "AbortError")
+}
+
 // ── Env-gated fault injector (test-only, #117) ─────────────────────────────
 // Deliberately triggers a worker-level fault so the crash safety net can be
 // verified end-to-end. NO effect unless CYBERSTRIKE_HB_FAULT is set. Fires once
@@ -723,6 +727,7 @@ async function explorePageWithAI(
   // Inline-exploration capability; default is a no-op at max depth so callers that
   // don't opt in keep the plain BFS-enqueue behavior (backward compatible).
   nav: ExploreContext = { explore: async () => {}, depth: MAX_INLINE_DEPTH },
+  signal?: AbortSignal,
 ): Promise<string[]> {
   const linksToEnqueue: string[] = []
   const semanticActionsDone = new Set<string>()
@@ -768,16 +773,23 @@ async function explorePageWithAI(
     }
     globalState.authRetryAttempts.add(retryKey)
 
-    let result = await autoLogin(page, credentials)
-    if (!result.success && result.error !== "saved_login_origin_mismatch") {
-      result = await aiLogin(page, credentials, model, usageAcc)
+    let result
+    try {
+      result = await autoLogin(page, credentials, signal)
+      if (!result.success && result.error !== "saved_login_origin_mismatch" && !signal?.aborted) {
+        result = await aiLogin(page, credentials, model, usageAcc, signal)
+      }
+      if (!result.success && !signal?.aborted) {
+        log.warn("automatic session recovery did not complete; waiting for operator authentication", {
+          reason: result.error,
+        })
+        await waitForManualLogin(page, "session re-authentication", undefined, signal)
+      }
+    } catch (error) {
+      if (isExpectedAbort(error, signal)) return visibleLinks()
+      throw error
     }
-    if (!result.success) {
-      log.warn("automatic session recovery did not complete; waiting for operator authentication", {
-        reason: result.error,
-      })
-      await waitForManualLogin(page, "session re-authentication")
-    }
+    if (signal?.aborted) return visibleLinks()
 
     pageUrl = page.url()
     elements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
@@ -1647,7 +1659,9 @@ async function aiLogin(
   credentials: NonNullable<AgentConfig["auth"]["credentials"]>,
   model: LanguageModel,
   usageAcc?: CrawlUsage,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; error?: string }> {
+  if (signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError")
   const originAllowed = () => {
     if (!credentials.origin) return true
     try {
@@ -1705,7 +1719,7 @@ async function aiLogin(
     if (!acted) break
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    await handle2FA(page, credentials.otpProvider, credentials.origin)
+    await handle2FA(page, credentials.otpProvider, credentials.origin, signal)
     await page.waitForTimeout(750)
     if (!(await stillOnLogin())) return { success: true }
   }
@@ -2126,6 +2140,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
   }
 
   const browser = await Stealth.connect({ cdp: config.cdp, headless: config.headless ?? false, network: config.network })
+  try {
   const health = createBrowserHealth()
   browser.on("disconnected", () => {
     health.dead = true
@@ -2213,7 +2228,13 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     // Manual login for this credential. Pass position in the sequence so the
     // button shows progress (e.g. "ADMIN (1/2)") and only the final credential
     // says "START SCAN" — earlier ones say "CONFIRM & NEXT".
-    await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length })
+    try {
+      await waitForManualLogin(page, cred.id, { index: credIndex, total: credentials.length }, config.signal)
+    } catch (error) {
+      if (isExpectedAbort(error, config.signal)) break
+      throw error
+    }
+    if (config.signal?.aborted) break
 
     // Register credential with CyberStrike (same as Firefox extension pattern)
     let credentialId = cred.id
@@ -2448,6 +2469,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
           maxPages,
           usageAcc,
           { explore: exploreInline, depth },
+          config.signal,
         )
         for (const u of found) enqueueWithContext(u, ctx.id, pageQueue, visitedPages, inScope, pathPatternCounts)
       }
@@ -2463,6 +2485,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
           maxPages,
           usageAcc,
           { explore: exploreInline, depth: 0 },
+          config.signal,
         )
         for (const url of discovered) {
           enqueueWithContext(url, ctx.id, pageQueue, visitedPages, inScope, pathPatternCounts)
@@ -2600,6 +2623,11 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     ],
     usage: usageAcc,
   }
+  } finally {
+    // Manual login/MFA waits can now reject immediately on cancellation. Always
+    // close the browser connection on every exceptional or early exit path too.
+    await browser.close().catch(() => {})
+  }
 }
 
 // ============================================================
@@ -2707,6 +2735,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
   const drainInterval = setInterval(() => {
     void drainCaptureQueue(captureQueue, (captured) => handleCapture(captured), "single-credential")
   }, 500)
+  let finalDrainCompleted = false
 
   try {
     // Navigate to target and authenticate
@@ -2728,6 +2757,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
         "single-credential",
         { finalDrain: true },
       )
+      finalDrainCompleted = true
       return {
         sessionID: dryRun ? "" : sessionID!,
         capturedEndpoints: 0,
@@ -2762,8 +2792,9 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
 
     // Login flow: --authenticated → manual login, --user/--pass → auto-login, neither → anonymous
     const isAuthenticated = config.auth.authenticated || !!scopedCredentials
+    try {
     if (config.auth.authenticated) {
-      await waitForManualLogin(page)
+      await waitForManualLogin(page, undefined, undefined, config.signal)
       // Resolve label → UUID. credentialId from the launcher is a user-supplied
       // label ("admin", "user"). The server only accepts PATCH /web/credentials/{uuid},
       // so syncCredentialHeaders (F.2) would 404 silently on every capture without
@@ -2778,21 +2809,25 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
         }
       }
     } else if (scopedCredentials) {
-      const loginResult = await autoLogin(page, scopedCredentials)
+      const loginResult = await autoLogin(page, scopedCredentials, config.signal)
       if (!loginResult.success && loginResult.error !== "saved_login_origin_mismatch") {
         const fallback = model
-          ? await aiLogin(page, scopedCredentials, model, usageAcc)
+          ? await aiLogin(page, scopedCredentials, model, usageAcc, config.signal)
           : { success: false, error: "no_model" }
         if (!fallback.success) {
           log.warn("AI login fallback failed; waiting for operator login", { reason: fallback.error })
-          await waitForManualLogin(page, "initial login")
+          await waitForManualLogin(page, "initial login", undefined, config.signal)
         }
       } else if (loginResult.error === "saved_login_origin_mismatch") {
         log.warn("saved login does not match the current page origin; refusing credential autofill")
-        await waitForManualLogin(page, "external authentication")
+        await waitForManualLogin(page, "external authentication", undefined, config.signal)
       }
     } else {
-      await handle2FA(page)
+      await handle2FA(page, undefined, undefined, config.signal)
+    }
+    } catch (error) {
+      if (!isExpectedAbort(error, config.signal)) throw error
+      log.info("authentication wait cancelled; ending crawl without starting further page exploration")
     }
 
     // Initialize global state (Aşama 13: outOfScope snapshotted from config)
@@ -2818,8 +2853,9 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     // Discovery Engine (#126): seed the BFS from declared sources (sitemap /
     // robots now; specs / JS routes in later phases) via the authenticated,
     // proxy-aware browser context. Best-effort + additive — a failure here
-    // never blocks the crawl; results just augment the queue.
-    try {
+    // never blocks the crawl; results just augment the queue. Do not start
+    // passive discovery after an operator has already cancelled the run.
+    if (!config.signal?.aborted) try {
       // Resolve against the current URL only if it's still in scope — an initial
       // navigation can redirect to an out-of-scope SSO/IdP; fall back to target.
       const seedBase = isInScope(page.url(), inScope) ? page.url() : targetUrl
@@ -3015,6 +3051,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           maxPages,
           usageAcc,
           { explore: exploreInline, depth },
+          config.signal,
         )
         for (const u of found) enqueueUrl(u, globalState, inScope)
       }
@@ -3031,6 +3068,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           maxPages,
           usageAcc,
           { explore: exploreInline, depth: 0 },
+          config.signal,
         )
       } catch (err) {
         if (isBrowserDead(health)) {
@@ -3144,6 +3182,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       "single-credential",
       { finalDrain: true },
     )
+    finalDrainCompleted = true
     return {
       sessionID: dryRun ? "" : sessionID!,
       capturedEndpoints: globalState.capturedEndpoints.size,
@@ -3166,6 +3205,22 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       usage: usageAcc,
     }
   } finally {
+    // A cancellation/error during authentication or crawling must not discard
+    // captures already observed by the request interceptor.
+    if (!finalDrainCompleted && captureQueue.length > 0) {
+      await drainCaptureQueue(
+        captureQueue,
+        (captured) => handleCapture(captured),
+        "single-credential",
+        { finalDrain: true },
+      ).catch((error) => {
+        log.error("final capture drain failed during worker cleanup", {
+          pending: captureQueue.length,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }
     clearInterval(drainInterval)
+    await browser.close().catch(() => {})
   }
 }
