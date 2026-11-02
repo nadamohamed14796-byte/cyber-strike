@@ -70,4 +70,33 @@ describe("Scheduler.register", () => {
     })
     expect(runs.count).toBe(1)
   })
+
+  test("does not overlap a slow run when the interval is shorter than the task", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const runs = { count: 0 }
+    const active = { count: 0, max: 0 }
+    const id = "scheduler.overlap." + Math.random().toString(36).slice(2)
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        Scheduler.register({
+          id,
+          interval: 2,
+          run: async () => {
+            runs.count++
+            active.count++
+            active.max = Math.max(active.max, active.count)
+            await new Promise<void>((resolve) => setTimeout(resolve, 20))
+            active.count--
+          },
+        })
+
+        await new Promise<void>((resolve) => setTimeout(resolve, 85))
+        expect(runs.count).toBeGreaterThan(1)
+        expect(active.max).toBe(1)
+        await Instance.dispose()
+      },
+    })
+  })
 })
