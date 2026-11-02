@@ -6,7 +6,7 @@ version: "1.0.0"
 author: "CyberStrike contributors"
 tags: [javascript, source-maps, endpoints, api, frontend-security, secrets]
 tech_stack: [javascript, typescript, browser, rest, graphql, spa]
-chains_with: [attack-web-recon, attack-source-leak, attack-dom-xss, attack-prototype-pollution, attack-shadow-api, attack-api-contract-testing, attack-browser-boundary-security, attack-triage-validation]
+chains_with: [recon-master, attack-source-leak, attack-dom-xss, attack-prototype-pollution, attack-shadow-api, attack-api-contract-testing, attack-browser-boundary-security, attack-triage-validation]
 sources:
   - "https://github.com/uphiago/recon-skills"
   - "https://owasp.org/www-project-web-security-testing-guide/"
