@@ -22,7 +22,7 @@
               "raw": "{\n  \"text\": \"Merhaba, bu bir test mesajı.\"\n}"
             },
             "url": "{{baseUrl}}/session/ingest",
-            "description": "Sends a message as user input. Creates a new session; response includes sessionID. Default agent is proxy-agent.",
+            "description": "Accepts a plain-text Extension task in an isolated child session under the returned parent sessionID. Uses the configured default agent unless agent is supplied; HTTP captures are routed to the Proxy Agent workflow.",
             "event": [
               {
                 "listen": "test",
@@ -48,7 +48,7 @@
               "raw": "{\n  \"text\": \"İkinci mesaj.\",\n  \"sessionID\": \"{{sessionID}}\"\n}"
             },
             "url": "{{baseUrl}}/session/ingest",
-            "description": "Sends a follow-up message to an existing session. Set sessionID variable from a previous ingest response."
+            "description": "Sends an Extension task to the existing parent session. The task runs in its dedicated Extension Agent Tasks child session, not in the parent chat."
           }
         },
         {
@@ -61,7 +61,7 @@
               "raw": "{\n  \"text\": \"Web uygulamasını tara.\",\n  \"agent\": \"proxy-agent\"\n}"
             },
             "url": "{{baseUrl}}/session/ingest",
-            "description": "Optional: specify agent (e.g. proxy-agent, build, web-application). Omit to use default proxy-agent."
+            "description": "Optional: select the agent for a plain-text Extension task. The selected agent runs in the dedicated child session; HTTP captures still use the Proxy Agent workflow. Example agent IDs: proxy-agent, build, web-application). Omit to use default proxy-agent."
           }
         }
       ]
