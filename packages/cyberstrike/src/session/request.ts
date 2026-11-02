@@ -426,6 +426,16 @@ export namespace Request {
     return rows.map(rowToInfo)
   }
 
+  /** Find one captured request by ID, restricted to its owning session. */
+  export function findById(sessionID: string, requestID: string): Info | undefined {
+    const row = Database.use((db) =>
+      db.select().from(RequestTable)
+        .where(and(eq(RequestTable.session_id, sessionID), eq(RequestTable.id, requestID)))
+        .get(),
+    )
+    return row ? rowToInfo(row) : undefined
+  }
+
   /**
    * Return unfinished requests in their original intake order. Their IDs are stamped
    * before asynchronous normalization so write/completion order cannot reorder recovery.
