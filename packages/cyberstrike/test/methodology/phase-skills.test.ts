@@ -110,6 +110,9 @@ describe("Phase-critical skill pinning", () => {
         expect(skill!.content).toContain("Tool selection and runtime discipline")
         expect(skill!.content).toContain("Source coverage and count semantics")
         expect(skill!.content).toContain("zero-results")
+        expect(skill!.content).toContain("Candidate handoff record")
+        expect(skill!.content).toContain("negative_control_needed")
+        expect(skill!.content).toContain("removed-from-current-observation")
         expect(skill!.content).toMatch(/stop conditions/i)
       },
     })
@@ -133,6 +136,16 @@ describe("Phase-critical skill pinning", () => {
         expect(workspace!.content).not.toContain("## Autonomous execution")
       },
     })
+  })
+
+  test("curated registry publishes canonical workflow skills and excludes retired duplicates", async () => {
+    const registryPath = path.resolve(import.meta.dir, "../../../../.cyberstrike/skill/index.json")
+    const registry = JSON.parse(await Bun.file(registryPath).text()) as { skills: Array<{ name: string }> }
+    const names = registry.skills.map((entry) => entry.name)
+    expect(names).toContain("attack-bb-methodology")
+    expect(names).not.toContain("bug-bounty-evidence-workflow")
+    expect(names).toContain("recon-master")
+    expect(names).not.toContain("attack-web-recon")
   })
 
   test("triage skill includes explicit counterevidence closure and severity calibration", async () => {
