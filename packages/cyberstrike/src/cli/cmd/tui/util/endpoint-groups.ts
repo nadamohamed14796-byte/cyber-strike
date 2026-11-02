@@ -37,8 +37,19 @@ export function groupCapturedRequests<T extends CapturedEndpointRequest>(request
   const domains = new Map<string, { label: string; endpoints: Map<string, Map<string, T[]>> }>()
 
   for (const request of requests) {
-    const host = formatEndpointHost(request.host, request.port) || "(unknown host)"
-    const domainKey = request.origin || host
+    let host = formatEndpointHost(request.host, request.port)
+    if (!host && request.origin) {
+      try {
+        const origin = new URL(request.origin)
+        host = formatEndpointHost(origin.hostname, origin.port ? Number(origin.port) : undefined)
+      } catch {
+        // Preserve malformed/legacy origin rows in the unknown-host bucket.
+      }
+    }
+    host = host || "(unknown host)"
+    // A domain groups its HTTP and HTTPS captures together; only host/port
+    // distinguish domains, not the transport scheme.
+    const domainKey = host.toLowerCase()
     let domain = domains.get(domainKey)
     if (!domain) {
       domain = { label: host, endpoints: new Map() }
