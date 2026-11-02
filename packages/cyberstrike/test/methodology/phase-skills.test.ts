@@ -170,10 +170,12 @@ describe("Phase-critical skill pinning", () => {
 
   test("recon phases pin specialist skills and keep generic guidance optional", () => {
     expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology", "recon-master"]))
-    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"]))
-    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-master", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["recon-master", "attack-web-recon", "attack-javascript-analysis"]))
     for (const phase of ["scope_analysis", "passive_recon", "active_recon"] as const) {
       expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-methodology")
+      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-subdomain-enumeration")
+      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-port-service-discovery")
       expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("community-tool-selection")
     }
   })
@@ -192,11 +194,14 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("scope_analysis")).toContain("target-workspace-workflow")
     expect(skillQueriesForPhase("scope_analysis")).toContain("attack-bb-methodology")
     expect(skillQueriesForPhase("scope_analysis")).toContain("recon-master")
+    expect(skillQueriesForPhase("scope_analysis")).not.toContain("recon-methodology")
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-master")
     expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
-    expect(skillQueriesForPhase("passive_recon")).toContain("recon-subdomain-enumeration")
-    expect(skillQueriesForPhase("passive_recon")).toContain("recon-asn-infrastructure")
-    expect(skillQueriesForPhase("active_recon")).toContain("recon-port-service-discovery")
+    expect(skillQueriesForPhase("passive_recon")).toContain("recon-master")
+    expect(skillQueriesForPhase("passive_recon")).not.toContain("recon-subdomain-enumeration")
+    expect(skillQueriesForPhase("passive_recon")).not.toContain("recon-asn-infrastructure")
+    expect(skillQueriesForPhase("active_recon")).toContain("recon-master")
+    expect(skillQueriesForPhase("active_recon")).not.toContain("recon-port-service-discovery")
     expect(skillQueriesForPhase("active_recon")).toContain("attack-web-recon")
     expect(skillQueriesForPhase("authorization_testing")).toContain("attack-idor-automation")
     expect(skillQueriesForPhase("input_validation")).toContain("attack-ssrf")
@@ -334,15 +339,11 @@ describe("Methodology phase skill routing", () => {
       severity_boost: {},
     })
     const ranked = rankSkillsForPhase("active_recon", [
-      "recon-methodology", "recon-subdomain-enumeration", "recon-port-service-discovery",
-      "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
-      "recon-email-security", "recon-gitlab-public-recon", "recon-error-log-mining",
-      "recon-visual-recon", "recon-asn-infrastructure", "attack-web-recon",
+      "recon-master", "attack-web-recon",
     ].map(makeSkill))
     const names = ranked.map((skill) => skill.name)
-    expect(names).toContain("recon-methodology")
-    expect(names).toContain("recon-subdomain-enumeration")
-    expect(names).toContain("recon-port-service-discovery")
+    expect(names).toContain("recon-master")
+    expect(names).toContain("attack-web-recon")
   })
 
   test("phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
@@ -359,9 +360,9 @@ describe("Methodology phase skill routing", () => {
     })
     const ranked = rankSkillsForPhase("active_recon", [
       makeSkill("generic-recon-tool"),
-      makeSkill("recon-methodology"),
+      makeSkill("recon-master"),
       makeSkill("attack-web-recon"),
-      makeSkill("recon-port-service-discovery"),
+      
       makeSkill("attack-javascript-analysis"),
       makeSkill("community-tool-selection"),
     ], 1)
@@ -549,7 +550,7 @@ describe("Methodology phase skill routing", () => {
     ], 2)
 
     const names = ranked.map((skill) => skill.name)
-    expect(names).toContain("recon-port-service-discovery")
+    expect(names).not.toContain("recon-port-service-discovery")
     expect(names).not.toContain("generic-web-testing")
   })
 
