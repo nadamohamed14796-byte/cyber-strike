@@ -10,7 +10,9 @@
 
 import z from "zod"
 import { Tool } from "./tool"
+import { Bus } from "../bus"
 import { Session } from "../session"
+import { Instance } from "../project/instance"
 import { Request } from "../session/request"
 import { WebCredential, COMMON_AUTH_HEADERS } from "../session/web/web-credential"
 import { credentialForSession } from "../session/web/credential-scope"
@@ -284,9 +286,55 @@ export function shouldRejectUnauthorized(insecureTls?: boolean): boolean {
   return insecureTls !== true
 }
 
+// ── Session/host-scoped replay governors ──────────────────────────────────────
+
+type ReplayHostGovernors = {
+  breaker: Governor.CircuitBreaker
+  limiter: Governor.AimdLimiter
+}
+
+type ReplaySessionGovernors = {
+  budget: Governor.GlobalBudget
+  hosts: Map<string, ReplayHostGovernors>
+}
+
+const replayGovernorState = Instance.state(
+  () => {
+    const sessions = new Map<string, ReplaySessionGovernors>()
+    const unsubscribe = Bus.subscribe(Session.Event.Deleted, (event) => {
+      sessions.delete(event.properties.info.id)
+    })
+    return { sessions, unsubscribe }
+  },
+  async (state) => {
+    state.unsubscribe()
+    state.sessions.clear()
+  },
+)
+
+/** Reuse one request budget per root session and independent feedback per host. */
+export function replayGovernorsFor(sessionID: string, origin: string) {
+  const sessions = replayGovernorState().sessions
+  let session = sessions.get(sessionID)
+  if (!session) {
+    session = {
+      budget: new Governor.GlobalBudget(),
+      hosts: new Map(),
+    }
+    sessions.set(sessionID, session)
+  }
+  const host = session.hosts.get(origin) ?? {
+    breaker: new Governor.CircuitBreaker(),
+    limiter: new Governor.AimdLimiter(),
+  }
+  session.hosts.set(origin, host)
+  return { budget: session.budget, breaker: host.breaker, limiter: host.limiter }
+}
+
 // ── Governed send wrapper ─────────────────────────────────────────────────────
 
 async function sendGoverned(
+  sessionID: string,
   msg: HttpMessage.Request,
   origin: string,
   opts: {
@@ -298,8 +346,6 @@ async function sendGoverned(
   },
 ): Promise<Send.Result> {
   const outbound = await Network.forUrl(origin)
-  const budget = new Governor.GlobalBudget()
-  const breaker = new Governor.CircuitBreaker()
   return Send.governed(
     () =>
       BackendFetch.send(msg, {
@@ -314,7 +360,7 @@ async function sendGoverned(
         signal: opts.signal,
       }),
     msg.method,
-    { budget, breaker },
+    replayGovernorsFor(sessionID, origin),
     {},
   )
 }
@@ -648,8 +694,8 @@ export const HttpReplayTool = Tool.define("http_replay", {
         exploitMsg = Apply.mutations(exploitMsg, compare.exploit.mutations as Apply.Mutation[])
 
       const [baselineResult, exploitResult] = await Promise.all([
-        sendGoverned(baselineMsg, origin, sendOpts),
-        sendGoverned(exploitMsg, origin, sendOpts),
+        sendGoverned(sessionID, baselineMsg, origin, sendOpts),
+        sendGoverned(sessionID, exploitMsg, origin, sendOpts),
       ])
 
       const diff = buildDiff(baselineResult, exploitResult)
@@ -697,6 +743,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
       sharedMsg = authResult
       if (params.mutations) sharedMsg = Apply.mutations(sharedMsg, params.mutations as Apply.Mutation[])
 
+      const governors = replayGovernorsFor(sessionID, origin)
       const results = await Batch.run(
         sweep.values,
         async (value) => {
@@ -707,13 +754,16 @@ export const HttpReplayTool = Tool.define("http_replay", {
           try {
             const mut = { ...sweep.mutation, value } as Apply.Mutation
             const varMsg = Apply.mutations(sharedMsg, [mut])
-            const result = await sendGoverned(varMsg, origin, sendOpts)
+            const result = await sendGoverned(sessionID, varMsg, origin, sendOpts)
             return { value: safeValue, ...summarize(result, params.marker) }
           } catch (e) {
             return { value: safeValue, error: redactSensitiveText(e instanceof Error ? e.message : String(e)) }
           }
         },
-        { concurrency: 3 },
+        {
+          concurrency: () => governors.limiter.value,
+          signal: sendOpts.signal,
+        },
       )
 
       const safeResults = results.filter(Boolean).map((entry) => {
@@ -752,7 +802,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
       }
     }
 
-    const result = await sendGoverned(msg, origin, sendOpts)
+    const result = await sendGoverned(sessionID, msg, origin, sendOpts)
 
     const facts = resultFacts(result)
     const noteSaved = await recordReplayObservation({
