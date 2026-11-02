@@ -94,3 +94,23 @@ This is the first canonical consolidation batch: 29 existing skill files expande
 - Claude-BugHunter: review its repository's content-specific license/notice before redistributing source-derived text; retain required attribution.
 - recon-skills: retain applicable MIT copyright/license notice for reused material.
 - Prefer original synthesis over verbatim copying and keep source URLs in the canonical skill's `sources` field.
+
+
+## Workflow consolidation — 2026-11-02
+
+The following semantic overlaps have been consolidated into canonical responsibilities. This is a workflow cleanup, not a merge of unrelated specialist skills.
+
+| Previous skill/workflow | Canonical destination | Result |
+|---|---|---|
+| `attack-web-recon` | `.cyberstrike/skill/recon-master/SKILL.md` | The seven-step web recon pipeline, iterative source expansion, validation controls, source coverage, endpoint normalization, and recon handoff are represented by the single recon entry point and its conditional chapters. The duplicate skill file and its phase pin are retired. |
+| `bug-bounty-evidence-workflow` | `.cyberstrike/skill/attack-bb-methodology/SKILL.md` | Intake, inventory handoff, hypothesis planning, execution/evidence records, status discipline, deduplication, chaining, reporting, learning, and closeout are consolidated into the canonical methodology. The duplicate skill file and index entry are retired. |
+| Broad workflow and workspace instructions | `.cyberstrike/skill/target-workspace-workflow/SKILL.md` + `packages/cyberstrike/src/agent/prompt/methodology/target-workflow.txt` | The runtime prompt retains global orchestration. The skill is narrowed to workspace identity, canonical paths, artifact persistence, state-ledger ownership, and target isolation. |
+
+The following remain separate by design because they perform different work:
+- `recon-master`: reconnaissance execution guidance and conditional asset-discovery procedures.
+- `attack-javascript-analysis`: JavaScript/source-map acquisition, local analysis, and source-linked endpoint candidates.
+- `attack-finding-correlation`: normalized evidence aggregation, graph updates, and evidence-driven skill handoffs.
+- `attack-triage-validation`: the required finding validation gate, counterevidence, verdict, and severity controls.
+- `attack-evidence-hygiene` and `attack-report-writing`: evidence sanitization/review and final report construction.
+
+Routing and regression coverage were updated so active reconnaissance loads the canonical recon skill without a parallel web-recon skill, and reporting discovers the canonical bug-bounty methodology rather than the retired evidence-workflow skill. Runtime test execution remains to be verified in the package environment.
