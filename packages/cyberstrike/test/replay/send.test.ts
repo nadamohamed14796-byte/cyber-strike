@@ -112,11 +112,13 @@ describe("Send.governed — guards", () => {
     expect(r.attempts).toBe(0)
   })
 
-  test("skips when the circuit breaker is open", async () => {
+  test("skips when the circuit breaker is open without consuming the session budget", async () => {
     const breaker = new Governor.CircuitBreaker(1, 10_000)
+    const budget = new Governor.GlobalBudget(5)
     breaker.onFailure(0) // opens (threshold 1)
-    const r = await Send.governed(scripted([ok()]), "GET", { breaker }, { sleep: noSleep, now: fixedNow })
+    const r = await Send.governed(scripted([ok()]), "GET", { breaker, budget }, { sleep: noSleep, now: fixedNow })
     expect(r.skipped).toBe("circuit")
     expect(r.attempts).toBe(0)
+    expect(budget.consumed).toBe(0)
   })
 })
