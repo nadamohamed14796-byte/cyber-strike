@@ -43,6 +43,7 @@ import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
 import { Truncate } from "./truncation"
 import { ApplyPatchTool } from "./apply_patch"
+import { ListTool } from "./ls"
 
 import { MemorySearchTool, MemoryWriteTool, MemoryReadTool, MemoryContextTool } from "./memory"
 import { ToolSearchTool, LoadToolsTool, UnloadToolsTool, ListLoadedToolsTool } from "./tool-search"
@@ -167,6 +168,7 @@ export namespace ToolRegistry {
       ...(["app", "cli", "desktop"].includes(Flag.CYBERSTRIKE_CLIENT) ? [QuestionTool] : []),
       BashTool,
       ReadTool,
+      ListTool,
       GlobTool,
       GrepTool,
       EditTool,
