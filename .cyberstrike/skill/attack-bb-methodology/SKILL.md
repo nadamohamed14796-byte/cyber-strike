@@ -1,149 +1,225 @@
 ---
 name: attack-bb-methodology
-description: "Plan focused, evidence-led bug bounty work and route findings to relevant skills"
+description: "Plan and run evidence-led bug bounty work from authorized scope through focused hypotheses, validation handoff, triage, and reporting"
 category: "methodology"
-version: "1.0.0"
-author: "CyberStrike contributors; adapted with upstream attribution"
-tags: [bug-bounty, workflow, prioritization, scope, triage]
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated from CyberStrike evidence-workflow guidance"
+tags: [bug-bounty, workflow, prioritization, evidence, hypothesis, chaining, deduplication, scope, triage, reporting]
 tech_stack: [web, api, infrastructure]
 prerequisites:
   - "Written authorization and defined engagement type"
   - "Program scope, exclusions, and testing policy"
 chains_with:
-  - attack-web-recon
+  - recon-master
   - attack-idor-automation
+  - attack-finding-correlation
   - attack-triage-validation
   - attack-evidence-hygiene
   - attack-report-writing
+  - skill-supply-chain-audit
 sources:
   - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/bb-methodology/SKILL.md"
   - "https://github.com/uphiago/recon-skills"
+  - "https://owasp.org/www-project-web-security-testing-guide/"
+  - "https://owasp.org/www-project-api-security/"
 ---
 
 # Bug Bounty Methodology
 
-## 1. Purpose
+## 1. Purpose and responsibility boundary
 
-Decide what to test, why it matters, when to change direction, and what evidence is needed before calling a behavior a vulnerability. The goal is to demonstrate reproducible security impact while respecting scope—not to generate the most requests.
+Decide what to investigate, why it matters, when to change direction, and what evidence is required before describing behavior as a vulnerability. The goal is reproducible security impact within the authorized engagement—not the highest request, endpoint, or finding count.
 
-## 2. Confirm engagement mode
+This is the canonical bug-bounty methodology and evidence lifecycle. It combines intake, inventory handoff, hypothesis planning, test recording, deduplication, chaining, closeout, and learning. It does **not** replace:
+- The shared Target Workflow Contract for authorization, workspace ownership, checkpoint/resume, execution order, retries, and closeout.
+- `recon-master` for reconnaissance and asset discovery procedures.
+- `attack-javascript-analysis` for JavaScript acquisition and code-level analysis.
+- `attack-finding-correlation` for canonical evidence aggregation and graph updates.
+- `attack-triage-validation` for the required finding-validation gate and verdict discipline.
+- `attack-evidence-hygiene` and `attack-report-writing` for redaction, evidence review, and report construction.
 
-Before active testing, record one:
-- **Bug bounty / VDP:** report issues that satisfy the program policy and demonstrate security impact.
+Load only the relevant specialist skills when evidence or a real decision requires them. Do not run every skill listed in `chains_with` automatically.
+
+## 2. Confirm engagement mode and working context
+
+Record the applicable engagement mode:
+- **Bug bounty / VDP:** follow the program's scope, safe-harbor, test restrictions, and reporting policy.
 - **Authorized penetration test:** follow the signed statement of work and rules of engagement.
-- **Red-team assessment:** include observations agreed with the client.
-- **Lab / CTF:** stay within the lab's permitted environment.
+- **Red-team assessment:** stay within the agreed objectives, assets, and operational boundaries.
+- **Lab / CTF:** stay within the permitted lab environment.
 
-If mode, ownership, or scope is ambiguous, stop and ask. Public reachability is not permission.
+Use the persisted scope and workspace from the shared workflow. Do not create a second scope manifest, workspace, or phase ledger here. Public reachability, a related hostname, a certificate entry, a source-code reference, or a historical report is not authorization.
 
-## 3. Session contract
+For each focused workstream, make the objective concrete:
+1. Target, canonical endpoint/operation, and persisted scope basis.
+2. Feature, actor, role, object, tenant, or trust boundary under review.
+3. Security property expected from the application.
+4. Current observation and its provenance.
+5. Hypothesis and evidence needed to confirm or refute it.
+6. Permitted test class, required identities/fixtures, and stop condition.
 
-Write down:
-1. Target and scope: exact domains, apps, API hosts, exclusions, and permitted test types.
-2. Objective: the feature or trust boundary and security property being tested.
-3. Hypothesis: the behavior that might violate the expected rule.
-4. Evidence bar: what observation would prove or disprove the hypothesis.
-5. Stop conditions: rate limits, instability, real user data, unexpected state changes, and policy restrictions.
+Keep one or two closely related security properties in focus for a test pass. Broaden only when a new observation justifies a distinct branch.
 
-Choose one or two related test classes per focused session. Keep unverified ideas in a queue rather than repeating probes without a decision-changing reason.
+## 3. Evidence-led lifecycle
 
-## 4. Non-linear workflow
+### A. Establish the evidence base
 
-### Phase A — Reconnaissance
-Identify in-scope assets, technologies, and exposed services. Prefer passive sources first; use active discovery only when permitted. Record provenance and confidence.
+Use `recon-master` for scope-aware asset, host, application, and URL discovery. Use `attack-javascript-analysis` for collected JavaScript/source maps and the canonical endpoint model. Merge browser traffic, forms, API contracts, static source candidates, and other observations into the existing target inventories.
 
-### Phase B — Map the application
-Map routes, API operations, parameters, authentication context, roles, tenant boundaries, and important workflows. Separate observed facts from assumptions.
+Do not create parallel endpoint roots for each source or method. Endpoint identity is normalized origin + route template + API version; keep HTTP methods as separate operations under that endpoint. Preserve operation-specific parameters, content type, authentication context, source provenance, confidence, and observed-versus-inferred status. A method seen only in captured traffic is traffic evidence, not proof that JavaScript declared it.
 
-### Phase C — Form a hypothesis
-For each candidate, state the expected rule, boundary to vary, safe test fixture, expected secure behavior, and observable proof.
+For every observation, separate:
+- **Discovery:** where the candidate came from.
+- **Attribution/scope:** why the asset belongs to the authorized engagement.
+- **Reachability:** whether the relevant route or code path was actually reached.
+- **Security interpretation:** what control or invariant may be violated.
+- **Validation:** whether the relevant behavior and impact were independently demonstrated.
 
-### Phase D — Validate safely
-Change one variable at a time. Capture a baseline, test with controlled identities or disposable objects, compare results, and repeat to rule out transient behavior.
+A scanner alert, version string, HTTP 200, route name, source-map string, or unusual response is a lead—not a confirmed finding.
 
-### Phase E — Triage and report
-Apply attack-triage-validation, redact artifacts with attack-evidence-hygiene, and draft the report with attack-report-writing. A newly discovered endpoint returns to mapping; a fix should trigger a scoped retest.
+### B. Create a testable hypothesis
 
-## 5. Prioritization
+Every candidate hypothesis must state:
+- The observed parent signal and its source/evidence reference.
+- The expected security rule or invariant.
+- The actor and prerequisites (anonymous/authenticated, role, tenant, session, ownership, feature state).
+- The exact endpoint/operation, object, field, or workflow step.
+- The single boundary or variable to compare.
+- A safe test fixture and baseline.
+- The expected secure result and the result that would support the hypothesis.
+- A relevant negative control or competing explanation.
+- The minimum evidence required to establish impact.
+- A bounded next step, cleanup requirement, and stop condition.
+- The specialist skill that matches the observed signal, if any.
 
-Rank candidates by exposure, trust boundary, demonstrated impact, evidence quality, cost, and risk. Do not prioritize solely by CVE age, product name, scanner count, or an unverified severity label.
+Prefer one discriminating experiment over a large set of equivalent payloads. A new endpoint or neighboring route should be mapped first; do not infer its security behavior from a sibling.
 
-## 6. Decision log
+### C. Request targeted testing only when permitted
 
-For each test, record the hypothesis, scope basis, endpoint, test identity/object, baseline, input change, result, evidence location, conclusion, and next action. Use these outcomes: confirmed, disproven, inconclusive, or blocked.
+Reconnaissance and passive collection do not automatically authorize vulnerability testing. Execute a test only when the user explicitly requested testing and the persisted engagement policy and runtime controls permit that specific action.
 
-A negative result is meaningful only when the test exercised the relevant boundary and the observation was interpretable.
+For an authorized test:
+1. Prefer a previously captured, in-scope baseline request.
+2. Use tester-owned accounts, controlled roles, and synthetic or disposable objects.
+3. Change one meaningful variable at a time (for example principal, object, tenant, method, field, content type, origin, or workflow state).
+4. Compare against a relevant negative control and the expected policy.
+5. Record the actual request/response and, when relevant, authoritative application state.
+6. Stop before messages are sent, money is moved, records are deleted, access is changed, real users are affected, or a production service becomes unstable unless that exact effect is explicitly authorized and safely controlled.
+7. Restore test state, revoke temporary sessions/tokens, and record cleanup.
 
-## 7. Stop conditions
+A failed request, timeout, tool error, blocked credential, missing account, or unavailable fixture is not a passed security test.
 
-Stop and reassess if scope is unclear, real third-party data appears, a test may send messages or move money/delete records/change access, service instability occurs, or a program restriction is reached.
+### D. Maintain the execution and evidence ledger
 
-## 8. CyberStrike integration contract
+Persist each meaningful attempt against its canonical target, endpoint/operation, hypothesis, and test context. Use the runtime's existing records and status vocabulary where available; do not create a competing global ledger.
 
-This document describes decision logic, not a claim that a runtime command exists. Verify the skill loader, tool registry, scope resolver, evidence store, and finding schema before automating. Skills must not bypass scope enforcement.
+Useful per-attempt dispositions are:
+- **CANDIDATE:** an observation supports further investigation but the control failure or impact is not proved.
+- **CONFIRMED:** the relevant path, failed control, and concrete impact have been reproducibly demonstrated and passed the validation lifecycle.
+- **REFUTED:** a relevant test or effective control contradicts this specific hypothesis.
+- **INCONCLUSIVE:** evidence is ambiguous, noisy, or insufficient to decide.
+- **BLOCKED:** a required permission, identity, fixture, tool, or other prerequisite is unavailable.
+- **NOT-RUN:** deliberately deferred or not executed, including recon-only work.
+- **OUT-OF-SCOPE:** the asset or action is not authorized.
+
+A **PASS-SECURE** observation is appropriate only when the test actually exercised the intended security boundary and the result supports the expected secure behavior. Do not convert BLOCKED, NOT-RUN, tool failure, or missing evidence into PASS-SECURE or a false positive.
+
+Each evidence record should link:
+- Canonical asset, endpoint ID, method/operation, and scope decision.
+- Hypothesis ID/fingerprint and discovery source.
+- Request/response artifact IDs or immutable paths, timestamp, and tool/version when applicable.
+- Test identity, role, tenant, object, and relevant application state.
+- Baseline, changed variable, negative control, expected policy, and observed result.
+- Impact demonstrated (or exact impact still unproved), confidence, and disposition.
+- Redaction/cleanup status, blocker, resume condition, and next action.
+
+Keep raw credentials, complete cookies, reset links, authorization headers, and unrelated personal data out of ordinary notes, graph summaries, commits, and reports.
+
+### E. Correlate and deduplicate
+
+Use `attack-finding-correlation` to normalize observations, enrich canonical endpoint/evidence records, update the evidence graph, and calculate signal-driven handoffs. Keep the graph and authoritative target/finding records as the source of evidence; this methodology is not a second graph implementation.
+
+Deduplicate by root cause + affected security boundary + endpoint/operation + impact—not title similarity or URL alone. Several observations can support one root cause; one endpoint can contain several independent authorization or business-logic flaws. Preserve different roles, tenants, objects, states, methods, and controls as separate evidence rows when they change the security property.
+
+Do not suppress a materially different branch because a related route, parameter, or test was previously rejected. Conversely, do not create duplicate findings from repeated captures or cosmetic request variations.
+
+### F. Chain only from observed signals
+
+A chain must identify the observed parent signal, child hypothesis, exact trust boundary, actor/prerequisites, controlled fixture, independent proof required for the next link, and combined effect. A child skill or finding never inherits the parent's verdict.
+
+Use `BUG_BOUNTY_CHAINING_PLAYBOOK.md` as the canonical signal-to-skill routing reference. It owns the detailed signal matrix, hop lifecycle, request-comparison rules, false-positive memory, and cleanup guidance; do not copy a second routing matrix here.
+
+Execute the next specialist only when its trigger is actually observed and the target is authorized for that test. A chain is confirmed only when every required link and the reported end state are independently reproducible. If a downstream link is unverified, report only the confirmed primitive and label the remainder as a hypothesis. Do not raise severity based on a theoretical chain.
+
+### G. Validate, sanitize, and report
+
+Before a candidate is presented as a finding:
+1. Run `attack-triage-validation` and its required `validate_finding` evidence gate. Missing evidence remains unknown/inconclusive; do not replace the required gate with this methodology's summary.
+2. Confirm that the verdict matches the direct evidence and that alternative benign explanations have been assessed.
+3. Use `attack-evidence-hygiene` to review redaction, integrity, provenance, and minimum necessary disclosure.
+4. Use `attack-report-writing` and the applicable program-specific reporting skill to prepare the report.
+5. Ensure every material claim maps to a request/response, state observation, source trace, or other reproducible evidence reference.
+6. Include a relevant negative control, role/account context, expected versus actual behavior, actual impact, limitations, and remediation.
+7. Check program duplicate rules, severity taxonomy, disclosure requirements, and whether the issue is already known.
+
+Never report a candidate as confirmed merely because the workflow reached the reporting stage.
+
+## 4. Prioritization and adaptive branch selection
+
+Rank work by:
+- The significance of the trust boundary and protected asset/action.
+- Whether the relevant path is reachable and first-party/in-scope.
+- Strength and independence of the evidence.
+- Realistic impact and attacker prerequisites.
+- Whether one low-impact experiment can distinguish competing explanations.
+- Cost, service risk, and program constraints.
+
+Do not prioritize solely by CVE age, product name, scanner count, number of endpoints, or an unverified severity label.
+
+At the end of a focused pass, record the most useful observation, the assumption it changed, and one next experiment that distinguishes competing explanations. When evidence is interesting, cluster related routes by controller, API version, workflow, or trust boundary. Test the same security property on sibling routes only with their own baseline and control; never copy an exploit blindly.
+
+Use the following branch prompts to guide—but not replace—specialist selection:
+
+| Observation | Competing explanations | Useful discriminating review |
+|---|---|---|
+| HTTP 200 on a protected-looking route | Public route, login shell, cache, actual protected data | Compare anonymous and permitted authenticated baselines; inspect a synthetic marker |
+| Input appears in a response | Safe encoding, inert reflection, executable context | Identify the exact output context and controlled browser behavior |
+| Secret-like string appears in JavaScript | Public client identifier, dummy value, secret candidate, dead code | Preserve only type/location/fingerprint; never use the value |
+| URL parameter is accepted | Browser redirect, server-side fetch, ignored field | Correlate navigation or a controlled callback to identify the actor |
+| Header is absent | Hardening gap, equivalent control, irrelevant response type | Inspect effective behavior on the affected route |
+| Two requests both succeed | Idempotent behavior, duplicate response, duplicate side effect | Compare authoritative state with a sequential control |
+
+For full signal-to-skill routes, use `BUG_BOUNTY_CHAINING_PLAYBOOK.md`.
+
+## 5. Coverage, learning, and closeout
+
+Maintain separate counts from persisted records for assets discovered, endpoints normalized, hypotheses created, attempts made, distinct findings confirmed, hypotheses refuted, blocked cases, inconclusive cases, and not-run/out-of-scope items. Do not estimate counts from chat prose.
+
+A workstream can close with no findings when its relevant evidence supports that outcome. It cannot be described as fully covered while sources, files, roles, routes, or required tests remain inaccessible, unsupported, blocked, or unprocessed. Report gaps explicitly.
+
+Before ending a session, report:
+- Completed work and canonical artifact references.
+- New/changed observations and what changed in the evidence graph.
+- Confirmed, refuted, candidate, inconclusive, blocked, not-run, and out-of-scope dispositions.
+- Actual source/tool coverage and meaningful failures or skipped branches.
+- Cleanup performed or still required.
+- Remaining uncertainty and one concrete next action.
+
+Preserve useful negative results with the exact identity, object, method, and state that were exercised. Reopen a rejected hypothesis only when the asset, role, object, state, version, source, or relevant prerequisite materially changes.
+
+Use public reports and research as sources of hypotheses and reusable preconditions, not as proof about the current target. Preserve source attribution and distinguish the researcher's narrative from independently verified technical facts. Never replay historical payloads blindly against a live target.
+
+## 6. Runtime and tool boundaries
+
+Tool selection is dynamic. Use the shared `community-tool-selection` catalog and actual registered tool schemas for available capabilities. Examples in upstream material do not prove that a command, helper, API, or runtime tool exists. Verify only candidates relevant to the current evidence gap; do not install or preflight the entire catalog, and do not copy a generic tool inventory into this skill.
+
+This skill defines methodology and evidence expectations. It does not claim that any particular runtime command exists, authorize a test, bypass scope enforcement, or create a second target workspace, checkpoint, evidence graph, or finding ledger.
 
 ## References
 
-- Claude-BugHunter methodology: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/bb-methodology/SKILL.md
-- Recon Skills: https://github.com/uphiago/recon-skills
-- OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
-
-## Practical hunting loop: hypothesis → request → decision
-For each promising route, keep a lightweight note that links the observed signal to exactly one testable policy statement. Prefer replaying an already-captured request and altering one variable; do not invent a command/API because a skill mentions it.
-
-```bash
-# Adapt paths to the real target-workspace layout and available CyberStrike CLI.
-find "$TARGET_WORKSPACE" -type f \\( -path '*/requests/*' -o -path '*/endpoints/*' -o -path '*/findings/*' \\) -print 2>/dev/null | sort
-cyberstrike --help
-```
-
-Keep exploration open-ended while each new test is materially different and useful. Deduplicate by target + endpoint + security property + strategy, not by an arbitrary total count. Stop at decisive evidence, an exhausted set of relevant hypotheses, missing valid prerequisites, or a real program/safety boundary. Chain the strongest observed signal to its specialist skill, then triage before reporting.
-
-## Targeted quality-loop enrichment (2026-10-19)
-
-### Branch-selection and learning loop
-At the end of each focused pass, record the most useful observation, the assumption it changed, and one next experiment that distinguishes competing explanations. When a result is interesting, cluster nearby routes in the same controller, API version, workflow, or trust boundary; test the same security property on siblings with their own baseline instead of copying an exploit blindly. Keep a negative-result note that says exactly which identity, object, method, and state were exercised, so future sessions do not repeat indistinguishable probes. Keep exploring when a new hypothesis can change the conclusion and is authorized; stop when the property is established, the meaningful branches are exhausted, or policy/safety blocks the next step.
-
-## Coverage ledger and adaptive branch selection
-
-For each workstream, maintain separate counts for assets discovered, endpoints normalized, hypotheses created, hypotheses attempted, findings confirmed, hypotheses disproven, blocked cases, and inconclusive cases. These counts must come from persisted records, not estimates in the model's prose.
-
-Use a branch table to prevent repetitive hunting:
-
-| Signal | Competing explanations | Cheapest discriminating check | Specialist handoff |
-|---|---|---|---|
-| 200 on protected-looking route | Public route, login shell, cached response, actual protected data | Compare anonymous and controlled authenticated baseline; inspect synthetic marker | Auth/BOLA/BFLA based on boundary |
-| Input reflected in response | Safe encoding, inert reflection, HTML/JS context execution | Identify exact output context and controlled browser behavior | XSS only if execution is reachable |
-| Secret-like string in JS | Public identifier, dummy value, credential, dead code | Record source and type without printing/using value; inspect approved docs/config | Secret triage/evidence hygiene |
-| URL parameter accepted | Browser redirect, server-side fetch, ignored field | Correlate with actual navigation or controlled callback | Open redirect or SSRF based on observed actor |
-| Header absent | Hardening gap, modern equivalent control, irrelevant response type | Inspect effective browser behavior on the relevant route | Header skill plus independently proven child impact |
-| Two requests succeed | Idempotent behavior, duplicate response, duplicate side effect | Read authoritative state after a sequential control | Business logic/race only with invariant violation |
-
-### Evidence-to-chain graph
-
-Every cross-skill edge should store source finding/observation, exact trigger signal, child hypothesis, required independent proof, and relationship type (prerequisite, shared root cause, impact amplifier, or sibling lead). A child skill should not inherit the parent's verdict automatically. If the parent is disproven, re-evaluate the child only if it has independent evidence.
-
-### Session closeout
-
-Before ending a work session, report completed phases, phases blocked/partial, new and changed observations, confirmed/disproven/inconclusive hypotheses, evidence paths, cleanup, and one concrete next action. Do not say all resources were covered if a source or tool was unavailable. Preserve useful negative results and deduplicate exact retries without suppressing materially new hypotheses.
-
-## Agent-executable CLI tooling, resources, and helper scripts
-
-Runtime selection is dynamic: the names and commands below are optional, non-exhaustive capability examples, not a fixed toolkit or phase-to-tool assignment. For each phase or new evidence gap, search the current registered/connected tools, inspect schemas, and consider verified CLIs, suitable APIs, datasets, and local helpers. Use only candidates that add useful coverage and satisfy the actual scope, policy, and output contract; do not require or install a named candidate just because it is listed.
-
-### Optional capability examples (non-exhaustive)
-- `subfinder`, `dnsx`, `httpx`, `katana`, and `gau` — select phase-appropriate passive discovery, DNS validation, HTTP metadata, crawling, and historical URL collection.
-- `jq`, `sort`, `comm`, and Python — normalize/deduplicate results while preserving provenance.
-- Shared helpers under `.cyberstrike/skill/scripts/` — normalize URLs, inventory JavaScript endpoints, compare saved responses, and validate evidence manifests.
-
-### Installation and verification
-Use the official project documentation at https://docs.projectdiscovery.io/ and https://github.com/lc/gau. Verify each selected binary with its documented version/help option before use. Check optional local utilities with `command -v` and their version output. Do not install the entire tool catalog by default; install only what the active phase needs. Record missing dependencies and use a supported fallback.
-
-### Resources
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://docs.projectdiscovery.io/
-- https://github.com/useosint/skills
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-### Evidence and handoff
-Label each result passive, DNS-only, or active HTTP; preserve source, observation time, confidence, corroboration, tool/version, errors, and artifact paths. Passive discovery does not authorize active testing. Respect program scope/rates and stop if instability appears. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes and commits. Mark outcomes confirmed, disproven, or hypothetical.
+- OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
+- OWASP API Security Top 10: https://owasp.org/www-project-api-security/
+- HackerOne quality reports: https://docs.hackerone.com/en/articles/8475116-quality-reports
+- Bugcrowd Vulnerability Rating Taxonomy: https://bugcrowd.com/vulnerability-rating-taxonomy/
+- CyberStrike signal-to-skill and chain lifecycle reference: `BUG_BOUNTY_CHAINING_PLAYBOOK.md`
+- Merged CyberStrike source: Evidence-Led Bug Bounty Workflow (now consolidated into this skill)
