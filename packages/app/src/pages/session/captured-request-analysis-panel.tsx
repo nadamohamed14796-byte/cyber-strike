@@ -1,4 +1,4 @@
-import { createEffect, createMemo, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 
@@ -18,11 +18,12 @@ export function CapturedRequestAnalysisPanel() {
   const sync = useSync()
 
   const parentID = () => params.id ?? ""
+  const [requestsReady, setRequestsReady] = createSignal(false)
 
   createEffect(() => {
     const sessionID = parentID()
     if (!sessionID) return
-    void sync.session.request(sessionID).catch(() => {})
+    void sync.session.request(sessionID).then(() => setRequestsReady(true)).catch(() => setRequestsReady(true))
   })
 
   const brokerSession = createMemo(() =>
@@ -43,8 +44,11 @@ export function CapturedRequestAnalysisPanel() {
   let pendingAgentNavigation = false
 
   createEffect(() => {
+    const ready = requestsReady()
     const count = requestCount()
     const broker = brokerSession()
+
+    if (!ready) return
 
     if (!initialized) {
       initialized = true
