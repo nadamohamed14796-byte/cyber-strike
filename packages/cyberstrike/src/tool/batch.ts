@@ -1,9 +1,33 @@
 import z from "zod"
 import { Tool } from "./tool"
 import DESCRIPTION from "./batch.txt"
+import { PermissionNext } from "../permission/next"
 
 const DISALLOWED = new Set(["batch"])
 const FILTERED_FROM_SUGGESTIONS = new Set(["invalid", "patch", ...DISALLOWED])
+
+/** Keep nested batch execution behind the same per-agent and per-user tool gates as direct calls. */
+export function batchAllowedToolIDs(input: {
+  toolIDs: string[]
+  agentID: string
+  agentMode: "subagent" | "primary" | "all"
+  permission: PermissionNext.Ruleset
+  userTools?: Record<string, boolean>
+}): Set<string> {
+  const disabled = PermissionNext.disabled(input.toolIDs, input.permission)
+  const internalImpactHandoff =
+    input.agentMode === "subagent" &&
+    input.agentID !== "impact-hunter" &&
+    input.userTools?.task !== false
+
+  return new Set(
+    input.toolIDs.filter(
+      (id) =>
+        input.userTools?.[id] !== false &&
+        (!disabled.has(id) || (id === "task" && internalImpactHandoff)),
+    ),
+  )
+}
 
 export const BatchTool = Tool.define("batch", async () => {
   return {
@@ -37,8 +61,26 @@ export const BatchTool = Tool.define("batch", async () => {
       const discardedCalls = params.tool_calls.slice(25)
 
       const { ToolRegistry } = await import("./registry")
-      const availableTools = await ToolRegistry.tools({ modelID: "", providerID: "" })
-      const toolMap = new Map(availableTools.map((t) => [t.id, t]))
+      const { Agent } = await import("../agent/agent")
+      const { Plugin } = await import("../plugin")
+      const agent = await Agent.get(ctx.agent)
+      if (!agent) throw new Error(`Cannot execute batch: agent "${ctx.agent}" is not registered.`)
+
+      const latestUser = ctx.messages.findLast((message) => message.info.role === "user")?.info
+      const userTools = latestUser?.role === "user" ? latestUser.tools : undefined
+      const model = ctx.extra?.model as { providerID?: string; api?: { id?: string } } | undefined
+      const availableTools = await ToolRegistry.tools(
+        { modelID: model?.api?.id ?? "", providerID: model?.providerID ?? "" },
+        agent,
+      )
+      const enabledToolIDs = batchAllowedToolIDs({
+        toolIDs: availableTools.map((tool) => tool.id),
+        agentID: ctx.agent,
+        agentMode: agent.mode,
+        permission: agent.permission,
+        userTools,
+      })
+      const toolMap = new Map(availableTools.filter((tool) => enabledToolIDs.has(tool.id)).map((t) => [t.id, t]))
 
       const executeCall = async (call: (typeof toolCalls)[0]) => {
         const callStartTime = Date.now()
@@ -76,7 +118,23 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
-          const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
+          const nestedContext: Tool.Context = {
+            ...ctx,
+            callID: partID,
+            metadata: (value) => ctx.metadata(value, partID),
+            ask: (request) => ctx.ask(request, partID),
+          }
+          await Plugin.trigger(
+            "tool.execute.before",
+            { tool: call.tool, sessionID: ctx.sessionID, callID: partID },
+            { args: validatedParams },
+          )
+          const result = await tool.execute(validatedParams, nestedContext)
+          await Plugin.trigger(
+            "tool.execute.after",
+            { tool: call.tool, sessionID: ctx.sessionID, callID: partID, args: validatedParams },
+            result,
+          )
 
           await Session.updatePart({
             id: partID,

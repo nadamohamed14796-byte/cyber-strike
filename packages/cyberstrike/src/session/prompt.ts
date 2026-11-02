@@ -1201,8 +1201,15 @@ export namespace SessionPrompt {
       extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck },
       agent: agentID,
       messages: input.messages,
-      metadata: async (val: { title?: string; metadata?: any }) => {
-        const match = input.processor.partFromToolCall(options.toolCallId)
+      metadata: async (val: { title?: string; metadata?: any }, callID = options.toolCallId) => {
+        let match = input.processor.partFromToolCall(callID)
+        // Batch-created child parts are persisted directly rather than streamed as
+        // AI SDK tool-call events, so resolve their part by call ID when necessary.
+        if (!match) {
+          match = (await MessageV2.parts(input.processor.message.id)).find(
+            (part): part is MessageV2.ToolPart => part.type === "tool" && part.callID === callID,
+          )
+        }
         if (match && match.state.status === "running") {
           await Session.updatePart({
             ...match,
@@ -1218,11 +1225,11 @@ export namespace SessionPrompt {
           })
         }
       },
-      async ask(req) {
+      async ask(req, callID = options.toolCallId) {
         await PermissionNext.ask({
           ...req,
           sessionID: input.session.id,
-          tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+          tool: { messageID: input.processor.message.id, callID },
           ruleset: PermissionNext.merge(input.agent.permission, input.session.permission ?? []),
         })
       },

@@ -21,8 +21,8 @@ export namespace Tool {
     callID?: string
     extra?: { [key: string]: any }
     messages: MessageV2.WithParts[]
-    metadata(input: { title?: string; metadata?: M }): void
-    ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">): Promise<void>
+    metadata(input: { title?: string; metadata?: M }, callID?: string): void
+    ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">, callID?: string): Promise<void>
   }
 
   /** Public initialized tool: callers may omit schema fields that have defaults. */
