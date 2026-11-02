@@ -32,6 +32,34 @@ export function CapturedRequestAnalysisPanel() {
     ),
   )
 
+  // Keep the child transcript synced even when it is not the active route.
+  // This lets text-only extension tasks trigger the same auto-open behavior as
+  // captured HTTP requests, without requiring a request inventory row.
+  let syncedBrokerID: string | undefined
+  createEffect(() => {
+    const id = brokerSession()?.id
+    if (!id || id === syncedBrokerID) return
+    syncedBrokerID = id
+    void sync.session.sync(id).catch(() => {})
+  })
+
+  const brokerMessages = createMemo(() => {
+    const id = brokerSession()?.id
+    return id ? (sync.data.message[id] ?? []) : []
+  })
+  const latestBrokerUserMessage = createMemo(() =>
+    [...brokerMessages()].reverse().find((message) => message.role === "user"),
+  )
+  const mountedAt = Date.now()
+  let lastOpenedMessageID: string | undefined
+  createEffect(() => {
+    const message = latestBrokerUserMessage()
+    const id = brokerSession()?.id
+    if (!id || !message || message.time.created < mountedAt || message.id === lastOpenedMessageID) return
+    lastOpenedMessageID = message.id
+    navigate(`/${params.dir}/session/${id}`)
+  })
+
   // Cumulative number of all requests received by this parent session.
   const requestCount = createMemo(() => sync.data.request[parentID()]?.length ?? 0)
 
