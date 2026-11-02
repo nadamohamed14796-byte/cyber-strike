@@ -128,6 +128,39 @@ describe("applyGlobalEvent", () => {
 })
 
 describe("applyDirectoryEvent", () => {
+  test("reconciles todo.updated by content and keeps the latest order/status", () => {
+    const initial = [
+      { content: "Inspect authorization boundary", status: "pending", priority: "high" },
+      { content: "Review input handling", status: "pending", priority: "medium" },
+    ]
+    const [store, setStore] = createStore(baseState({ todo: { ses_todo: initial } }))
+    const originalAuthorizationTodo = store.todo.ses_todo[0]
+
+    applyDirectoryEvent({
+      event: {
+        type: "todo.updated",
+        properties: {
+          sessionID: "ses_todo",
+          todos: [
+            { content: "Review input handling", status: "completed", priority: "medium" },
+            { content: "Inspect authorization boundary", status: "in_progress", priority: "high" },
+          ],
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.todo.ses_todo).toEqual([
+      { content: "Review input handling", status: "completed", priority: "medium" },
+      { content: "Inspect authorization boundary", status: "in_progress", priority: "high" },
+    ])
+    expect(store.todo.ses_todo[1]).toBe(originalAuthorizationTodo)
+  })
+
   test("stores live ingest queue status per session", () => {
     const [store, setStore] = createStore(baseState())
 
