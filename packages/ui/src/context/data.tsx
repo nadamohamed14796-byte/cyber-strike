@@ -7,6 +7,7 @@ import type {
   PermissionRequest,
   QuestionRequest,
   QuestionAnswer,
+  Todo,
 } from "@cyberstrike-io/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
@@ -18,6 +19,9 @@ type Data = {
   }
   session_diff: {
     [sessionID: string]: FileDiff[]
+  }
+  todo?: {
+    [sessionID: string]: Todo[]
   }
   session_diff_preload?: {
     [sessionID: string]: PreloadMultiFileDiffResult<any>[]
@@ -65,6 +69,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
     onSyncSession?: SyncSessionFn
+  onSyncTodo?: SyncSessionFn
     agentColor?: AgentColorFn
   }) => {
     return {
@@ -80,6 +85,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,
       syncSession: props.onSyncSession,
+      syncTodo: props.onSyncTodo,
       agentColor: props.agentColor,
     }
   },
