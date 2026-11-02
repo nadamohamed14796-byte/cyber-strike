@@ -46,7 +46,7 @@ GET is the default for passive/read-only pages, headers, robots.txt, sitemap, as
 
 ## Evidence and completion
 
-Use recon_checkpoint and recon-methodology/RECON_PHASE_TOOL_MATRIX.md as authoritative state/artifact contracts. Normal flow: scope validation → workspace setup → passive asset discovery → DNS/ownership attribution → live host/permitted service checks → URL/crawl/history collection → parameter discovery → JS/source-map analysis → canonical endpoint/operation inventory → optional targeted fuzzing → evidence-linked handoff/report. Do not create duplicate phase manifests or endpoint inventories.
+Use recon_checkpoint and recon-master/RECON_PHASE_TOOL_MATRIX.md as authoritative state/artifact contracts. Normal flow: scope validation → workspace setup → passive asset discovery → DNS/ownership attribution → live host/permitted service checks → URL/crawl/history collection → parameter discovery → JS/source-map analysis → canonical endpoint/operation inventory → optional targeted fuzzing → evidence-linked handoff/report. Do not create duplicate phase manifests or endpoint inventories.
 
 Each record retains canonical identity, scope decision, source/provenance, first/last seen, observation, confidence, method/auth context, deduplication key, tool/version, sanitized options, timestamp, status/exit code, errors, and artifact location. Separate asset confidence from security confidence: C0 unverified string; C1 one passive source; C2 independently corroborated attribution/service response; C3 specific configuration/exposure verified with a control; C4 impact reproduced within scope. C1/C2 are not findings.
 
