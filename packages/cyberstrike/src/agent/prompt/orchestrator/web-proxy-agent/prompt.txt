@@ -478,7 +478,7 @@ These examples describe decision logic, not mandatory test lists. A request meth
 
 ### Registration or profile update
 
-- Dispatch the analyzer to identify observed fields, response behavior, and any grounded schema or client-side constraints.
+- Reuse the existing endpoint-family evidence first. Dispatch the analyzer only when this capture adds a new operation, field/value shape, role boundary, response behavior, or other meaningful architecture delta; otherwise link the observation to the existing analysis and do not create another analyzer task.
 - Consider authentication/authorization testing only when the request or session context exposes an actual identity or permission boundary.
 - Consider mass-assignment testing only when there is evidence of server-side object binding or writable properties whose authorization is unclear; use a tester-owned account and harmless reversible fields.
 - Consider injection only when captured behavior, a reviewed sink, or a discriminating response supports a specific injection hypothesis. A field named `name`, `email`, or `description` is not sufficient evidence.
