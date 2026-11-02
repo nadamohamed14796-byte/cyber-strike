@@ -270,7 +270,7 @@ export namespace LazyToolRegistry {
   export function search(query: string, limit = 10): LazyTool[] {
     const queryLower = query.trim().toLowerCase()
     if (!queryLower || !Number.isFinite(limit) || limit <= 0) return []
-    const queryWords = queryLower.split(/\\s+/)
+    const queryWords = queryLower.split(/\s+/)
     const current = state()
 
     const scored: Array<{ tool: LazyTool; score: number }> = []
@@ -390,12 +390,12 @@ export namespace LazyToolRegistry {
       "",
       ...tools.map((tool, index) => {
         const loaded = isLoaded(tool.id) ? " [LOADED]" : ""
-        return `${index + 1}. **${tool.name}**${loaded}\\n   ID: \`${tool.id}\`\\n   ${tool.summary}\\n   Category: ${tool.category}`
+        return `${index + 1}. **${tool.name}**${loaded}\n   ID: \`${tool.id}\`\n   ${tool.summary}\n   Category: ${tool.category}`
       }),
       "",
       "Use `load_tools` with the tool IDs to make them available for use.",
     ]
-    return lines.join("\\n")
+    return lines.join("\n")
   }
 
   function extractKeywords(name: string, description: string): string[] {

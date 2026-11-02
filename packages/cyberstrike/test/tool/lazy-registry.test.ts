@@ -253,4 +253,27 @@ describe("lazy tool registry snapshot reconciliation", () => {
       }
     })
   })
+  test("matches all query words independently, including reversed multi-word queries", async () => {
+    await withProject(() => {
+      LazyToolRegistry.reconcileServerTools("test.server", [
+        { name: "search_customer_record", description: "lookup customer record" },
+      ])
+      expect(LazyToolRegistry.search("record customer").map((tool) => tool.name)).toEqual(["search_customer_record"])
+    })
+  })
+
+  test("formats search results with real line breaks", async () => {
+    await withProject(() => {
+      LazyToolRegistry.reconcileServerTools("test.server", [
+        { name: "search_customer_record", description: "lookup customer record" },
+      ])
+      const tool = LazyToolRegistry.getAll().find((item) => item.name === "search_customer_record")!
+      const output = LazyToolRegistry.formatSearchResults([tool])
+      expect(output).toContain("\n   ID:")
+      expect(output).toContain("\n   Category:")
+      expect(output).not.toContain("\\n")
+      expect(output.split("\n").length).toBeGreaterThan(3)
+    })
+  })
+
 })
