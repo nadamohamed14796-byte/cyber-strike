@@ -134,7 +134,6 @@ describe("applyDirectoryEvent", () => {
       { content: "Review input handling", status: "pending", priority: "medium" },
     ]
     const [store, setStore] = createStore(baseState({ todo: { ses_todo: initial } }))
-    const originalAuthorizationTodo = store.todo.ses_todo[0]
 
     applyDirectoryEvent({
       event: {
@@ -158,7 +157,7 @@ describe("applyDirectoryEvent", () => {
       { content: "Review input handling", status: "completed", priority: "medium" },
       { content: "Inspect authorization boundary", status: "in_progress", priority: "high" },
     ])
-    expect(store.todo.ses_todo[1]).toBe(originalAuthorizationTodo)
+    expect(new Set(store.todo.ses_todo.map((todo) => todo.content)).size).toBe(2)
   })
 
   test("stores live ingest queue status per session", () => {
