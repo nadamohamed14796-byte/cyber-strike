@@ -1210,6 +1210,32 @@ describe("captured request HTTP route scope gate", () => {
     })
   })
 
+  test("rejects an unknown extension Agent before creating a task session", async () => {
+    await withInstance(async () => {
+      const parent = await Session.create({ title: "extension-invalid-agent-parent-test" })
+      try {
+        const response = await Server.App().request(
+          "/session/ingest?directory=" + encodeURIComponent(Instance.directory),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionID: parent.id,
+              agent: "missing-extension-agent",
+              text: "Inspect this extension task.",
+            }),
+          },
+        )
+
+        expect(response.status, await response.clone().text()).toBe(400)
+        expect(await Session.children(parent.id)).toHaveLength(0)
+        expect(await Session.messages({ sessionID: parent.id })).toHaveLength(0)
+      } finally {
+        await Session.remove(parent.id).catch(() => {})
+      }
+    })
+  })
+
   test("rejects an out-of-scope request before creating a request record or proxy broker", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "ingest-scope-gate-test" })
