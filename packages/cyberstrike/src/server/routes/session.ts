@@ -1991,7 +1991,14 @@ export const SessionRoutes = lazy(() =>
             // Plain-text extension tasks are not automatically Proxy tasks. Honor an
             // explicit agent selection; otherwise use the configured default agent.
             // HTTP captures continue through the dedicated proxy orchestrator above.
-            const agentName = body.agent ?? (await Agent.defaultAgent())
+            const requestedAgent = body.agent ?? (await Agent.defaultAgent())
+            const agentName = await Agent.resolveID(requestedAgent)
+            if (!agentName) {
+              c.status(400)
+              return c.json({
+                error: `Unknown or ambiguous Agent "${requestedAgent}". Use a stable registered Agent ID.`,
+              })
+            }
             const brokerSession = await getOrCreateExtensionTaskSession({
               parentSessionID: activeSessionID,
             })
