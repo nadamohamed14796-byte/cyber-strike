@@ -104,10 +104,12 @@ describe("Phase-critical skill pinning", () => {
           "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
           "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
           "recon-origin-ip-discovery", "recon-port-service-discovery",
-          "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon",
+          "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon", "attack-web-recon",
         ]) expect(await Skill.get(retired), retired + " must not remain a separately loadable skill").toBeUndefined()
         expect(skill!.content).toContain("HTTP method policy")
         expect(skill!.content).toContain("Tool selection and runtime discipline")
+        expect(skill!.content).toContain("Source coverage and count semantics")
+        expect(skill!.content).toContain("zero-results")
         expect(skill!.content).toMatch(/stop conditions/i)
       },
     })
@@ -124,6 +126,11 @@ describe("Phase-critical skill pinning", () => {
         expect(methodology!.content).toContain("Coverage, learning, and closeout")
         expect(await Skill.get("bug-bounty-evidence-workflow")).toBeUndefined()
         expect(await Skill.get("attack-web-recon")).toBeUndefined()
+        const workspace = await Skill.get("target-workspace-workflow")
+        expect(workspace, "target-workspace-workflow must preserve the workspace contract").toBeDefined()
+        expect(workspace!.content).toContain("Canonical layout")
+        expect(workspace!.content).toContain("Artifact persistence rules")
+        expect(workspace!.content).not.toContain("## Autonomous execution")
       },
     })
   })
