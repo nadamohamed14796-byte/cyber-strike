@@ -40,6 +40,16 @@ describe("reportScopeViolation", () => {
     test("authz tester may report an authorization-bypass VRT category", () => {
       expect(reportScopeViolation("proxy-tester-authz", "auth bypass", "Authorization Bypass in admin endpoint")).toBeNull()
     })
+
+    test("authn tester cannot report an authorization-bypass title under the shared category", () => {
+      const result = reportScopeViolation("proxy-tester-authn", "auth bypass", "Authorization Bypass in admin endpoint")
+      expect(result?.inferred).toBe("authz")
+    })
+
+    test("authz tester cannot report an authentication-bypass title under the shared category", () => {
+      const result = reportScopeViolation("proxy-tester-authz", "auth bypass", "Authentication Bypass in login flow")
+      expect(result?.inferred).toBe("authn")
+    })
   })
 
   describe("out-of-scope category — violation returned", () => {
