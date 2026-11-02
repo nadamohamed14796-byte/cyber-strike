@@ -134,8 +134,14 @@ test("processes the complete JavaScript worklist beyond the former 64 MiB aggreg
         const tool = await IngestJavaScriptURLsTool.init()
         const result = await tool.execute({
           target_url: canonicalTarget,
-          urls,
-          source: "unit-test",
+          urls: [],
+          url_sources: [
+            { url: urls[0]!, source: "url-collector" },
+            { url: urls[0]!, source: "hackbrowser" },
+            { url: urls[1]!, source: "browser-extension" },
+            { url: urls[2]!, source: "HTML-script-src" },
+          ],
+          source: "unit-test-fallback",
           force_refresh: false,
         }, toolContext(session.id))
 
@@ -153,12 +159,15 @@ test("processes the complete JavaScript worklist beyond the former 64 MiB aggreg
         expect(metadata.collection_complete).toBe(true)
 
         const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
-          assets: Array<{ url: string; status: string; error?: string }>
+          assets: Array<{ url: string; status: string; error?: string; sources?: string[] }>
         }
         const statusFor = (url: string) => manifest.assets.find((item) => item.url === url)
         expect(statusFor(urls[0])?.status).toBe("downloaded")
         expect(statusFor(urls[1])?.status).toBe("reused")
         expect(statusFor(urls[2])?.status).toBe("reused")
+        expect(statusFor(urls[0])?.sources).toEqual(["hackbrowser", "url-collector"])
+        expect(statusFor(urls[1])?.sources).toContain("browser-extension")
+        expect(statusFor(urls[2])?.sources).toContain("HTML-script-src")
       },
     })
   } finally {
