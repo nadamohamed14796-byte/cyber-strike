@@ -250,8 +250,8 @@
         "visual-recon",
         "error-logs",
         "asset-inventory",
-        "evidence",
         "scope",
+        "evidence",
         "tool-selection"
       ],
       "tech_stack": [
