@@ -141,6 +141,7 @@ export async function bootstrapDirectory(input: {
     input.sdk.path.get().then((x) => input.setStore("path", x.data!)),
     input.sdk.command.list().then((x) => input.setStore("command", x.data ?? [])),
     input.sdk.session.status().then((x) => input.setStore("session_status", x.data!)),
+    input.sdk.session.queueStatus().then((x) => input.setStore("session_queue_status", x.data ?? {})).catch(() => {}),
     input.loadSessions(input.directory),
     input.sdk.mcp
       .status()
