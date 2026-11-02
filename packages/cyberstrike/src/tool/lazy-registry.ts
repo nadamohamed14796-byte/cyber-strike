@@ -3,6 +3,7 @@ import { Log } from "../util/log"
 import { MCP } from "../mcp"
 import { Bus } from "../bus"
 import type { Tool as AITool } from "ai"
+import { Instance } from "../project/instance"
 
 const log = Log.create({ service: "tool.lazy-registry" })
 
@@ -37,91 +38,165 @@ export namespace LazyToolRegistry {
     tool: AITool
   }
 
-  // State
-  const lazyTools = new Map<string, LazyTool>()
-  const loadedTools = new Map<string, LoadedTool>()
-  const loadedToolIds = new Set<string>()
+  type RegistryState = {
+    lazyTools: Map<string, LazyTool>
+    loadedTools: Map<string, LoadedTool>
+    loadedToolIds: Set<string>
+    clients: Map<string, object>
+    refreshing: Map<string, Promise<void>>
+    initializing?: Promise<void>
+    unsubscribe?: () => void
+  }
+
+  // MCP clients, Bus subscriptions and project tool registries are all scoped to
+  // Instance.directory. Keeping this state per project prevents two active
+  // projects with the same MCP server name from sharing tools or live clients.
+  const state = Instance.state<RegistryState>(
+    () => ({
+      lazyTools: new Map(),
+      loadedTools: new Map(),
+      loadedToolIds: new Set(),
+      clients: new Map(),
+      refreshing: new Map(),
+    }),
+    async (current) => {
+      current.unsubscribe?.()
+      current.unsubscribe = undefined
+      current.lazyTools.clear()
+      current.loadedTools.clear()
+      current.loadedToolIds.clear()
+      current.clients.clear()
+      current.refreshing.clear()
+    },
+  )
 
   const TOOL_CONTEXT_BUDGET = 30000
   const AVG_TOKENS_PER_TOOL = 500
 
   export async function init(): Promise<void> {
-    log.info("initializing lazy tool registry")
+    const current = state()
+    if (current.initializing) return current.initializing
 
-    const mcpStatus = await MCP.status()
-    const boltStatusMap = await MCP.boltStatus()
-    const allStatus = { ...mcpStatus, ...boltStatusMap }
-    const clients = await MCP.clients()
+    const pending = (async () => {
+      log.info("initializing lazy tool registry")
+      const [mcpStatus, boltStatusMap, clients] = await Promise.all([
+        MCP.status(),
+        MCP.boltStatus(),
+        MCP.clients(),
+      ])
+      const allStatus = { ...mcpStatus, ...boltStatusMap }
+      const connectedEntries = Object.entries(allStatus).filter(
+        ([serverName, status]) => status.status === "connected" && Boolean(clients[serverName]),
+      )
+      const connectedServers = new Set(connectedEntries.map(([serverName]) => serverName))
 
-    const connectedServers = new Set<string>()
-    for (const [serverName, status] of Object.entries(allStatus)) {
-      if (status.status !== "connected") continue
-      const client = clients[serverName]
-      if (!client) continue
-      connectedServers.add(serverName)
-      try {
-        const toolsResult = await client.listTools()
-        reconcileServerTools(serverName, toolsResult.tools)
-        log.info("collected tool metadata", { server: serverName, count: toolsResult.tools.length })
-      } catch (err) {
-        // Preserve last known metadata on transient listing failures.
-        log.error("failed to collect tool metadata", { server: serverName, error: err })
+      ensureSubscribed(current)
+
+      // Independent MCP servers must not serialize model startup. Reuse a
+      // snapshot while the underlying client identity is unchanged; the
+      // ToolsChanged event below refreshes it when the server changes its schema.
+      await Promise.all(
+        connectedEntries.map(([serverName]) => refreshServerTools(current, serverName, clients[serverName]!)),
+      )
+
+      const knownServers = new Set([
+        ...current.clients.keys(),
+        ...[...current.lazyTools.values()].map((tool) => tool.mcpServer).filter(Boolean) as string[],
+      ])
+      for (const serverName of knownServers) {
+        if (connectedServers.has(serverName)) continue
+        removeServerTools(current, serverName)
+        current.clients.delete(serverName)
       }
+
+      log.info("lazy tool registry initialized", {
+        totalTools: current.lazyTools.size,
+        loadedTools: current.loadedTools.size,
+      })
+    })()
+
+    current.initializing = pending
+    try {
+      await pending
+    } finally {
+      if (current.initializing === pending) current.initializing = undefined
     }
-
-    // A disconnected server can no longer provide callable tools.
-    for (const serverName of new Set([...lazyTools.values()].map((tool) => tool.mcpServer).filter(Boolean) as string[])) {
-      if (!connectedServers.has(serverName)) removeServerTools(serverName)
-    }
-
-    log.info("lazy tool registry initialized", {
-      totalTools: lazyTools.size,
-      loadedTools: loadedTools.size,
-    })
-
-    ensureSubscribed()
   }
 
-  /**
-   * Refresh tools from a specific server (called when ToolListChanged notification fires)
-   */
+  /** Refresh one server after a ToolListChanged notification or client change. */
   export async function refresh(serverName: string): Promise<void> {
+    const current = state()
     const clients = await MCP.clients()
     const client = clients[serverName]
-    if (!client) return
+    if (!client) {
+      removeServerTools(current, serverName)
+      current.clients.delete(serverName)
+      return
+    }
+    await refreshServerTools(current, serverName, client, true)
+  }
 
+  async function refreshServerTools(
+    current: RegistryState,
+    serverName: string,
+    client: { listTools(): Promise<{ tools: Array<{ name: string; description?: string; inputSchema?: unknown }> }> },
+    force = false,
+  ): Promise<void> {
+    const inFlight = current.refreshing.get(serverName)
+    if (inFlight) {
+      await inFlight
+      if (!force && current.clients.get(serverName) === client) return
+    }
+    if (!force && current.clients.get(serverName) === client) return
+
+    // A replacement connection invalidates executable closures from the old
+    // client even when the server returns an identical schema.
+    if (current.clients.get(serverName) !== client) invalidateLoadedServerTools(current, serverName)
+
+    const pending = (async () => {
+      try {
+        const toolsResult = await client.listTools()
+        const latestClients = await MCP.clients()
+        if (latestClients[serverName] !== client) return
+        reconcileServerToolsInState(current, serverName, toolsResult.tools)
+        current.clients.set(serverName, client)
+        log.info("collected tool metadata", { server: serverName, count: toolsResult.tools.length })
+      } catch (err) {
+        // Preserve searchable metadata on transient failures, but do not treat
+        // a replacement client as loaded until its own schema is confirmed.
+        log.error("failed to collect tool metadata", { server: serverName, error: err })
+      }
+    })()
+    current.refreshing.set(serverName, pending)
     try {
-      const toolsResult = await client.listTools()
-      reconcileServerTools(serverName, toolsResult.tools)
-      log.info("refreshed tools from server", {
-        server: serverName,
-        serverTools: toolsResult.tools.length,
-        totalTools: lazyTools.size,
-      })
-    } catch (err) {
-      log.error("failed to refresh tools", { server: serverName, error: err })
+      await pending
+    } finally {
+      if (current.refreshing.get(serverName) === pending) current.refreshing.delete(serverName)
     }
   }
 
-  // Ensure we only subscribe once
-  let subscribed = false
-  function ensureSubscribed() {
-    if (subscribed) return
-    subscribed = true
-    Bus.subscribe(MCP.ToolsChanged, async (payload) => {
+  function ensureSubscribed(current: RegistryState): void {
+    if (current.unsubscribe) return
+    current.unsubscribe = Bus.subscribe(MCP.ToolsChanged, async (payload) => {
       log.info("tools changed notification, refreshing", { server: payload.properties.server })
       await refresh(payload.properties.server)
     })
   }
 
-
-
-  function removeServerTools(serverName: string): void {
-    for (const [id, tool] of lazyTools) {
+  function invalidateLoadedServerTools(current: RegistryState, serverName: string): void {
+    for (const [id, tool] of current.lazyTools) {
       if (tool.mcpServer !== serverName) continue
-      lazyTools.delete(id)
-      loadedTools.delete(id)
-      loadedToolIds.delete(id)
+      current.loadedTools.delete(id)
+      current.loadedToolIds.delete(id)
+    }
+  }
+
+  function removeServerTools(current: RegistryState, serverName: string): void {
+    for (const [id, tool] of current.lazyTools) {
+      if (tool.mcpServer !== serverName) continue
+      current.lazyTools.delete(id)
+      current.loadedTools.delete(id)
+      current.loadedToolIds.delete(id)
     }
   }
 
@@ -139,8 +214,8 @@ export namespace LazyToolRegistry {
     return createHash("sha256").update(stable(schema)).digest("hex")
   }
 
-  /** Replace one server's snapshot after a successful listTools call. */
-  export function reconcileServerTools(
+  function reconcileServerToolsInState(
+    current: RegistryState,
     serverName: string,
     definitions: Array<{ name: string; description?: string; inputSchema?: unknown }>,
   ): void {
@@ -160,10 +235,9 @@ export namespace LazyToolRegistry {
       })
     }
 
-    // Preserve loaded executable definitions when metadata is unchanged. The
-    // registry is refreshed during each turn, so dropping every loaded entry
-    // here would make load_tools appear to work for only one turn.
-    for (const [id, existing] of lazyTools) {
+    // Preserve a loaded definition only if metadata is unchanged AND the
+    // connection identity was retained by refreshServerTools.
+    for (const [id, existing] of current.lazyTools) {
       if (existing.mcpServer !== serverName) continue
       const updated = next.get(id)
       const unchanged = updated &&
@@ -177,87 +251,78 @@ export namespace LazyToolRegistry {
         next.set(id, existing)
         continue
       }
-      lazyTools.delete(id)
-      loadedTools.delete(id)
-      loadedToolIds.delete(id)
+      current.lazyTools.delete(id)
+      current.loadedTools.delete(id)
+      current.loadedToolIds.delete(id)
     }
 
-    for (const [id, tool] of next) lazyTools.set(id, tool)
+    for (const [id, tool] of next) current.lazyTools.set(id, tool)
+  }
+
+  /** Replace one server's snapshot after a successful listTools call. */
+  export function reconcileServerTools(
+    serverName: string,
+    definitions: Array<{ name: string; description?: string; inputSchema?: unknown }>,
+  ): void {
+    reconcileServerToolsInState(state(), serverName, definitions)
   }
 
   export function search(query: string, limit = 10): LazyTool[] {
     const queryLower = query.trim().toLowerCase()
     if (!queryLower || !Number.isFinite(limit) || limit <= 0) return []
-    const queryWords = queryLower.split(/\s+/)
+    const queryWords = queryLower.split(/\\s+/)
+    const current = state()
 
     const scored: Array<{ tool: LazyTool; score: number }> = []
-
-    for (const tool of lazyTools.values()) {
+    for (const tool of current.lazyTools.values()) {
       let score = 0
-
-      if (tool.name.toLowerCase() === queryLower) {
-        score += 100
-      }
-
-      if (tool.name.toLowerCase().includes(queryLower)) {
-        score += 50
-      }
-
-      if (tool.summary.toLowerCase().includes(queryLower)) {
-        score += 30
-      }
+      if (tool.name.toLowerCase() === queryLower) score += 100
+      if (tool.name.toLowerCase().includes(queryLower)) score += 50
+      if (tool.summary.toLowerCase().includes(queryLower)) score += 30
 
       for (const word of queryWords) {
         for (const keyword of tool.keywords) {
-          if (keyword.includes(word) || word.includes(keyword)) {
-            score += 20
-          }
+          if (keyword.includes(word) || word.includes(keyword)) score += 20
         }
       }
-
-      if (tool.category.toLowerCase().includes(queryLower)) {
-        score += 25
-      }
-
-      if (score > 0) {
-        scored.push({ tool, score })
-      }
+      if (tool.category.toLowerCase().includes(queryLower)) score += 25
+      if (score > 0) scored.push({ tool, score })
     }
 
     scored.sort((a, b) => b.score - a.score)
-
-    return scored.slice(0, limit).map((s) => s.tool)
+    return scored.slice(0, limit).map((item) => item.tool)
   }
 
   export async function load(toolIds: string[]): Promise<LoadedTool[]> {
+    const current = state()
+    const requestedIDs = [...new Set(toolIds)]
     const newlyLoaded: LoadedTool[] = []
+    const toLoad = requestedIDs.filter((id) => !current.loadedToolIds.has(id) && current.lazyTools.has(id))
 
-    const currentCount = loadedTools.size
-    const newCount = toolIds.filter((id) => !loadedToolIds.has(id)).length
-    const estimatedTokens = (currentCount + newCount) * AVG_TOKENS_PER_TOOL
-
+    const estimatedTokens = (current.loadedTools.size + toLoad.length) * AVG_TOKENS_PER_TOOL
     if (estimatedTokens > TOOL_CONTEXT_BUDGET) {
       // Loading is intentionally lossless: never silently discard a tool the
       // agent explicitly selected. The budget is advisory, and the caller can
       // inspect/unload tools deliberately after the current evidence task.
       log.warn("tool context budget exceeded; keeping explicitly requested tools loaded", {
-        current: currentCount,
-        new: newCount,
+        current: current.loadedTools.size,
+        new: toLoad.length,
         estimated: estimatedTokens,
         budget: TOOL_CONTEXT_BUDGET,
       })
     }
 
-    const mcpTools = await MCP.tools()
-
-    for (const id of toolIds) {
-      if (loadedToolIds.has(id)) {
-        const existing = loadedTools.get(id)
+    // Avoid a full MCP tool listing when every requested tool is already loaded
+    // (or no longer exists in this project's current snapshot).
+    const mcpTools = toLoad.length > 0 ? await MCP.tools() : {}
+    for (const id of requestedIDs) {
+      if (current.loadedToolIds.has(id)) {
+        const existing = current.loadedTools.get(id)
         if (existing) newlyLoaded.push(existing)
         continue
       }
 
-      const lazyTool = lazyTools.get(id)
+      const lazyTool = current.lazyTools.get(id)
       if (!lazyTool) {
         log.warn("tool not found in lazy registry", { id })
         continue
@@ -269,15 +334,10 @@ export namespace LazyToolRegistry {
         continue
       }
 
-      const loaded: LoadedTool = {
-        id,
-        tool: fullTool,
-      }
-
-      loadedTools.set(id, loaded)
-      loadedToolIds.add(id)
+      const loaded: LoadedTool = { id, tool: fullTool }
+      current.loadedTools.set(id, loaded)
+      current.loadedToolIds.add(id)
       newlyLoaded.push(loaded)
-
       log.info("loaded tool", { id, source: lazyTool.source })
     }
 
@@ -285,23 +345,24 @@ export namespace LazyToolRegistry {
   }
 
   export function unload(toolIds: string[]): void {
+    const current = state()
     for (const id of toolIds) {
-      loadedTools.delete(id)
-      loadedToolIds.delete(id)
+      current.loadedTools.delete(id)
+      current.loadedToolIds.delete(id)
       log.info("unloaded tool", { id })
     }
   }
 
   export function getLoaded(): LoadedTool[] {
-    return Array.from(loadedTools.values())
+    return Array.from(state().loadedTools.values())
   }
 
   export function getAll(): LazyTool[] {
-    return Array.from(lazyTools.values())
+    return Array.from(state().lazyTools.values())
   }
 
   export function isLoaded(id: string): boolean {
-    return loadedToolIds.has(id)
+    return state().loadedToolIds.has(id)
   }
 
   export function stats(): {
@@ -310,10 +371,11 @@ export namespace LazyToolRegistry {
     estimatedTokens: number
     budgetRemaining: number
   } {
-    const loaded = loadedTools.size
+    const current = state()
+    const loaded = current.loadedTools.size
     const estimatedTokens = loaded * AVG_TOKENS_PER_TOOL
     return {
-      available: lazyTools.size,
+      available: current.lazyTools.size,
       loaded,
       estimatedTokens,
       budgetRemaining: TOOL_CONTEXT_BUDGET - estimatedTokens,
@@ -321,22 +383,19 @@ export namespace LazyToolRegistry {
   }
 
   export function formatSearchResults(tools: LazyTool[]): string {
-    if (tools.length === 0) {
-      return "No matching tools found."
-    }
+    if (tools.length === 0) return "No matching tools found."
 
     const lines = [
       `Found ${tools.length} matching tool(s):`,
       "",
-      ...tools.map((t, i) => {
-        const loaded = isLoaded(t.id) ? " [LOADED]" : ""
-        return `${i + 1}. **${t.name}**${loaded}\n   ID: \`${t.id}\`\n   ${t.summary}\n   Category: ${t.category}`
+      ...tools.map((tool, index) => {
+        const loaded = isLoaded(tool.id) ? " [LOADED]" : ""
+        return `${index + 1}. **${tool.name}**${loaded}\\n   ID: \`${tool.id}\`\\n   ${tool.summary}\\n   Category: ${tool.category}`
       }),
       "",
       "Use `load_tools` with the tool IDs to make them available for use.",
     ]
-
-    return lines.join("\n")
+    return lines.join("\\n")
   }
 
   function extractKeywords(name: string, description: string): string[] {
@@ -439,8 +498,10 @@ export namespace LazyToolRegistry {
   }
 
   export function clear(): void {
-    lazyTools.clear()
-    loadedTools.clear()
-    loadedToolIds.clear()
+    const current = state()
+    current.lazyTools.clear()
+    current.loadedTools.clear()
+    current.loadedToolIds.clear()
+    current.clients.clear()
   }
 }
