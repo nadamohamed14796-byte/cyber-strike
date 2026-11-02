@@ -159,6 +159,10 @@ export function rankSkillsForPhase(
 
   for (const entry of entries) {
     if (entry.verified === "tampered") continue
+    // Recon is intentionally represented by one canonical master skill.
+    // Keep legacy specialist slugs out of phase ranking even if stale or
+    // externally supplied index entries still contain them.
+    if (entry.name.startsWith("recon-") && entry.name !== "recon-master") continue
     const name = normalizeSkillText(entry.name)
     const tags = entry.tags.map(normalizeSkillText).filter(Boolean)
     const signals = Array.from(new Set([...(entry.signals ?? []), ...entry.tags])).map(normalizeSkillText).filter(Boolean)
