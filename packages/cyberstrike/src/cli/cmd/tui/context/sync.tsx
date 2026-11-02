@@ -99,9 +99,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
       }
       // Per-endpoint observed values, fetched on-demand when an endpoint is expanded
-      // in the sidebar. Keyed by the endpoint's key_hash. Raw facts only.
+      // in the sidebar. Keyed by key_hash, or request ID when legacy rows lack it.
+      // Raw facts only.
       request_observation: {
-        [keyHash: string]: {
+        [lookupKey: string]: {
           credentials: (string | null)[]
           params: {
             name: string
