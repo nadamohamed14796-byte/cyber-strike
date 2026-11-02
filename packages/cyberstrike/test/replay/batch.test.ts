@@ -69,6 +69,27 @@ describe("Batch.run", () => {
     expect(launched).toBeLessThan(10)
   })
 
+  test("waits for every in-flight worker to settle after abort", async () => {
+    const ctrl = new AbortController()
+    const completed = [false, false]
+    const run = Batch.run(
+      [0, 1],
+      async (index) => {
+        await new Promise<void>((resolve) => setTimeout(resolve, index === 0 ? 10 : 40))
+        completed[index] = true
+        return index
+      },
+      { concurrency: 2, signal: ctrl.signal },
+    )
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 2))
+    ctrl.abort()
+    const results = await run
+
+    expect(completed).toEqual([true, true])
+    expect(results).toEqual([0, 1])
+  })
+
   test("token bucket paces requests per second", async () => {
     // capacity 2, refill 0 within the test window → only 2 ever launch.
     let launched = 0
