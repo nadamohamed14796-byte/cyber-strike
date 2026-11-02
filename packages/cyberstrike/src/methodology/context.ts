@@ -20,12 +20,12 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
   mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
-    "recon-master", "community-tool-selection", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "passive reconnaissance", "OSINT", "certificate transparency",
+    "recon-master", "community-tool-selection", "attack-shadow-api", "attack-subdomain-takeover", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
     "recon-master", "community-tool-selection", "attack-shadow-api",
-    "attack-javascript-analysis", "attack-subdomain-takeover", "attack-database-service-exposure",
-    "endpoint enumeration", "parameter discovery", "JavaScript analysis",
+    "attack-subdomain-takeover", "attack-database-service-exposure",
+    "endpoint enumeration", "parameter discovery",
   ],
   technology_profiling: [
     "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09", "wstg-recon-config",
@@ -93,8 +93,8 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
 export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-master"],
-  passive_recon: ["recon-master", "attack-javascript-analysis"],
-  active_recon: ["recon-master", "attack-javascript-analysis"],
+  passive_recon: ["recon-master"],
+  active_recon: ["recon-master"],
   authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-account-lifecycle-verification"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
