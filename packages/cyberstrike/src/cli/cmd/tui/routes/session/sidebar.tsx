@@ -596,7 +596,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </Show>
               </box>
             </Show>
-            <Show when={!isExtensionTreeSession() && !!session()?.parentID && requests().length > 0}>
+            <Show when={!isExtensionTreeSession() && !session()?.parentID && requests().length > 0}>
               <box>
                 <box
                   flexDirection="row"
@@ -709,7 +709,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                       </box>
                     )}
                   </For>
-                </Show>         </Show>
+                </Show>
               </box>
             </Show>
             <Show when={roles().length > 0}>
