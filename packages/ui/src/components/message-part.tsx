@@ -515,6 +515,7 @@ export interface ToolProps {
   hideDetails?: boolean
   defaultOpen?: boolean
   forceOpen?: boolean
+  sessionID?: string
   locked?: boolean
 }
 
@@ -646,6 +647,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
             input={input()}
             tool={part.tool}
             metadata={metadata()}
+            sessionID={part.sessionID}
             // @ts-expect-error
             output={part.state.output}
             status={part.state.status}
@@ -1016,6 +1018,7 @@ ToolRegistry.register({
           input={input}
           tool={part.tool}
           metadata={metadata}
+          sessionID={part.sessionID}
           // @ts-expect-error
           output={part.state.output}
           status={part.state.status}
@@ -1302,7 +1305,18 @@ ToolRegistry.register({
   name: "todowrite",
   render(props) {
     const i18n = useI18n()
+    const data = useData()
+
+    // A tool card is a historical message part, but its checklist must show
+    // the session's current authoritative todo snapshot just like the sidebar.
+    createEffect(() => {
+      if (props.sessionID) void data.syncTodo?.(props.sessionID)
+    })
+
     const todos = createMemo(() => {
+      const current = props.sessionID ? data.store.todo?.[props.sessionID] : undefined
+      if (Array.isArray(current)) return current
+
       const meta = props.metadata?.todos
       if (Array.isArray(meta)) return meta
 
