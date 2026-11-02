@@ -433,6 +433,7 @@ async function getOrCreateExtensionTaskSession(input: {
 }
 
 async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Promise<void> {
+  const analysisStartedAt = performance.now()
   const sessionID = input.sessionID
   const req = input.req
   const normalized = {
@@ -726,6 +727,8 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
       brokerSessionID: childSessionID,
       requestID: req.id,
       status: finalStatus,
+      queueWaitMs: Math.max(0, analysisStartedAt - req.time.created),
+      analysisDurationMs: Math.round(performance.now() - analysisStartedAt),
     })
   }
 }
@@ -1818,7 +1821,17 @@ export const SessionRoutes = lazy(() =>
               intakeOrderReleased = true
             }
           }
+          const normalizationStartedAt = performance.now()
           const normalized = await runNormalize(body, activeSessionID, ingestDryRun)
+          log.info("captured request normalization completed", {
+            sessionID,
+            requestID: capturedRequestID,
+            elapsedMs: Math.round(performance.now() - normalizationStartedAt),
+            normalizePipelineMs: normalized?.durationMs,
+            normSource: normalized?.normSource,
+            method: normalized?.method,
+            path: normalized?.normalizedPath,
+          })
 
         // Never route a malformed extension capture into the ordinary parent-chat
         // branch. That fallback writes into the active text window and can hijack
