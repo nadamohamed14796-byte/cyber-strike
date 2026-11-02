@@ -46,7 +46,7 @@ export namespace SessionProcessor {
       get message() {
         return input.assistantMessage
       },
-      partFromToolCall(toolCallID: string) {
+      partFromToolCall(toolCallID: string): MessageV2.ToolPart | undefined {
         return toolcalls[toolCallID]
       },
       async process(streamInput: LLM.StreamInput) {
