@@ -13,17 +13,44 @@ import type { MessageV2 } from "../../src/session/message-v2"
 
 describe("session.llm.canExposeInternalImpactHandoff", () => {
   test("allows the internal handoff tool for non-Impact-Hunter subagents", () => {
-    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-tester-injection", mode: "subagent" })).toBe(true)
-    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-analyzer", mode: "subagent" })).toBe(true)
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "proxy-tester-injection",
+      name: "Injection specialist",
+      mode: "subagent",
+    })).toBe(true)
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "proxy-analyzer",
+      name: "Proxy analyzer",
+      mode: "subagent",
+    })).toBe(true)
   })
 
   test("does not expose the handoff tool to primary agents or Impact Hunter itself", () => {
-    expect(LLM.canExposeInternalImpactHandoff({ name: "cyberstrike", mode: "primary" })).toBe(false)
-    expect(LLM.canExposeInternalImpactHandoff({ name: "impact-hunter", mode: "subagent" })).toBe(false)
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "cyberstrike",
+      name: "cyberstrike",
+      mode: "primary",
+    })).toBe(false)
+    // Renaming the display label must not expose the task tool to the Hunter itself.
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "impact-hunter",
+      name: "Renamed Hunter",
+      mode: "subagent",
+    })).toBe(false)
+    // A different agent may use the display label "impact-hunter"; the registry ID wins.
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "proxy-analyzer",
+      name: "impact-hunter",
+      mode: "subagent",
+    })).toBe(true)
   })
 
   test("respects an explicit task-tool disable", () => {
-    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-tester-injection", mode: "subagent" }, true)).toBe(false)
+    expect(LLM.canExposeInternalImpactHandoff({
+      id: "proxy-tester-injection",
+      name: "Injection specialist",
+      mode: "subagent",
+    }, true)).toBe(false)
   })
 })
 

@@ -2300,13 +2300,18 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       throw error
     }
 
+    const agentID = await Agent.resolveID(agent)
+    if (!agentID) {
+      throw new Error(`Unable to resolve stable agent ID for command "${input.command}" agent "${agentName}".`)
+    }
+
     const templateParts = await resolvePromptParts(template)
     const isSubtask = (agent.mode === "subagent" && command.subtask !== false) || command.subtask === true
     const parts = isSubtask
       ? [
           {
             type: "subtask" as const,
-            agent: agent.name,
+            agent: agentID,
             description: command.description ?? "",
             command: input.command,
             model: {
@@ -2319,7 +2324,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         ]
       : [...templateParts, ...(input.parts ?? [])]
 
-    const userAgent = isSubtask ? (input.agent ?? (await Agent.defaultAgent())) : agentName
+    const userAgent = isSubtask ? (input.agent ?? (await Agent.defaultAgent())) : agentID
     const userModel = isSubtask
       ? input.model
         ? Provider.parseModel(input.model)

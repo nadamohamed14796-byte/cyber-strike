@@ -127,3 +127,16 @@ describe("runtime agent integration contracts", () => {
     expect(prompt).toContain("returned `<skill_files>` manifest")
   })
 })
+
+
+test("command-created subtasks persist stable agent registry IDs, not display labels", async () => {
+  const source = await Bun.file(path.resolve(import.meta.dir, "../../src/session/prompt.ts")).text()
+  const start = source.indexOf("const parts = isSubtask")
+  const end = source.indexOf("const userAgent =", start)
+
+  expect(start).toBeGreaterThanOrEqual(0)
+  expect(end).toBeGreaterThan(start)
+  const subtaskBuilder = source.slice(start, end)
+  expect(subtaskBuilder).toContain("agent: agentID")
+  expect(subtaskBuilder).not.toContain("agent: agent.name")
+})

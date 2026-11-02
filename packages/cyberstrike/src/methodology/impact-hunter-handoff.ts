@@ -16,6 +16,11 @@ export interface ImpactHunterHandoffResult {
   reason?: string
 }
 
+/** Resolve the caller's stable registry identity before applying Hunter-only guards. */
+export async function isImpactHunterCaller(agent: string | Agent.Info | undefined): Promise<boolean> {
+  return (await Agent.resolveID(agent)) === "impact-hunter"
+}
+
 /**
  * Find this finding's Hunter task anywhere beneath the same root session.
  * A single finding can be reported first by a proxy and later triaged by the
@@ -54,12 +59,12 @@ async function dispatch(
   finding: Vulnerability.Info,
   mode: ImpactHunterMode,
 ): Promise<ImpactHunterHandoffResult> {
-  if (ctx.agent === "impact-hunter") {
-    return { started: false, mode, reason: "recursive Impact Hunter dispatch is disabled" }
-  }
-
   try {
-    const reporter = await Agent.get(ctx.agent)
+    const reporterID = await Agent.resolveID(ctx.agent)
+    if (reporterID === "impact-hunter") {
+      return { started: false, mode, reason: "recursive Impact Hunter dispatch is disabled" }
+    }
+    const reporter = reporterID ? await Agent.get(reporterID) : undefined
     if (!reporter) return { started: false, mode, reason: "reporting agent is not registered: " + String(ctx.agent) }
 
     const preferredRequestID = requestIDFromRecentPromptTexts(
@@ -183,13 +188,13 @@ async function dispatch(
 
 const runImpactHunterHandoff = createModeAwareFlightRegistry<string, ImpactHunterMode, ImpactHunterHandoffResult>()
 
-export function startImpactHunterHandoff(
+export async function startImpactHunterHandoff(
   ctx: Tool.Context,
   finding: Vulnerability.Info,
   mode: ImpactHunterMode,
 ): Promise<ImpactHunterHandoffResult> {
-  if (ctx.agent === "impact-hunter") {
-    return Promise.resolve({ started: false, mode, reason: "recursive Impact Hunter dispatch is disabled" })
+  if (await isImpactHunterCaller(ctx.agent)) {
+    return { started: false, mode, reason: "recursive Impact Hunter dispatch is disabled" }
   }
 
   const key = Session.root(ctx.sessionID) + ":" + finding.id

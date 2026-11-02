@@ -418,15 +418,20 @@ export namespace LLM {
   // guarded background Impact Hunter escalation path. TaskTool still enforces all
   // normal dispatch permissions at execution time; Impact Hunter itself cannot recurse.
   export function canExposeInternalImpactHandoff(
-    agent: Pick<Agent.Info, "name" | "mode">,
+    agent: Pick<Agent.Info, "name" | "mode"> & { id: string },
     taskExplicitlyDisabled = false,
   ) {
-    return !taskExplicitlyDisabled && agent.mode === "subagent" && agent.name !== "impact-hunter"
+    // The user message stores the stable registry ID. Display labels are
+    // configurable and must never decide whether the Impact Hunter can recurse.
+    return !taskExplicitlyDisabled && agent.mode === "subagent" && agent.id !== "impact-hunter"
   }
 
   async function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "user">) {
     const disabled = PermissionNext.disabled(Object.keys(input.tools), input.agent.permission)
-    const internalImpactHandoff = canExposeInternalImpactHandoff(input.agent, input.user.tools?.task === false)
+    const internalImpactHandoff = canExposeInternalImpactHandoff(
+      { id: input.user.agent, name: input.agent.name, mode: input.agent.mode },
+      input.user.tools?.task === false,
+    )
     for (const tool of Object.keys(input.tools)) {
       if (
         input.user.tools?.[tool] === false ||
