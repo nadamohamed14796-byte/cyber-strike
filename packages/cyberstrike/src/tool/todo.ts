@@ -4,14 +4,19 @@ import DESCRIPTION_WRITE from "./todowrite.txt"
 import { Todo } from "../session/todo"
 
 export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) {
-  const next = incoming.map((todo) => {
-    const prior = previous.find((item) => item.content.trim() === todo.content.trim())
+  const seen = new Set<string>()
+  const next = incoming.flatMap((todo) => {
+    const content = todo.content.trim()
+    if (!content || seen.has(content)) return []
+    seen.add(content)
+    const normalized = { ...todo, content }
+    const prior = previous.find((item) => item.content.trim() === content)
     if (prior?.status === "in_progress" && todo.status === "pending") {
-      return { ...todo, status: "in_progress" }
+      return [{ ...normalized, status: "in_progress" }]
     }
-    return todo
+    return [normalized]
   })
-  const hasTodo = (content: string) => next.some((todo) => todo.content.trim() === content.trim())
+  const hasTodo = (content: string) => next.some((todo) => todo.content === content.trim())
   const preserved = previous.filter(
     (todo) =>
       (todo.status === "pending" || todo.status === "in_progress") &&
