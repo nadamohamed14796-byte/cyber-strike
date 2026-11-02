@@ -25,6 +25,16 @@ describe("todo snapshot reconciliation", () => {
     expect(result.preserved.map((todo) => todo.content)).toEqual(["Analyze endpoints"])
   })
 
+  test("normalizes content and removes duplicate identities", () => {
+    const result = mergeTodoSnapshot([], [
+      item("  Inspect API authorization  ", "pending", "high"),
+      item("Inspect API authorization", "completed", "low"),
+    ])
+
+    expect(result.todos).toEqual([item("Inspect API authorization", "pending", "high")])
+    expect(result.preserved).toEqual([])
+  })
+
   test("does not regress an in-progress task to pending", () => {
     const result = mergeTodoSnapshot(
       [item("Verify output files", "in_progress", "high")],
