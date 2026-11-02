@@ -337,7 +337,8 @@ for (const key of Object.keys(binaries)) {
   // set; these runtime-critical entries also fail the release build immediately.
   for (const requiredSkill of [
     "target-workspace-workflow/SKILL.md",
-    "recon-methodology/SKILL.md",
+    "recon-master/SKILL.md",
+    "recon-master/RECON_PHASE_TOOL_MATRIX.md",
     "community-tool-selection/SKILL.md",
     "attack-javascript-analysis/SKILL.md",
     "WEB/OWASP_WSTG_4.2/wstg-authz-04/SKILL.md",
