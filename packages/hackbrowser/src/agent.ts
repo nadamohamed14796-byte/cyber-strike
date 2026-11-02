@@ -2715,6 +2715,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
   const drainInterval = setInterval(() => {
     void drainCaptureQueue(captureQueue, (captured) => handleCapture(captured), "single-credential")
   }, 500)
+  let finalDrainCompleted = false
 
   try {
     // Navigate to target and authenticate
@@ -2736,6 +2737,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
         "single-credential",
         { finalDrain: true },
       )
+      finalDrainCompleted = true
       return {
         sessionID: dryRun ? "" : sessionID!,
         capturedEndpoints: 0,
@@ -3152,6 +3154,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       "single-credential",
       { finalDrain: true },
     )
+    finalDrainCompleted = true
     return {
       sessionID: dryRun ? "" : sessionID!,
       capturedEndpoints: globalState.capturedEndpoints.size,
@@ -3174,6 +3177,22 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       usage: usageAcc,
     }
   } finally {
+    // A cancellation/error during authentication or crawling must not discard
+    // captures already observed by the request interceptor.
+    if (!finalDrainCompleted && captureQueue.length > 0) {
+      await drainCaptureQueue(
+        captureQueue,
+        (captured) => handleCapture(captured),
+        "single-credential",
+        { finalDrain: true },
+      ).catch((error) => {
+        log.error("final capture drain failed during worker cleanup", {
+          pending: captureQueue.length,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }
     clearInterval(drainInterval)
+    await browser.close().catch(() => {})
   }
 }
