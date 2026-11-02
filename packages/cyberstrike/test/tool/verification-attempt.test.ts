@@ -40,6 +40,7 @@ test("verification evidence_ref must identify a captured request in the same ses
     directory: tmp.path,
     async fn() {
       const session = await Session.create({})
+      const childSession = await Session.createNext({ directory: tmp.path, parentID: session.id, title: "verification-request-child" })
       const otherSession = await Session.create({})
       try {
         const foreignRequest = Request.add({
@@ -52,15 +53,15 @@ test("verification evidence_ref must identify a captured request in the same ses
         })
         expect(foreignRequest).toBeDefined()
 
-        const localRequest = Request.add({
-          sessionID: session.id,
+        const childRequest = Request.add({
+          sessionID: childSession.id,
           method: "GET",
           normalizedPath: "/api/profile",
           origin: "https://example.test",
           scheme: "https",
           host: "example.test",
         })
-        expect(localRequest).toBeDefined()
+        expect(childRequest).toBeDefined()
 
         const tool = await VerificationAttemptTool.init()
         const ctx = toolContext(session.id)
@@ -79,14 +80,14 @@ test("verification evidence_ref must identify a captured request in the same ses
           hypothesisKey: "verification-request-reference",
         })).toHaveLength(0)
 
-        const valid = await tool.execute(recordParams("  " + localRequest!.id + "  "), ctx)
+        const valid = await tool.execute(recordParams("  " + childRequest!.id + "  "), ctx)
         expect(valid.title).toContain("Verification (1 evidence-backed attempts)")
         const attempts = VerificationLedger.list({
           sessionID: session.id,
           hypothesisKey: "verification-request-reference",
         })
         expect(attempts).toHaveLength(1)
-        expect(attempts[0]?.evidenceRef).toBe(localRequest!.id)
+        expect(attempts[0]?.evidenceRef).toBe(childRequest!.id)
       } finally {
         await Session.remove(otherSession.id)
         await Session.remove(session.id)
