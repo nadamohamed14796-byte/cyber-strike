@@ -2,7 +2,8 @@ import { createEffect, createMemo, createSignal, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { useSync } from "@/context/sync"
 
-const PROXY_BROKER_TITLES = new Set([
+const EXTENSION_TASKS_TITLES = new Set([
+  "Extension Agent Tasks",
   "Agent Proxy",
   "Extension Proxy Broker (@proxy-agent subagent)",
 ])
@@ -28,7 +29,7 @@ export function CapturedRequestAnalysisPanel() {
 
   const brokerSession = createMemo(() =>
     (sync.data.session ?? []).find(
-      (item) => item.parentID === parentID() && PROXY_BROKER_TITLES.has(item.title ?? ""),
+      (item) => item.parentID === parentID() && EXTENSION_TASKS_TITLES.has(item.title ?? ""),
     ),
   )
 
@@ -96,7 +97,7 @@ export function CapturedRequestAnalysisPanel() {
     navigate(`/${params.dir}/session/${broker.id}`)
   })
 
-  function enterAgentProxy() {
+  function enterExtensionTasks() {
     const childID = brokerSession()?.id
     if (!childID) return
     navigate(`/${params.dir}/session/${childID}`)
@@ -105,12 +106,12 @@ export function CapturedRequestAnalysisPanel() {
   return (
     <Show when={brokerSession()}>
       <section
-        aria-label="Extension Agent queue"
+        aria-label="Extension Agent tasks"
         class="absolute right-4 bottom-32 z-[80] w-[min(390px,calc(100%_-_32px))] rounded-xl border border-border-base bg-background-base p-3 shadow-xl"
       >
         <div class="flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-center gap-2">
-            <h2 class="shrink-0 text-13-semibold text-text-strong">Extension Agent</h2>
+            <h2 class="shrink-0 text-13-semibold text-text-strong">Extension Agent Tasks</h2>
             <span
               aria-label={`${requestCount()} captured requests`}
               class="inline-flex min-w-6 items-center justify-center rounded bg-surface-base px-2 py-1 text-11-semibold tabular-nums text-text-weak"
@@ -121,7 +122,7 @@ export function CapturedRequestAnalysisPanel() {
 
           <button
             type="button"
-            onClick={enterAgentProxy}
+            onClick={enterExtensionTasks}
             class="shrink-0 rounded-md border border-border-base bg-surface-raised-base px-3 py-1.5 text-12-semibold text-text-base hover:bg-surface-base"
           >
             Enter
