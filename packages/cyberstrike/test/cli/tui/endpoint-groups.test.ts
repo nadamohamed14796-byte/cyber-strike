@@ -21,7 +21,7 @@ const request = (input: Partial<{
   operation: input.operation,
 })
 
-describe("TUI captured request grouping", () => {
+describe("shared captured request grouping", () => {
   test("groups requests by domain, then endpoint, then HTTP method", () => {
     const groups = groupCapturedRequests([
       request({ id: "req_3", normalized_path: "/api/users", method: "POST" }),
@@ -47,6 +47,18 @@ describe("TUI captured request grouping", () => {
     ])
     expect(groups).toHaveLength(1)
     expect(groups[0]?.requestCount).toBe(2)
+  })
+
+  test("normalizes host casing but keeps non-default ports separate", () => {
+    const groups = groupCapturedRequests([
+      request({ id: "base-1", host: "app.example.com", port: 443 }),
+      request({ id: "base-2", host: "APP.EXAMPLE.COM", port: 443 }),
+      request({ id: "custom-port", host: "app.example.com", port: 8443 }),
+    ])
+
+    expect(groups).toHaveLength(2)
+    expect(groups.find((group) => group.key === "app.example.com")?.requestCount).toBe(2)
+    expect(groups.find((group) => group.key === "app.example.com:8443")?.requestCount).toBe(1)
   })
 
   test("preserves independent captures for the same operation and separates GraphQL operations", () => {
