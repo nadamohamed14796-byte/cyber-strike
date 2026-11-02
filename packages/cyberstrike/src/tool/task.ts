@@ -297,15 +297,25 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Ask for permission only after request identity, duplicate-lane, and
       // per-request budget checks. Rejected duplicate fan-out must not prompt the user.
       if (!ctx.extra?.bypassAgentCheck && !impactHandoff) {
-        await ctx.ask({
-          permission: "task",
-          patterns: [params.subagent_type],
-          always: ["*"],
-          metadata: {
-            description: params.description,
-            subagent_type: params.subagent_type,
-          },
-        })
+        try {
+          await ctx.ask({
+            permission: "task",
+            patterns: [params.subagent_type],
+            always: ["*"],
+            metadata: {
+              description: params.description,
+              subagent_type: params.subagent_type,
+            },
+          })
+        } catch (error) {
+          if (proxyDispatchReservation) {
+            const reservations = proxyRequestDispatchReservations.get(proxyDispatchReservation.key)
+            reservations?.delete(proxyDispatchReservation.agentID)
+            if (reservations?.size === 0) proxyRequestDispatchReservations.delete(proxyDispatchReservation.key)
+            proxyDispatchReservation = undefined
+          }
+          throw error
+        }
       }
 
       const hasTaskPermission = PermissionNext.evaluate("task", "*", agent.permission).action !== "deny"
