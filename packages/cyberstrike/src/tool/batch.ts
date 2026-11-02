@@ -121,7 +121,7 @@ export const BatchTool = Tool.define("batch", async () => {
           const nestedContext: Tool.Context = {
             ...ctx,
             callID: partID,
-            metadata: (value) => ctx.metadata(value, partID),
+            metadata: (value) => ctx.metadata(value, partID, validatedParams as Record<string, any>),
             ask: (request) => ctx.ask(request, partID),
           }
           await Plugin.trigger(

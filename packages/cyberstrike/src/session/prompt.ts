@@ -1201,7 +1201,11 @@ export namespace SessionPrompt {
       extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck },
       agent: agentID,
       messages: input.messages,
-      metadata: async (val: { title?: string; metadata?: any }, callID = options.toolCallId) => {
+      metadata: async (
+        val: { title?: string; metadata?: any },
+        callID = options.toolCallId,
+        toolInput: Record<string, any> = args,
+      ) => {
         let match = input.processor.partFromToolCall(callID)
         // Batch-created child parts are persisted directly rather than streamed as
         // AI SDK tool-call events, so resolve their part by call ID when necessary.
@@ -1217,7 +1221,7 @@ export namespace SessionPrompt {
               title: val.title,
               metadata: val.metadata,
               status: "running",
-              input: args,
+              input: toolInput,
               time: {
                 start: Date.now(),
               },

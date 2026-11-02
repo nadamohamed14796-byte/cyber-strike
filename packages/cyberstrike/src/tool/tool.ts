@@ -21,7 +21,7 @@ export namespace Tool {
     callID?: string
     extra?: { [key: string]: any }
     messages: MessageV2.WithParts[]
-    metadata(input: { title?: string; metadata?: M }, callID?: string): void
+    metadata(input: { title?: string; metadata?: M }, callID?: string, toolInput?: Record<string, any>): void
     ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">, callID?: string): Promise<void>
   }
 
