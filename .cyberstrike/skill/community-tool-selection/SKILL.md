@@ -12,7 +12,7 @@ tags:
   - tool-preflight
   - research
 prerequisites:
-  - recon-methodology
+  - recon-master
 ---
 
 # Tool Selection
