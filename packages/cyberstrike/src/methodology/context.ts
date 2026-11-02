@@ -23,9 +23,8 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "recon-master", "community-tool-selection", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
-    "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-port-service-discovery",
-    "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
-    "recon-asn-infrastructure", "recon-visual-recon", "attack-web-recon", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "attack-database-service-exposure", "recon-error-log-mining",
+    "recon-master", "community-tool-selection", "attack-web-recon", "attack-shadow-api",
+    "attack-javascript-analysis", "attack-subdomain-takeover", "attack-database-service-exposure",
     "endpoint enumeration", "parameter discovery", "JavaScript analysis",
   ],
   technology_profiling: [
