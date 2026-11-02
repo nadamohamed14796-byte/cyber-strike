@@ -2,7 +2,7 @@
 name: community-tool-selection
 description: Choose and verify a fit-for-purpose external tool, API, dataset, or local helper without duplicating the canonical tool catalog.
 category: information-gathering
-version: "1.0.0"
+version: "1.1.0"
 author: cyberstrike-official
 tags:
   - tool-selection
@@ -23,7 +23,7 @@ Load this skill only when a concrete task has an evidence gap that may benefit f
 
 ## Single source of truth
 
-Use the `TOOLING_CATALOG.md` companion listed in this skill's returned `<skill_files>`, reading it from this skill's returned `Base directory` rather than the target workspace. It is the one shared reference for candidate tools, APIs, local helpers, official references, availability/preflight guidance, and output expectations. It is a candidate catalog, not a tool allowlist or proof that a tool is installed. Do not copy its inventory into individual skills.
+Use the `TOOLING_CATALOG.md` companion listed in this skill's returned `<skill_files>`, reading it from this skill's returned `Base directory` rather than the target workspace. It is the one shared reference for candidate tools, APIs, local helpers, official references, availability/preflight guidance, and output expectations. It is a candidate catalog, not a tool allowlist or proof that a tool is installed. Do not copy its inventory into individual skills. For reconnaissance, consult its `Verified per-tool recon flag guide (2026-11-02)` and `Recon flag decision matrix` for release-pinned options, `-all`/recursive decisions, request budgets, and GET/HEAD/POST selection; then verify flags against the installed binary's own help.
 
 ## Procedure
 
@@ -39,7 +39,7 @@ Use the `TOOLING_CATALOG.md` companion listed in this skill's returned `<skill_f
 
 ## Route to the appropriate procedure
 
-- Recon, DNS, ports, TLS, origins, virtual hosts, URL history, parameters, and JavaScript: load the relevant `recon-*` or JavaScript skill.
+- Recon, DNS, ports, TLS, origins, virtual hosts, URL history, parameters, and asset discovery: use the consolidated `recon-master` skill and select only the applicable specialist chapter. Do not search for or load retired standalone `recon-*` skills. JavaScript analysis remains a separate specialist skill.
 - A concrete vulnerability hypothesis: load its canonical `attack-*` or OWASP WSTG skill before choosing specialist tooling.
 - Source exposure, secrets, dependency/CVE, cloud, containers, CMS, CI/CD, mobile, or identity: load the relevant platform or assessment skill.
 - Evidence/reporting: use evidence-hygiene, triage-validation, report-writing, and the validators listed in the canonical catalog.
