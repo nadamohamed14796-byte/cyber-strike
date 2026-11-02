@@ -245,7 +245,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         requestID &&
         !params.task_id &&
         !ctx.extra?.bypassAgentCheck &&
-        (agent.id === "proxy-analyzer" || agent.id.startsWith("proxy-tester-"))
+        (params.subagent_type === "proxy-analyzer" || params.subagent_type.startsWith("proxy-tester-"))
       ) {
         const reservationKey = ctx.sessionID + ":" + requestID
         let reservations = proxyRequestDispatchReservations.get(reservationKey)
@@ -253,7 +253,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           reservations = new Set<string>()
           proxyRequestDispatchReservations.set(reservationKey, reservations)
         }
-        if (reservations.has(agent.id)) {
+        if (reservations.has(params.subagent_type)) {
           return {
             title: "Duplicate specialist dispatch skipped",
             output: `This lane is already being dispatched for request ${requestID}. Do not create another task.`,
@@ -265,18 +265,18 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           }
         }
         const alreadyReserved = [...reservations]
-        reservations.add(agent.id)
+        reservations.add(params.subagent_type)
         try {
           const children = await Session.children(ctx.sessionID)
           const decision = evaluateProxyRequestDispatch({
             requestID,
-            agentID: agent.id,
+            agentID: params.subagent_type,
             children,
             reservedAgentIDs: alreadyReserved,
             maxSpecialists: 2,
           })
           if (!decision.allowed) {
-            reservations.delete(agent.id)
+            reservations.delete(params.subagent_type)
             if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
             const existingTaskID = decision.reason === "duplicate" ? decision.existingTaskID : undefined
             return {
@@ -295,7 +295,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
               },
             }
           }
-          proxyDispatchReservation = { key: reservationKey, agentID: agent.id }
+          proxyDispatchReservation = { key: reservationKey, agentID: params.subagent_type }
         } catch (error) {
           reservations.delete(agent.id)
           if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
@@ -351,7 +351,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           parentID: parentSessionID,
           title: params.description + ` (@${agent.name} subagent)` +
             (proxyDispatchReservation && requestID
-              ? ` [request:${requestID}] [agent:${agent.id}]`
+              ? ` [request:${requestID}] [agent:${params.subagent_type}]`
               : ""),
           permission: [
             {
