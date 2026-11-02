@@ -903,7 +903,7 @@ function WebContextPanelList() {
   // capture rows stay intact so status, retry, and observation details remain per request.
   const endpointGroups = createMemo(() =>
     activeSection() === "endpoints"
-      ? groupCapturedRequests(items() as CapturedEndpointRequest[])
+      ? groupCapturedRequests(items() as unknown as CapturedEndpointRequest[])
       : [],
   )
 
