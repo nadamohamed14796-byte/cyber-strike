@@ -120,114 +120,7 @@ function McpPanelList() {
       <Show when={items().length === 0 && boltGroups().length === 0}>
         <div class="px-2 py-3 text-center text-12-regular text-text-weak">{language.t("dialog.mcp.empty")}</div>
       </Show>
-      <Show when={activeSection() === "endpoints"}>
-        <For each={endpointGroups()}>
-          {(domain) => (
-            <div class="flex flex-col gap-1 px-2 py-1">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-11-medium text-text-accent truncate">{domain.label}</span>
-                <span class="text-10-regular text-text-muted shrink-0">{domain.requestCount}</span>
-              </div>
-              <For each={domain.endpoints}>
-                {(endpoint) => (
-                  <div class="flex flex-col gap-1 pl-2 border-l border-border-weak-base">
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-12-regular text-text-base truncate">{endpoint.path}</span>
-                      <span class="text-10-regular text-text-muted shrink-0">{endpoint.requestCount}</span>
-                    </div>
-                    <For each={endpoint.operations}>
-                      {(operation) => (
-                        <div class="flex flex-col gap-1 pl-2">
-                          <div class="flex items-center gap-1.5">
-                            <span class="text-11-medium text-text-accent shrink-0">{operation.method}</span>
-                            <Show when={operation.protocol}>
-                              <span class="text-10-regular text-text-muted">{operation.protocol?.toUpperCase()}</span>
-                            </Show>
-                            <Show when={operation.operation}>
-                              <span class="text-11-regular text-text-muted truncate">{operation.operation}</span>
-                            </Show>
-                            <span class="text-10-regular text-text-muted shrink-0">({operation.requests.length})</span>
-                          </div>
-                          <For each={operation.requests}>
-                            {(request) => {
-                              const id = request.id
-                              const v = request as unknown as Record<string, unknown>
-                              const status = String(v.status ?? "unknown")
-                              return (
-                                <div class="flex flex-col gap-0.5 pl-2">
-                                  <div
-                                    class="flex items-center gap-1.5 min-w-0 cursor-pointer rounded hover:bg-surface-raised-base"
-                                    onClick={() => void toggleEndpoint(v)}
-                                  >
-                                    <span class="text-11-regular text-text-muted shrink-0">
-                                      {expandedEp()[id] ? "▾" : "▸"}
-                                    </span>
-                                    <span class={`w-1.5 h-1.5 rounded-full shrink-0 ${endpointStatusColor(status)}`} />
-                                    <span class="text-11-regular text-text-muted truncate">{id.slice(-8)}</span>
-                                    <span class="text-10-regular text-text-muted shrink-0">{status}</span>
-                                    <Show when={status === "failed" && !retryQueued()[id]}>
-                                      <button
-                                        type="button"
-                                        disabled={retryingRequestID() === id}
-                                        class="ml-auto shrink-0 rounded border border-border-base px-1.5 py-0.5 text-10-medium hover:bg-surface-raised-base disabled:opacity-50"
-                                        onClick={(event) => {
-                                          event.stopPropagation()
-                                          void retryCapturedRequest(id)
-                                        }}
-                                      >
-                                        {retryingRequestID() === id ? "Retrying…" : "Retry"}
-                                      </button>
-                                    </Show>
-                                  </div>
-                                  <Show when={retryNotices()[id]}>
-                                    <span class="pl-5 text-10-regular text-text-weak">{retryNotices()[id]}</span>
-                                  </Show>
-                                  <Show when={retryErrors()[id]}>
-                                    <span role="alert" class="pl-5 text-10-regular text-icon-danger-base">
-                                      Retry failed: {retryErrors()[id]}
-                                    </span>
-                                  </Show>
-                                  <Show when={expandedEp()[id]}>
-                                    <div class="flex flex-col gap-0.5 pl-5">
-                                      <For each={obsTree()[id]?.params ?? []}>
-                                        {(p) => (
-                                          <div class="flex flex-col">
-                                            <span class="text-11-regular text-text-muted">{p.name}</span>
-                                            <For each={p.byCredential}>
-                                              {(bc) => (
-                                                <div class="flex gap-1.5 pl-3">
-                                                  <span class="text-11-medium text-text-accent shrink-0">
-                                                    {credLabel(bc.credentialID)}
-                                                  </span>
-                                                  <span class="text-11-regular truncate">
-                                                    → {bc.redacted ? "[redacted]" : bc.values.join(", ")}
-                                                  </span>
-                                                </div>
-                                              )}
-                                            </For>
-                                          </div>
-                                        )}
-                                      </For>
-                                      <Show when={obsTree()[id] && obsTree()[id]!.params.length === 0}>
-                                        <span class="text-11-regular text-text-weak pl-3">(no observed values)</span>
-                                      </Show>
-                                    </div>
-                                  </Show>
-                                </div>
-                              )
-                            }}
-                          </For>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                )}
-              </For>
-            </div>
-          )}
-        </For>
-      </Show>
-      <For each={activeSection() === "endpoints" ? [] : items()}>
+      <For each={items()}>
         {(i) => (
           <div
             class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-surface-raised-base cursor-pointer"
@@ -1058,7 +951,114 @@ function WebContextPanelList() {
       <Show when={sessionID() && items().length === 0}>
         <div class="px-2 py-3 text-center text-12-regular text-text-weak">{language.t("dialog.web.empty")}</div>
       </Show>
-      <For each={items()}>
+      <Show when={activeSection() === "endpoints"}>
+        <For each={endpointGroups()}>
+          {(domain) => (
+            <div class="flex flex-col gap-1 px-2 py-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-11-medium text-text-accent truncate">{domain.label}</span>
+                <span class="text-10-regular text-text-muted shrink-0">{domain.requestCount}</span>
+              </div>
+              <For each={domain.endpoints}>
+                {(endpoint) => (
+                  <div class="flex flex-col gap-1 pl-2 border-l border-border-weak-base">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-12-regular text-text-base truncate">{endpoint.path}</span>
+                      <span class="text-10-regular text-text-muted shrink-0">{endpoint.requestCount}</span>
+                    </div>
+                    <For each={endpoint.operations}>
+                      {(operation) => (
+                        <div class="flex flex-col gap-1 pl-2">
+                          <div class="flex items-center gap-1.5">
+                            <span class="text-11-medium text-text-accent shrink-0">{operation.method}</span>
+                            <Show when={operation.protocol}>
+                              <span class="text-10-regular text-text-muted">{operation.protocol?.toUpperCase()}</span>
+                            </Show>
+                            <Show when={operation.operation}>
+                              <span class="text-11-regular text-text-muted truncate">{operation.operation}</span>
+                            </Show>
+                            <span class="text-10-regular text-text-muted shrink-0">({operation.requests.length})</span>
+                          </div>
+                          <For each={operation.requests}>
+                            {(request) => {
+                              const id = request.id
+                              const v = request as unknown as Record<string, unknown>
+                              const status = String(v.status ?? "unknown")
+                              return (
+                                <div class="flex flex-col gap-0.5 pl-2">
+                                  <div
+                                    class="flex items-center gap-1.5 min-w-0 cursor-pointer rounded hover:bg-surface-raised-base"
+                                    onClick={() => void toggleEndpoint(v)}
+                                  >
+                                    <span class="text-11-regular text-text-muted shrink-0">
+                                      {expandedEp()[id] ? "▾" : "▸"}
+                                    </span>
+                                    <span class={`w-1.5 h-1.5 rounded-full shrink-0 ${endpointStatusColor(status)}`} />
+                                    <span class="text-11-regular text-text-muted truncate">{id.slice(-8)}</span>
+                                    <span class="text-10-regular text-text-muted shrink-0">{status}</span>
+                                    <Show when={status === "failed" && !retryQueued()[id]}>
+                                      <button
+                                        type="button"
+                                        disabled={retryingRequestID() === id}
+                                        class="ml-auto shrink-0 rounded border border-border-base px-1.5 py-0.5 text-10-medium hover:bg-surface-raised-base disabled:opacity-50"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          void retryCapturedRequest(id)
+                                        }}
+                                      >
+                                        {retryingRequestID() === id ? "Retrying…" : "Retry"}
+                                      </button>
+                                    </Show>
+                                  </div>
+                                  <Show when={retryNotices()[id]}>
+                                    <span class="pl-5 text-10-regular text-text-weak">{retryNotices()[id]}</span>
+                                  </Show>
+                                  <Show when={retryErrors()[id]}>
+                                    <span role="alert" class="pl-5 text-10-regular text-icon-danger-base">
+                                      Retry failed: {retryErrors()[id]}
+                                    </span>
+                                  </Show>
+                                  <Show when={expandedEp()[id]}>
+                                    <div class="flex flex-col gap-0.5 pl-5">
+                                      <For each={obsTree()[id]?.params ?? []}>
+                                        {(p) => (
+                                          <div class="flex flex-col">
+                                            <span class="text-11-regular text-text-muted">{p.name}</span>
+                                            <For each={p.byCredential}>
+                                              {(bc) => (
+                                                <div class="flex gap-1.5 pl-3">
+                                                  <span class="text-11-medium text-text-accent shrink-0">
+                                                    {credLabel(bc.credentialID)}
+                                                  </span>
+                                                  <span class="text-11-regular truncate">
+                                                    → {bc.redacted ? "[redacted]" : bc.values.join(", ")}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </For>
+                                          </div>
+                                        )}
+                                      </For>
+                                      <Show when={obsTree()[id] && obsTree()[id]!.params.length === 0}>
+                                        <span class="text-11-regular text-text-weak pl-3">(no observed values)</span>
+                                      </Show>
+                                    </div>
+                                  </Show>
+                                </div>
+                              )
+                            }}
+                          </For>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </For>
+            </div>
+          )}
+        </For>
+      </Show>
+      <For each={activeSection() === "endpoints" ? [] : items()}>
         {(item) => {
           const v = item as Record<string, unknown>
           return (
