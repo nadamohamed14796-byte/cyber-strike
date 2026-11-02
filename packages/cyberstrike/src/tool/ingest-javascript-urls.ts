@@ -15,7 +15,11 @@ const MAX_REDIRECTS = 5
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
   urls: z.array(z.string().trim().min(1)).default([])
-    .describe("Optional JavaScript asset or HTML page URLs from the URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths. Leave empty to resume pending/retryable URLs saved in the existing target manifest."),
+    .describe("Optional plain URL list for backward compatibility; the shared `source` value is applied to each URL. Pass actual HTTP(S) URLs, not local file paths."),
+  url_sources: z.array(z.object({
+    url: z.string().trim().min(1).describe("Discovered HTTP(S) JavaScript asset or HTML page URL."),
+    source: z.string().trim().min(1).describe("Exact discovery source for this URL, e.g. urls.txt, crawler, hackbrowser, browser-extension, observed-request, HTML script src, ES module import, source map, local artifact, or user supplied."),
+  })).default([]).describe("Source-aware URL inputs. Use one entry for each URL/source observation; the same URL may appear with several sources. Fetches are deduplicated by normalized URL while all source labels are merged into the single manifest record. HTML pages are parsed as inert containers for inline scripts and external script src URLs. Leave both `urls` and `url_sources` empty to resume pending/retryable work saved in the manifest."),
   source: z.string().trim().min(1).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   force_refresh: z.boolean().default(false)
@@ -329,7 +333,7 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
+    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, browser/HackBrowser and extension captures, another tool, or links manually supplied by the user. Prefer `url_sources: [{ url, source }]` so each URL keeps its exact provenance; repeated URL/source observations merge into one manifest entry and are fetched once. The legacy `urls` array remains supported and applies the shared `source` label to each item. Leave both arrays empty to resume eligible pending/retryable work.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. The complete response body is downloaded and processed regardless of URL-list length or file size; no URL-count, batch, aggregate-byte, per-file-byte, URL-string-length, or provenance-string-length cap is imposed. The invocation processes the full dynamic worklist (including discovered imports and source maps), writing progress and manifest updates as it goes. Cancellation leaves unfinished URLs pending for resume.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports, literal CommonJS/System.import loaders, Worker/importScripts references, HTML script src, modulepreload/preload-as-script links, and source-map references are discovered and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -435,8 +439,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
 
-    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
-    const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
+    const suppliedURLs = [...params.urls, ...params.url_sources.map((item) => item.url)]
+    const invalidCount = suppliedURLs.filter((url) => !normalizeURL(url)).length
+    const inputURLs = [...new Set(suppliedURLs.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const localJavaScriptInputsAtStart = inputURLs.length === 0 ? await hasLocalJavaScriptInputs(root) : false
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
@@ -476,7 +481,14 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       markPending(url, params.force_refresh)
       return true
     }
-    for (const url of inputURLs) addSource(url, params.source)
+    for (const rawURL of params.urls) {
+      const url = normalizeURL(rawURL)
+      if (url) addSource(url, params.source)
+    }
+    for (const item of params.url_sources) {
+      const url = normalizeURL(item.url)
+      if (url) addSource(url, item.source)
+    }
     for (const item of manifest.assets) {
       if (!shouldResumeAsset(item)) continue
       const url = normalizeURL(item.url)
