@@ -6,7 +6,6 @@ export interface DispatchChild {
 export type ProxyDispatchDecision =
   | { allowed: true }
   | { allowed: false; reason: "duplicate"; existingTaskID?: string }
-  | { allowed: false; reason: "specialist_budget"; existingSpecialists: string[] }
 
 const REQUEST_MARKER = (requestID: string) => "[request:" + requestID + "]"
 const AGENT_MARKER = (agentID: string) => "[agent:" + agentID + "]"
@@ -21,7 +20,6 @@ export function evaluateProxyRequestDispatch(input: {
   agentID: string
   children: DispatchChild[]
   reservedAgentIDs?: string[]
-  maxSpecialists?: number
 }): ProxyDispatchDecision {
   const marker = REQUEST_MARKER(input.requestID)
   const scoped = input.children.filter((child) => child.title.includes(marker))
@@ -32,24 +30,8 @@ export function evaluateProxyRequestDispatch(input: {
     return { allowed: false, reason: "duplicate" }
   }
 
-  const isSpecialist = input.agentID.startsWith("proxy-tester-")
-  if (!isSpecialist) return { allowed: true }
-
-  const persisted = new Set<string>()
-  for (const child of scoped) {
-    const match = child.title.match(/\[agent:(proxy-tester-[^\]]+)\]/)
-    if (match) persisted.add(match[1])
-  }
-  for (const agentID of input.reservedAgentIDs ?? []) {
-    if (agentID.startsWith("proxy-tester-")) persisted.add(agentID)
-  }
-  const maxSpecialists = input.maxSpecialists ?? 2
-  if (persisted.size >= maxSpecialists) {
-    return {
-      allowed: false,
-      reason: "specialist_budget",
-      existingSpecialists: [...persisted].sort(),
-    }
-  }
+  // Distinct evidence-supported lanes are not subject to a total-count budget.
+  // Concurrency is bounded separately by AgentTaskConcurrency; this guard only
+  // prevents the same lane from being dispatched twice for one request.
   return { allowed: true }
 }

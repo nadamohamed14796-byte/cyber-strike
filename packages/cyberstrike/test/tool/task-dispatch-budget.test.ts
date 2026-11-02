@@ -33,41 +33,66 @@ test("allows the same specialist for a different captured request", () => {
   expect(result).toEqual({ allowed: true })
 })
 
-test("caps automatic specialist fan-out at two independent lanes per request", () => {
+test("allows every independently supported specialist lane after earlier lanes complete", () => {
   const children = [
     { id: "ses_idor", title: "Ownership check [request:req_three] [agent:proxy-tester-idor]" },
     { id: "ses_authz", title: "Access boundary check [request:req_three] [agent:proxy-tester-authz]" },
+    { id: "ses_injection", title: "Injection sink check [request:req_three] [agent:proxy-tester-injection]" },
+    { id: "ses_ssrf", title: "SSRF destination check [request:req_three] [agent:proxy-tester-ssrf]" },
   ]
-  const result = evaluateProxyRequestDispatch({
-    requestID: "req_three",
-    agentID: "proxy-tester-injection",
-    children,
-  })
-  expect(result).toEqual({
-    allowed: false,
-    reason: "specialist_budget",
-    existingSpecialists: ["proxy-tester-authz", "proxy-tester-idor"],
-  })
+  const remaining = [
+    "proxy-tester-mass-assignment",
+    "proxy-tester-authn",
+    "proxy-tester-business-logic",
+    "proxy-tester-file-attacks",
+    "proxy-tester-llm",
+  ]
+
+  for (const agentID of remaining) {
+    expect(evaluateProxyRequestDispatch({ requestID: "req_three", agentID, children })).toEqual({ allowed: true })
+  }
 })
 
-test("counts in-flight reservations so concurrent model tool calls cannot exceed the budget", () => {
-  const result = evaluateProxyRequestDispatch({
+test("allows distinct in-flight reservations while rejecting the same reserved lane", () => {
+  const reservations = ["proxy-tester-idor", "proxy-tester-authz"]
+
+  expect(evaluateProxyRequestDispatch({
     requestID: "req_four",
     agentID: "proxy-tester-injection",
     children: [],
-    reservedAgentIDs: ["proxy-tester-idor", "proxy-tester-authz"],
-  })
-  expect(result.allowed).toBe(false)
-  if (!result.allowed) expect(result.reason).toBe("specialist_budget")
+    reservedAgentIDs: reservations,
+  })).toEqual({ allowed: true })
+
+  expect(evaluateProxyRequestDispatch({
+    requestID: "req_four",
+    agentID: "proxy-tester-idor",
+    children: [],
+    reservedAgentIDs: reservations,
+  })).toEqual({ allowed: false, reason: "duplicate" })
 })
 
-test("allows one analyzer plus up to two specialist lanes", () => {
-  const result = evaluateProxyRequestDispatch({
+test("allows one analyzer plus all distinct specialist lanes", () => {
+  const children = [
+    { id: "ses_analyzer", title: "Endpoint analysis [request:req_five] [agent:proxy-analyzer]" },
+    { id: "ses_idor", title: "Ownership check [request:req_five] [agent:proxy-tester-idor]" },
+    { id: "ses_authz", title: "Access check [request:req_five] [agent:proxy-tester-authz]" },
+  ]
+  expect(evaluateProxyRequestDispatch({
     requestID: "req_five",
-    agentID: "proxy-tester-idor",
-    children: [
-      { id: "ses_analyzer", title: "Endpoint analysis [request:req_five] [agent:proxy-analyzer]" },
-    ],
-  })
-  expect(result).toEqual({ allowed: true })
+    agentID: "proxy-tester-llm",
+    children,
+  })).toEqual({ allowed: true })
+})
+
+test("allows analyzer dispatch after specialist lanes without counting it as a tester", () => {
+  const children = [
+    { id: "ses_idor", title: "Ownership check [request:req_six] [agent:proxy-tester-idor]" },
+    { id: "ses_authz", title: "Access check [request:req_six] [agent:proxy-tester-authz]" },
+    { id: "ses_injection", title: "Injection check [request:req_six] [agent:proxy-tester-injection]" },
+  ]
+  expect(evaluateProxyRequestDispatch({
+    requestID: "req_six",
+    agentID: "proxy-analyzer",
+    children,
+  })).toEqual({ allowed: true })
 })

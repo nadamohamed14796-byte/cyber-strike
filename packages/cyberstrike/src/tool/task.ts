@@ -41,7 +41,8 @@ import {
 const MAX_PREPEND_BYTES = 48 * 1024
 
 // Reserve request-scoped Proxy Agent lanes before the first await so concurrent
-// Task calls cannot race past the per-request tester budget.
+// Task calls cannot dispatch the same lane twice. Distinct supported lanes remain
+// unbounded in total; AgentTaskConcurrency bounds simultaneous execution.
 const proxyRequestDispatchReservations = new Map<string, Set<string>>()
 
 
@@ -281,21 +282,16 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             agentID: params.subagent_type,
             children,
             reservedAgentIDs: alreadyReserved,
-            maxSpecialists: 2,
           })
           if (!decision.allowed) {
             reservations.delete(params.subagent_type)
             if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
-            const existingTaskID = decision.reason === "duplicate" ? decision.existingTaskID : undefined
+            const existingTaskID = decision.existingTaskID
             return {
-              title: decision.reason === "duplicate"
-                ? "Duplicate specialist dispatch skipped"
-                : "Specialist dispatch budget reached",
-              output: decision.reason === "duplicate"
-                ? existingTaskID
-                  ? `This exact lane was already dispatched for request ${requestID}. Do not create another task. Resume the existing task with task_id: ${existingTaskID} when its result is needed.`
-                  : `This lane is already being dispatched for request ${requestID}. Do not create another task.`
-                : `Request ${requestID} already has two distinct specialist lanes (${decision.existingSpecialists.join(", ")}). Do not fan out further. Preserve other hypotheses for later evidence instead of creating more agents.`,
+              title: "Duplicate specialist dispatch skipped",
+              output: existingTaskID
+                ? `This exact lane was already dispatched for request ${requestID}. Do not create another task. Resume the existing task with task_id: ${existingTaskID} when its result is needed.`
+                : `This lane is already being dispatched for request ${requestID}. Do not create another task.`,
               metadata: {
                 sessionId: existingTaskID ?? "",
                 model: { providerID: "", modelID: "" },
