@@ -6,7 +6,7 @@ version: "1.0.0"
 tags: [database, redis, mongodb, postgresql, mysql, elasticsearch, opensearch, exposure]
 tech_stack: [tcp, tls, redis, mongodb, postgresql, mysql, elasticsearch, opensearch]
 prerequisites: ["Explicitly authorized host/service and allowed port range", "Prefer configuration review and read-only checks"]
-chains_with: [recon-port-service-discovery, cloud-assessment, attack-nosqli, attack-information-disclosure, attack-triage-validation]
+chains_with: [recon-master, cloud-assessment, attack-nosqli, attack-information-disclosure, attack-triage-validation]
 ---
 
 # Database and Search Service Exposure Review
