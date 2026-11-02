@@ -146,6 +146,14 @@ describe("classifyFindingTitle", () => {
     test("weak password", () => {
       expect(classifyFindingTitle("Weak Password stored in plaintext")).toBe("authn")
     })
+
+    test("explicit authentication bypass", () => {
+      expect(classifyFindingTitle("Authentication Bypass in login flow")).toBe("authn")
+    })
+
+    test("OTP bypass", () => {
+      expect(classifyFindingTitle("OTP Bypass in verification flow")).toBe("authn")
+    })
   })
 
   describe("authz class", () => {
@@ -159,6 +167,14 @@ describe("classifyFindingTitle", () => {
 
     test("unauthenticated access to", () => {
       expect(classifyFindingTitle("Unauthenticated Access to /admin/settings")).toBe("authz")
+    })
+
+    test("explicit authorization bypass", () => {
+      expect(classifyFindingTitle("Authorization Bypass in admin endpoint")).toBe("authz")
+    })
+
+    test("access-control bypass", () => {
+      expect(classifyFindingTitle("Access Control Bypass for admin action")).toBe("authz")
     })
   })
 
@@ -191,6 +207,10 @@ describe("classifyFindingTitle", () => {
 
     test("information disclosure (not in any class)", () => {
       expect(classifyFindingTitle("Sensitive Information in response headers")).toBeNull()
+    })
+
+    test("generic auth bypass remains ambiguous without a boundary qualifier", () => {
+      expect(classifyFindingTitle("Auth Bypass in account endpoint")).toBeNull()
     })
   })
 
