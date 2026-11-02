@@ -34,10 +34,13 @@ When present, read additionalScenarios from the JavaScript correlation graph/tes
 For every imported record retain:
 - stable source record ID and source/tool name/version;
 - observation time and run ID;
+- `first_seen`, `last_seen`, `last_checked`, freshness/TTL, scope evidence, and attribution confidence when available; keep these separate from security confidence;
 - asset, origin, route template, HTTP method, parameter location/name, content hash, identity/role/tenant context when known;
 - evidence path or request/response ID, redaction state, and source lineage;
 - status (observed, inferred, candidate, confirmed, refuted, inconclusive, blocked, not_run);
 - confidence plus the reason for it.
+
+For candidate handoffs, retain `observed_signal`, bounded `hypothesis`, `negative_control_needed`, `candidate_skill`, `active_test_allowed`, prerequisites/authorization basis, priority rationale, exact blocked reason, and `next_action` when applicable. These are fields on the existing canonical graph/ledger record—not a second recon candidate queue.
 
 Normalize host case, default ports, URL fragments, path templates, parameter names/locations, and equivalent representations only where semantics are preserved. Never erase method, origin, API version, auth context, tenant/object boundary, content type, or meaningful state differences merely to increase deduplication.
 
