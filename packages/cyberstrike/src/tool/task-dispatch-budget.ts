@@ -8,8 +8,8 @@ export type ProxyDispatchDecision =
   | { allowed: false; reason: "duplicate"; existingTaskID?: string }
   | { allowed: false; reason: "specialist_budget"; existingSpecialists: string[] }
 
-const REQUEST_MARKER = (requestID: string) => \`[request:\${requestID}]\`
-const AGENT_MARKER = (agentID: string) => \`[agent:\${agentID}]\`
+const REQUEST_MARKER = (requestID: string) => "[request:" + requestID + "]"
+const AGENT_MARKER = (agentID: string) => "[agent:" + agentID + "]"
 
 /**
  * Runtime guard for automatic Proxy Agent request-scoped delegation.
