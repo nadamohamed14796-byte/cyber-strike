@@ -50,6 +50,7 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
     store.permission[sessionID] !== undefined ||
     store.question[sessionID] !== undefined ||
     store.session_status[sessionID] !== undefined ||
+    store.session_queue_status[sessionID] !== undefined ||
     store.request[sessionID] !== undefined ||
     store.web_credential[sessionID] !== undefined ||
     store.web_role[sessionID] !== undefined ||
@@ -73,6 +74,7 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
       delete draft.permission[sessionID]
       delete draft.question[sessionID]
       delete draft.session_status[sessionID]
+      delete draft.session_queue_status[sessionID]
       delete draft.request[sessionID]
       delete draft.web_credential[sessionID]
       delete draft.web_role[sessionID]
@@ -198,6 +200,11 @@ export function applyDirectoryEvent(input: {
     case "session.status": {
       const props = event.properties as { sessionID: string; status: SessionStatus }
       input.setStore("session_status", props.sessionID, reconcile(props.status))
+      break
+    }
+    case "session.queue.status": {
+      const props = event.properties as { sessionID: string; status: State["session_queue_status"][string] }
+      input.setStore("session_queue_status", props.sessionID, reconcile(props.status))
       break
     }
     case "message.updated": {
