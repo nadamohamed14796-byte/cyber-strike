@@ -229,6 +229,23 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           `Request context ${requestID} does not exist in the current root session. Refusing to start a subagent with unrelated or stale request evidence.`,
         )
       }
+      if (
+        callerID === "proxy-agent" &&
+        !requestID &&
+        !params.task_id &&
+        !ctx.extra?.bypassAgentCheck &&
+        (params.subagent_type === "proxy-analyzer" || params.subagent_type.startsWith("proxy-tester-"))
+      ) {
+        return {
+          title: "Request-specific dispatch blocked",
+          output: "A Proxy Agent analyzer/tester task requires the exact current request_id from the server-built Request Task Identity block. No agent was started. Re-read the current request context and retry with that request_id.",
+          metadata: {
+            sessionId: "",
+            model: { providerID: "", modelID: "" },
+            outcome: "clean" as const,
+          },
+        }
+      }
 
       let proxyDispatchReservation: { key: string; agentID: string } | undefined
       if (
