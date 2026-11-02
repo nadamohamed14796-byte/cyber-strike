@@ -1,4 +1,4 @@
-Runtime access: load `recon-methodology`, then read this file using the exact path listed in that skill's returned `<skill_files>` and its returned `Base directory`. This is a companion reference, not a skill to load separately.
+Runtime access: load `recon-master`, then read this file using the exact path listed in that skill's returned `<skill_files>` and its returned `Base directory`. This is a companion reference, not a skill to load separately.
 
 # Recon Phase Matrix: State, Artifacts, and Completion
 
