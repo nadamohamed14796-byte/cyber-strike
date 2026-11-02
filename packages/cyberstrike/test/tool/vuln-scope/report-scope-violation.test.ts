@@ -43,12 +43,14 @@ describe("reportScopeViolation", () => {
 
     test("authn tester cannot report an authorization-bypass title under the shared category", () => {
       const result = reportScopeViolation("proxy-tester-authn", "auth bypass", "Authorization Bypass in admin endpoint")
-      expect(result?.inferred).toBe("authz")
+      expect(result).not.toBeNull()
+      expect(result?.cls).toBe("authn")
     })
 
     test("authz tester cannot report an authentication-bypass title under the shared category", () => {
       const result = reportScopeViolation("proxy-tester-authz", "auth bypass", "Authentication Bypass in login flow")
-      expect(result?.inferred).toBe("authn")
+      expect(result).not.toBeNull()
+      expect(result?.cls).toBe("authz")
     })
   })
 
