@@ -149,3 +149,42 @@ For every phase, report selected method(s), availability/version, run status, ar
 - If a permitted OpenAPI/Swagger contract or Postman collection is available, merge its operations into the existing endpoint inventory and route security-boundary differences to `attack-api-contract-testing`. Do not generate one inventory per spec/tool.
 - If JavaScript reveals cross-window messaging, service-worker caching, opener/navigation trust, or cross-origin state behavior, route only those evidence-matched leads to `attack-browser-boundary-security`; keep actual runtime traffic and source location attached.
 - Run dependency/CVE analysis only when an authorized source checkout or source artifacts provide reliable manifests/lockfiles. Prefer file-based read-only scanners already available; do not install or execute target dependencies just to scan them. Record advisory/database freshness and separate version match, deployment, reachability, and confirmed impact.
+
+## Version freshness and release verification
+
+Tool versions in this document are examples/reference data, not a promise that a local binary is current. Before execution, resolve the actual executable (`command -v`/absolute path), run its own version and help command, and compare the installed version with the official upstream release page or documented package channel. Record both installed version and checked upstream version/date in run metadata. Prefer current stable releases compatible with the supported OS/runtime; do not blindly upgrade pinned dependencies, alter lockfiles, or install from untrusted mirrors. If release information cannot be verified, label the version unverified and do not describe it as latest.
+
+Version refresh checklist for each selected tool:
+1. Identify exact binary/package and installation source.
+2. Read installed version output and the installed version's help.
+3. Check official upstream release notes/changelog and supported platform/runtime.
+4. Compare syntax, defaults, output schema, rate/concurrency behavior, and removed/deprecated flags.
+5. Update this catalog only with verified version metadata and source URL; keep the runtime decision dynamic.
+6. Run a harmless local/help or fixture check before using it against an authorized target.
+
+## Recon flag decision matrix
+
+| Need / condition | Prefer | Avoid / gate |
+|---|---|---|
+| Fast initial pass or urgent triage | Passive sources, known-host validation, small targeted inputs, machine-readable output | Broad brute force before establishing baseline |
+| Large authorized wildcard scope | All documented passive sources and batching; use broad-source flags only after verifying exact semantics and request budget | Assuming `-all` means safe, complete, or equivalent across tools |
+| Nested/delegated naming evidence | Documented recursive mode with deduplication and a recursion stop condition | Unbounded recursion or repeated expansion of the same roots |
+| Active name discovery permitted | Evidence-derived wordlist, conservative rate/concurrency, explicit scope | Large default wordlists or high-rate brute force without policy approval |
+| Explicit IP/CIDR port assessment permitted | Evidence-derived/common ports first; full range only with explicit justification | Full-range scans of hostnames/shared provider ranges by default |
+| Technology identified | Relevant technology-specific checks and fingerprints | Framework-specific flags based on a guess/banner alone |
+| Fragile/rate-limited service | Lower concurrency, backoff, fresh-result reuse, stop on repeated throttling | Increasing threads/retries to force completion |
+| Need response metadata | HEAD only if reliable; otherwise GET | Assuming HEAD behavior equals GET |
+| Read-only API operation documented as POST | POST with exact content type/schema and safe fixture, if policy permits | Replacing normal GET discovery with arbitrary POST bodies |
+| State-changing API behavior | Separate explicitly authorized test workflow and cleanup plan | PUT/PATCH/DELETE in routine recon |
+
+## HTTP request method policy
+
+- GET: default for ordinary page, asset, robots/sitemap, documentation, and crawler discovery.
+- HEAD: optional optimization for metadata when the service responds consistently; verify/fallback to GET.
+- POST: only where application/API semantics require it and the operation is read-only or uses a safe test fixture under explicit policy.
+- PUT/PATCH/DELETE: never routine reconnaissance; require separate explicit authorization and a controlled cleanup plan.
+- Preserve each method as a distinct operation with request body/content type, parameters, auth context, and observed-vs-inferred provenance.
+
+## Recon tool selection record
+
+For each selected tool, save capability requested, evidence gap, installed version, official version checked, verified flags/options, input scope, rate/concurrency/timeout, output format, exit status, artifact path, and reason for selection. For alternatives, state the distinct coverage or recovery value. Do not run equivalent tools just to increase counts.
