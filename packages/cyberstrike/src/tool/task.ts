@@ -253,6 +253,17 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           reservations = new Set<string>()
           proxyRequestDispatchReservations.set(reservationKey, reservations)
         }
+        if (reservations.has(agent.id)) {
+          return {
+            title: "Duplicate specialist dispatch skipped",
+            output: `This lane is already being dispatched for request ${requestID}. Do not create another task.`,
+            metadata: {
+              sessionId: "",
+              model: { providerID: "", modelID: "" },
+              outcome: "clean" as const,
+            },
+          }
+        }
         const alreadyReserved = [...reservations]
         reservations.add(agent.id)
         try {
