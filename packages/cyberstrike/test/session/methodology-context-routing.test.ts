@@ -26,7 +26,7 @@ describe("methodology is not an agent dispatch gate", () => {
 
   test("captured requests are sent to the Proxy Agent without a Recon-phase precondition", async () => {
     const routeSource = await Bun.file(`${import.meta.dir}/../../src/server/routes/session.ts`).text()
-    const brokerStart = routeSource.indexOf("async function getOrCreateProxyBrokerSession")
+    const brokerStart = routeSource.indexOf("async function getOrCreateExtensionTaskSession")
     const analyzeStart = routeSource.indexOf("async function analyzeCapturedRequest", brokerStart)
     expect(brokerStart).toBeGreaterThanOrEqual(0)
     expect(analyzeStart).toBeGreaterThan(brokerStart)
@@ -36,7 +36,7 @@ describe("methodology is not an agent dispatch gate", () => {
 
     const analyzeEnd = routeSource.indexOf("\\nasync function ", analyzeStart + 1)
     const analysisSource = routeSource.slice(analyzeStart, analyzeEnd < 0 ? undefined : analyzeEnd)
-    expect(analysisSource).toContain("getOrCreateProxyBrokerSession")
+    expect(analysisSource).toContain("getOrCreateExtensionTaskSession")
     expect(analysisSource).toContain("SessionPrompt.prompt")
     expect(analysisSource).not.toContain("Methodology.computeState")
     expect(analysisSource).not.toContain("MethodologyContext.generate")
