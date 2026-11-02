@@ -297,7 +297,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           }
           proxyDispatchReservation = { key: reservationKey, agentID: params.subagent_type }
         } catch (error) {
-          reservations.delete(agent.id)
+          reservations.delete(params.subagent_type)
           if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
           throw error
         }
