@@ -95,12 +95,19 @@ export namespace Normalize {
    * tests can call orchestrate() directly with InMemoryTemplateStore.
    */
   export async function run(input: RunInput): Promise<RunResult> {
-    const client =
-      input.client ??
-      (await createProviderClient({
-        providerID: input.providerID,
-        modelID: input.modelID,
-      }))
+    // Keep the common Tier 1 / Tier 2 path provider-free. Creating the
+    // provider client before parsing forced every captured request — including
+    // simple routes such as "/" — through model/provider resolution even when
+    // deterministic normalization had already solved the path.
+    const client: Tier3Client = input.client ?? {
+      async classify(classifyInput) {
+        const providerClient = await createProviderClient({
+          providerID: input.providerID,
+          modelID: input.modelID,
+        })
+        return providerClient.classify(classifyInput)
+      },
+    }
 
     const orchestrateInput: OrchestrateInput = {
       raw: input.raw,
