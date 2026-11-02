@@ -14,6 +14,7 @@ import type {
   QuestionRequest,
   Session,
   SessionStatus,
+  SessionQueueStatus,
   Todo,
   VcsInfo,
   Vulnerability,
@@ -46,6 +47,9 @@ export type State = {
   sessionTotal: number
   session_status: {
     [sessionID: string]: SessionStatus
+  }
+  session_queue_status: {
+    [sessionID: string]: SessionQueueStatus
   }
   session_diff: {
     [sessionID: string]: FileDiff[]
