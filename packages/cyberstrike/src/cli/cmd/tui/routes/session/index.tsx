@@ -128,13 +128,13 @@ export function Session() {
       .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   })
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
-  // Extension captures use one persistent child session titled Agent Proxy.
-  // Only that broker is interactive; specialist tester sessions nested beneath
-  // it remain read-only in the TUI. The stable child title survives restarts.
+  // Extension captures use one persistent child session titled Extension Agent Tasks.
+  // The orchestrator is interactive; specialist sessions nested beneath it remain read-only.
   const proxyAgentSession = createMemo(
     () =>
       !!session()?.parentID &&
-      (session()?.title === "Agent Proxy" ||
+      (session()?.title === "Extension Agent Tasks" ||
+        session()?.title === "Agent Proxy" ||
         session()?.title === "Extension Proxy Broker (@proxy-agent subagent)" ||
         messages().some((message) => message.role === "user" && message.agent === "proxy-agent")),
   )
