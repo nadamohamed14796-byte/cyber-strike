@@ -39,6 +39,7 @@ function DirectoryDataProvider(props: ParentProps<{ directory: string }>) {
       onNavigateToSession={(sessionID: string) => navigate(`/${params.dir}/session/${sessionID}`)}
       onSessionHref={(sessionID: string) => `/${params.dir}/session/${sessionID}`}
       onSyncSession={(sessionID: string) => sync.session.sync(sessionID)}
+      onSyncTodo={(sessionID: string) => sync.session.todo(sessionID)}
       agentColor={resolveAgentColor}
     >
       <LocalProvider>{props.children}</LocalProvider>
