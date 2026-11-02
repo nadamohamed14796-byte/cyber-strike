@@ -7,7 +7,7 @@ author: "CyberStrike contributors"
 tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, asn, cidr, origin-ip, vhost, ports, services, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, error-logs, asset-inventory, scope, evidence, tool-selection]
 tech_stack: [dns, http, tls, tcp, javascript, api, cloud, browser, git, smtp]
 prerequisites: []
-chains_with: [community-tool-selection, attack-web-recon, attack-javascript-analysis, attack-shadow-api, attack-subdomain-takeover, attack-api-contract-testing]
+chains_with: [community-tool-selection, attack-javascript-analysis, attack-shadow-api, attack-subdomain-takeover, attack-api-contract-testing]
 ---
 
 # Recon Master
@@ -343,6 +343,22 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - HTTP/TLS fingerprint and random-host control.
 - Clear reason for ownership attribution and scope classification.
 - A vulnerability report must include separate proof of impact; subdomain discovery alone is not a finding.
+
+#### Source coverage and count semantics
+
+For every source family, retain an explicit outcome: `not-attempted`, `attempted`, `succeeded`, `zero-results`, `failed`, or `blocked`. Include the observation time, relevant query/configuration, exit status or response state, and a concise failure/block reason. A successful zero-result response is not a failure and does not prove that the wider asset set is empty; an unavailable or blocked source is a coverage gap, not a zero result.
+
+Keep these counts separate:
+- Raw source candidates before normalization.
+- Unique normalized hostnames after deduplication.
+- Scope-eligible candidates after applying inclusions and exclusions.
+- DNS-resolved candidates, with wildcard and transient-resolution outcomes separated.
+- HTTP/TLS-live hosts.
+- Assets with corroborated first-party attribution.
+
+Preserve the contributing source references when several sources identify the same hostname. Do not present raw candidate volume as verified asset coverage, and do not count a third-party/shared service as first-party merely because it appears in DNS, a certificate, or a shared IP range.
+
+Continue with independent, relevant sources while they can add meaningful coverage. Do not repeat an unchanged source/query after a deterministic failure or a completed zero-result response; choose a materially different source or record the unresolved coverage gap. There is no fixed candidate-count ceiling, but scope, rate, and safety controls remain authoritative.
 
 #### Chapter-specific implementation notes and resources
 
