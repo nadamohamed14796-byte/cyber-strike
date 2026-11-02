@@ -786,7 +786,7 @@ function WebContextPanelList() {
     const visited = new Set<string>()
     while (cursor?.parentID && !visited.has(cursor.id)) {
       visited.add(cursor.id)
-      if (cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") {
+      if (cursor.title === "Extension Agent Tasks" || cursor.title === "Agent Proxy" || cursor.title === "Extension Proxy Broker (@proxy-agent subagent)") {
         return cursor.parentID
       }
       cursor = all.find((item) => item.id === cursor?.parentID)
