@@ -186,8 +186,9 @@ describe("lazy tool registry snapshot reconciliation", () => {
       const boltStatusSpy = spyOn(MCP, "boltStatus").mockResolvedValue({} as any)
       const clientsSpy = spyOn(MCP, "clients").mockResolvedValue({ "test.server": client } as any)
       try {
-        await LazyToolRegistry.init()
-        await LazyToolRegistry.init()
+        // Exercise twenty consecutive agent turns: a stable MCP connection
+        // must reuse its schema snapshot instead of issuing twenty listTools calls.
+        for (let turn = 0; turn < 20; turn++) await LazyToolRegistry.init()
         expect(listCount).toBe(1)
 
         currentDefinitions = [{ name: "lookup_orders", description: "look up orders" }]
@@ -244,8 +245,8 @@ describe("lazy tool registry snapshot reconciliation", () => {
         [id]: { description: "ready", inputSchema: { type: "object" }, execute: async () => ({ content: [] }) },
       } as any)
       try {
-        await LazyToolRegistry.load([id])
-        await LazyToolRegistry.load([id])
+        // Repeated load_tool requests for an already-loaded tool must stay local.
+        for (let turn = 0; turn < 20; turn++) await LazyToolRegistry.load([id])
         expect(toolsSpy).toHaveBeenCalledTimes(1)
       } finally {
         toolsSpy.mockRestore()
