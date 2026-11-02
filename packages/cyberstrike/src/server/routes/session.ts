@@ -1726,6 +1726,19 @@ export const SessionRoutes = lazy(() =>
             body.page_visited_by?.length,
         )
         const isHTTPRequest = looksLikeHTTPRequest(body.text, hasCaptureMetadata)
+        // Resolve text-task agents before creating sessions or queue reservations.
+        // Invalid/ambiguous explicit selections must not leave orphan sessions.
+        let textAgentName: string | undefined
+        if (!isHTTPRequest) {
+          const requestedAgent = body.agent ?? (await Agent.defaultAgent())
+          textAgentName = await Agent.resolveID(requestedAgent)
+          if (!textAgentName) {
+            c.status(400)
+            return c.json({
+              error: `Unknown or ambiguous Agent "${requestedAgent}". Use a stable registered Agent ID.`,
+            })
+          }
+        }
         // Stamp the durable ID and intake-order barrier before any awaited work.
         // A later capture cannot take a broker slot while an earlier capture is
         // still resolving session/scope/normalization prerequisites.
@@ -1991,14 +2004,7 @@ export const SessionRoutes = lazy(() =>
             // Plain-text extension tasks are not automatically Proxy tasks. Honor an
             // explicit agent selection; otherwise use the configured default agent.
             // HTTP captures continue through the dedicated proxy orchestrator above.
-            const requestedAgent = body.agent ?? (await Agent.defaultAgent())
-            const agentName = await Agent.resolveID(requestedAgent)
-            if (!agentName) {
-              c.status(400)
-              return c.json({
-                error: `Unknown or ambiguous Agent "${requestedAgent}". Use a stable registered Agent ID.`,
-              })
-            }
+            const agentName = textAgentName!
             const brokerSession = await getOrCreateExtensionTaskSession({
               parentSessionID: activeSessionID,
             })
