@@ -300,7 +300,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const key = keyFor(directory, sessionID)
           return runInflight(inflightTodo, key, () =>
             retry(() => client.session.todo({ sessionID })).then((todo) => {
-              setStore("todo", sessionID, reconcile(todo.data ?? [], { key: "id" }))
+              // A live todo.updated event may arrive while this initial snapshot is in flight.
+              // Never let that older HTTP response overwrite the newer event state.
+              if (store.todo[sessionID] !== undefined) return
+              setStore("todo", sessionID, reconcile(todo.data ?? [], { key: "content" }))
             }),
           )
         },
