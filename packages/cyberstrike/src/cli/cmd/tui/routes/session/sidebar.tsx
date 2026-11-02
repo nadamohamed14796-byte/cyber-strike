@@ -523,7 +523,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               </box>
             </Show>
             {/* LSP section hidden — will enable for source code review */}
-            <Show when={todo().length > 0 && todo().some((t) => t.status !== "completed")}>
+            <Show when={todo().length > 0}>
               <box>
                 <box
                   flexDirection="row"
