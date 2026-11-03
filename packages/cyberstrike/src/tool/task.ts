@@ -13,6 +13,8 @@ import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
 import { Request } from "../session/request"
 import { Vulnerability } from "../session/vulnerability"
+import { TargetMemory } from "../target"
+import { reconPhaseGate } from "../target/recon-gate"
 import { CoverageNote } from "../session/coverage-note"
 import { WebCredential } from "../session/web/web-credential"
 import { Observation } from "../session/observation"
@@ -134,6 +136,19 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         const finding = Vulnerability.get(rootSessionID).find((item) => item.id === findingID)
         if (!finding) {
           throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " was not found in the current session.")
+        }
+        const workspace = finding.target_id
+          ? TargetMemory.list().find((item) => item.id === finding.target_id)
+          : undefined
+        if (!workspace) {
+          throw new Error("Impact Hunter dispatch is blocked: finding is not linked to an existing target workspace.")
+        }
+        const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
+        if (!testingGate.allowed) {
+          throw new Error(
+            "Impact Hunter dispatch is blocked because the explicit vulnerability_testing checkpoint is not active: " +
+            testingGate.reason,
+          )
         }
 
         const requestIDsInPrompt = (promptField("supporting_request_ids") ?? "")
