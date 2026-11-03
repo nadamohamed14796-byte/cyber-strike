@@ -101,6 +101,7 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
         resolve("dark")
       }, 1000)
     } catch {
+      cleanup()
       resolve("dark")
     }
   })
