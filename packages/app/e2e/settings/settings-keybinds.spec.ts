@@ -211,7 +211,7 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
     await keybindButton.click()
     await expect(keybindButton).toHaveText(/press/i)
 
-    await page.keyboard.press(`${modKey}+Shift+KeyN`)
+    await page.keyboard.press(`${modKey}+Shift+KeyM`)
     await page.waitForTimeout(100)
 
     const newKeybind = await keybindButton.textContent()
@@ -221,7 +221,7 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
       const raw = localStorage.getItem("settings.v3")
       return raw ? JSON.parse(raw) : null
     })
-    expect(stored?.keybinds?.["session.new"]).toBe("mod+shift+n")
+    expect(stored?.keybinds?.["session.new"]).toBe("mod+shift+m")
 
     await closeDialog(page, dialog)
 
