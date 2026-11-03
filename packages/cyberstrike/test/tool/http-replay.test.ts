@@ -8,7 +8,7 @@ import { Batch } from "../../src/replay/batch"
 import { Send } from "../../src/replay/send"
 import { tmpdir } from "../fixture/fixture"
 
-test("structured and raw replay send nothing before explicit vulnerability-testing handoff", async () => {
+test("structured and raw replay send nothing before explicit active-testing handoff", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
