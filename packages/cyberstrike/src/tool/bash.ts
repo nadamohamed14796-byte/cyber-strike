@@ -1065,6 +1065,12 @@ export function parseScopedPortSpec(spec: string): number[] | undefined {
 }
 
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
+  const executableIndex = commandExecutableIndex(command)
+  if (executableIndex >= 0) {
+    const executable = command[executableIndex]!
+    const block = bundledAttackScriptBlockReason(executable, command.slice(executableIndex + 1))
+    if (block) throw new Error("Cannot run " + executable + ": " + block + " No command was started.")
+  }
   const scannerIndex = scannerExecutableIndex(command, commandText)
   if (scannerIndex < 0) {
     const executableIndex = commandExecutableIndex(command)
@@ -1106,10 +1112,6 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   }
   const scanner = path.basename(command[scannerIndex]!).toLowerCase()
   const args = command.slice(scannerIndex + 1)
-  const bundledScriptBlock = bundledAttackScriptBlockReason(scanner, args)
-  if (bundledScriptBlock) {
-    throw new Error("Cannot run " + scanner + ": " + bundledScriptBlock + " No command was started.")
-  }
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
   // Do not blanket-disable a scanner because of its name. Every explicit input
