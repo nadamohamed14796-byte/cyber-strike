@@ -47,7 +47,9 @@ jobs:
           git diff --exit-code -- .cyberstrike/skill/index.json || { git --no-pager diff -- .cyberstrike/skill/index.json; exit 1; }
 
       - name: Install Chromium for browser integration tests
-        run: bunx playwright install --with-deps chromium
+        run: |
+          PLAYWRIGHT_VERSION="$(node -p 'require("./package.json").devDependencies["@playwright/test"]')"
+          bunx "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
 
       - name: Run unit tests
         run: bun turbo test
