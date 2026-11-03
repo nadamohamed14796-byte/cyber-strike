@@ -52,6 +52,15 @@
     gap: 10px;
   }
 
+  &[data-nonblocking="true"] {
+    pointer-events: none;
+
+    [data-slot="toast-action"],
+    [data-slot="toast-close-button"] {
+      pointer-events: auto;
+    }
+  }
+
   &[data-opened] {
     animation: toastPopIn 150ms ease-out;
   }

@@ -112,6 +112,7 @@ export interface ToastOptions {
   variant?: ToastVariant
   duration?: number
   persistent?: boolean
+  nonBlocking?: boolean
   actions?: ToastAction[]
 }
 
@@ -122,6 +123,7 @@ export function showToast(options: ToastOptions | string) {
       toastId={props.toastId}
       duration={opts.duration}
       persistent={opts.persistent}
+      data-nonblocking={opts.nonBlocking ? "true" : undefined}
       data-variant={opts.variant ?? "default"}
     >
       <Show when={opts.icon}>

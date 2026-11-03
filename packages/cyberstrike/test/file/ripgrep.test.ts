@@ -129,7 +129,9 @@ test("file search rebuilds its index after edited and watched file events", asyn
         expect(scanCount).toBe(1)
         const editedPath = path.join(tmp.path, "edited.js")
         await Bun.write(editedPath, "edited")
+        // Internal edit tools publish both events for one logical file change.
         await Bus.publish(File.Event.Edited, { file: editedPath })
+        await Bus.publish(FileWatcher.Event.Updated, { file: editedPath, event: "add" })
         expect(await File.search({ query: "edited.js", dirs: false, limit: 10 })).toContain("edited.js")
         expect(scanCount).toBe(2)
         const watchedPath = path.join(tmp.path, "watched.js")

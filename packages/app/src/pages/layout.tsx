@@ -312,6 +312,7 @@ export default function Layout(props: ParentProps) {
         })
         toastId = showToast({
           persistent: true,
+          nonBlocking: true,
           icon: "download",
           title: language.t("toast.update.title"),
           description: language.t("toast.update.description", { version }),

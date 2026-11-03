@@ -397,7 +397,8 @@ export namespace File {
         if (!fetching && !activeScan) void startScan()
       }
 
-      const unsubscribeEdited = Bus.subscribe(Event.Edited, (event) => invalidate(event.properties.file))
+      // Write/edit tools publish File.Event.Edited and then one watcher update;
+      // the watcher event is the canonical inventory invalidation signal.
       const unsubscribeWatcher = Bus.subscribe(FileWatcher.Event.Updated, (event) => invalidate(event.properties.file))
 
       void startScan()
@@ -419,7 +420,6 @@ export namespace File {
         },
         async dispose() {
           disposed = true
-          unsubscribeEdited()
           unsubscribeWatcher()
           abort.abort()
           await activeScan?.catch(() => undefined)
