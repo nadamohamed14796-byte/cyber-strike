@@ -6,6 +6,7 @@ import { WebCredential } from "../session/web/web-credential"
 import { Session } from "../session"
 import { Network } from "../network/network"
 import { TargetMemory } from "../target"
+import { reconPhaseGate } from "../target/recon-gate"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // inject_probe (v1 — XSS only) — an EVIDENCE ENGINE, NOT an oracle.
@@ -1726,6 +1727,27 @@ export const InjectProbeTool = Tool.define("inject_probe", {
           "A configured target workspace and persisted authorization scope are required.",
         ].join("\n"),
         metadata: { scopeDenied: true, reason: targetAuthorization.reason },
+      }
+    }
+
+    if (!targetAuthorization.workspace) {
+      return {
+        title: "inject_probe — refused (target workspace)",
+        output: "No injection probes were sent because the persisted scope check did not resolve a canonical target workspace.",
+        metadata: { scopeDenied: true, reason: "target_workspace_unresolved" },
+      }
+    }
+    const testingGate = await reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        title: "inject_probe — refused (testing checkpoint)",
+        output: [
+          "No injection probes were sent.",
+          "URL: " + resolved.url.toString(),
+          "Reason: " + testingGate.reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before retrying.",
+        ].join("\\n"),
+        metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
       }
     }
 
