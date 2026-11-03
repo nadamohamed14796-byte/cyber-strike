@@ -1038,7 +1038,7 @@ Record the organization-owned mail domain and each observed MX, SPF, DKIM select
 #### Additional validation refinements
 
 ##### Mail-domain evidence and impact boundary
-For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact; validate with an authorized synthetic recipient/domain and do not send deceptive mail to real users. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.
+For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact. If recipient-side validation is required, hand the test plan to the authorized mail specialist for a separately approved synthetic recipient/domain; this Recon chapter sends no test mail. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.
 
 
 #### Additional references
