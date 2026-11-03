@@ -75,7 +75,10 @@ export const FileRoutes = lazy(() =>
         const limit = c.req.valid("query").limit
         const results = await File.search({
           query,
-          limit: limit ?? 10,
+          // Keep the HTTP route aligned with File.search's own 100-result
+          // default so file mentions and picker consumers don't silently lose
+          // deep-path matches in a narrower route-level default.
+          limit: limit ?? 100,
           dirs: dirs !== "false",
           type,
         })
