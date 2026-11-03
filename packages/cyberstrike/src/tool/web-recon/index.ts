@@ -4,6 +4,7 @@ import path from "node:path"
 import z from "zod"
 import { Tool } from "../tool"
 import { TargetMemory, type Workspace } from "../../target"
+import { reconPhaseGate } from "../../target/recon-gate"
 import type { ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
 import {
@@ -20,6 +21,7 @@ import {
   openRedirect,
 } from "./programs"
 import { sessionScan } from "./session-scan"
+import { executionPhaseForWebRecon } from "./phase"
 
 const PROGRAMS = {
   session_scan: {
@@ -612,11 +614,25 @@ export const WebReconTool = Tool.define("web_recon", {
     let result: WebReconResult
     let targetWorkspace: Workspace | undefined
     const sessionScopeWorkspaceIDs = new Set<string>()
+    const sessionGateDenials = new Set<string>()
+    const sessionGateCache = new Map<string, ReturnType<typeof reconPhaseGate>>()
     if (program === "session_scan") {
       try {
         const sessionScopeCheck: ScopeCheck = async (url) => {
           const decision = await TargetMemory.checkURLScope(url)
           if (!decision.allowed || !decision.workspace) return false
+          // One gate check per canonical workspace; the filter is also called for
+          // each individual captured request and again by the underlying probes.
+          let gate = sessionGateCache.get(decision.workspace.id)
+          if (!gate) {
+            gate = reconPhaseGate(decision.workspace, "vulnerability_testing")
+            sessionGateCache.set(decision.workspace.id, gate)
+          }
+          const testing = await gate
+          if (!testing.allowed) {
+            sessionGateDenials.add(decision.workspace.targetURL + ": " + testing.reason)
+            return false
+          }
           sessionScopeWorkspaceIDs.add(decision.workspace.id)
           return true
         }
@@ -628,6 +644,18 @@ export const WebReconTool = Tool.define("web_recon", {
             metadata: { program },
           })
         }, sessionScopeCheck)
+        if (sessionScopeWorkspaceIDs.size === 0 && sessionGateDenials.size > 0) {
+          return fail([
+            "[-] session_scan blocked by the explicit vulnerability-testing checkpoint.",
+            "No network probes were sent.",
+            ...[...sessionGateDenials].map((reason) => "- " + reason),
+            "Complete scope_validation and workspace_setup, verify endpoint_inventory, then begin vulnerability_testing before retrying.",
+          ].join("\\n"))
+        }
+        if (sessionGateDenials.size > 0) {
+          result.output += "\\n\\n[!] Active checks skipped for workspace(s) whose vulnerability-testing checkpoint or saved scope fingerprint was not valid:\\n" +
+            [...sessionGateDenials].map((reason) => "- " + reason).join("\\n")
+        }
       } catch (e) {
         return fail(`[-] session_scan failed: ${e instanceof Error ? e.message : String(e)}`)
       }
@@ -648,9 +676,23 @@ export const WebReconTool = Tool.define("web_recon", {
       // for each host just because it matches a wildcard. The scope decision above
       // remains authoritative for the requested URL and active tools enforce scope.
 
-      // Checkpoint state is workflow metadata, not a tool-availability allowlist.
-      // Persisted per-URL scope checks and the explicit web_recon permission below
-      // remain authoritative for every request.
+      if (!authorization.workspace) {
+        return fail("[-] Refusing web_recon: the persisted scope check did not resolve a canonical target workspace. No network probes were sent.")
+      }
+      const requiredPhase = executionPhaseForWebRecon(program)
+      const testingGate = await reconPhaseGate(authorization.workspace, requiredPhase)
+      if (!testingGate.allowed) {
+        return fail([
+          "[-] Refusing " + program + ": the " + requiredPhase + " checkpoint is not authorized to run.",
+          "Target: " + params.target,
+          "Reason: " + testingGate.reason,
+          "No network probes were sent.",
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before retrying active checks.",
+        ].join("\\n"))
+      }
+
+      // The phase gate authorizes only the current opt-in workflow state. Each
+      // concrete URL and redirect still passes the persisted request-level scope check.
       await ctx.ask({
         permission: "web_recon",
         patterns: [params.target],
