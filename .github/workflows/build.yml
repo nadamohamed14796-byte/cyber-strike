@@ -32,6 +32,12 @@ jobs:
       - name: Build monorepo
         run: bun turbo build
 
+      - name: Typecheck monorepo
+        run: bun turbo typecheck
+
+      - name: Test monorepo
+        run: bun turbo test
+
       - name: Prepare portable Linux x64 package
         run: |
           BIN_DIR="packages/cyberstrike/dist/cyberstrike-linux-x64/bin"
