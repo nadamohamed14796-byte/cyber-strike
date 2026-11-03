@@ -229,7 +229,7 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
     await page.waitForTimeout(200)
 
     const newUrl = page.url()
-    expect(newUrl).toMatch(/\/session\/?$/)
+    expect(newUrl).toMatch(/\/session\/[^/?#]+$/)
     expect(newUrl).not.toContain(session.id)
   })
 })
