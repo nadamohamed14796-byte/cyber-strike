@@ -28,6 +28,8 @@ chains_with:
   - attack-idor-automation
   - attack-auth-bypass
   - attack-session
+  - attack-exchange-owa
+  - attack-oauth
 ---
 # Recon Master — Evidence-driven Recon Router
 
@@ -88,6 +90,7 @@ Load a specialist only after its trigger is observed; chains_with is discoverabi
 | A source/build artifact or source map exposes application source/configuration | attack-source-leak |
 | A log/debug/exception artifact discloses internal or sensitive information | attack-information-disclosure; use attack-phpinfo-exposure only for an actual PHP configuration artifact |
 | Visual evidence points to an admin-only function, tenant/object boundary, or authentication/session flow and normal HTTP evidence corroborates it | attack-bfla, attack-idor-automation, attack-auth-bypass, or attack-session according to the observed boundary |
+| The owned domain publishes mail/identity endpoints or an actual OAuth flow is observed | attack-exchange-owa for attributable Exchange/OWA surfaces; attack-oauth for an observed OAuth/OIDC flow |
 
 For every handoff, pass the observed signal, canonical asset/endpoint ID, evidence references, timestamp, attribution and scope decisions, prerequisites, negative control needed, active-test permission state, exact uncertainty, and next action. The recipient must independently validate its own preconditions and impact.
 
