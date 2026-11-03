@@ -628,6 +628,17 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             })
           },
         )
+        if (schedule === "cancelled") {
+          return {
+            title: params.description,
+            metadata: {
+              sessionId: "",
+              model,
+              outcome: "aborted" as const,
+            },
+            output: "Background task was cancelled before an execution slot became available. No worker was started.",
+          }
+        }
         return {
           title: params.description,
           metadata: {

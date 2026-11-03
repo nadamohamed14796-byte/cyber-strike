@@ -80,7 +80,7 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
       }
 
       let settled = false
-      let entry: ScheduledEntry
+      let entry!: ScheduledEntry
       const cleanup = () => signal?.removeEventListener("abort", onAbort)
       const onAbort = () => {
         if (settled) return
@@ -150,7 +150,7 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
 
     let started = false
     let cancelled = false
-    let entry: ScheduledEntry
+    let entry!: ScheduledEntry
     const cleanup = () => signal?.removeEventListener("abort", onAbort)
     const onAbort = () => {
       if (started || cancelled) return
