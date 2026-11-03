@@ -23,6 +23,13 @@ await Log.init({
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
     e: e instanceof Error ? e.message : e,
+    name: e instanceof Error ? e.name : undefined,
+    stack: e instanceof Error ? e.stack : undefined,
+    cause: e instanceof Error && e.cause instanceof Error
+      ? { name: e.cause.name, message: e.cause.message, stack: e.cause.stack }
+      : e instanceof Error
+        ? e.cause
+        : undefined,
   })
 })
 
