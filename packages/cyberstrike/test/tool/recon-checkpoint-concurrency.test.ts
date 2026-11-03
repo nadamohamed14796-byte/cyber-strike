@@ -11,7 +11,7 @@ import {
 import { ReconCheckpointTool } from "../../src/tool/recon-checkpoint"
 import { tmpdir } from "../fixture/fixture"
 
-test("concurrent checkpoint begins preserve both phase transitions in one target manifest", async () => {
+test("concurrent duplicate checkpoint begins preserve one serialized phase transition", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -48,16 +48,16 @@ test("concurrent checkpoint begins preserve both phase transitions in one target
         metadata: () => undefined,
         ask: async () => {},
       } as never
-      const [asset, live] = await Promise.all([
+      const [first, duplicate] = await Promise.all([
         tool.execute({ action: "begin", target_url: targetURL, phase: "asset_discovery" }, ctx),
-        tool.execute({ action: "begin", target_url: targetURL, phase: "live_hosts_ports" }, ctx),
+        tool.execute({ action: "begin", target_url: targetURL, phase: "asset_discovery" }, ctx),
       ])
-      expect(asset.metadata.saved).toBe(true)
-      expect(live.metadata.saved).toBe(true)
+      expect([first.metadata.saved, duplicate.metadata.saved].filter(Boolean)).toHaveLength(1)
+      expect([first.metadata.reason, duplicate.metadata.reason]).toContain("phase_already_running")
 
       const persisted = JSON.parse(await fs.readFile(path.join(root.workspace.workspacePath, relativePath), "utf-8"))
       expect(persisted.phases.asset_discovery.status).toBe("running")
-      expect(persisted.phases.live_hosts_ports.status).toBe("running")
+      expect(persisted.phases.live_hosts_ports.status).toBe("pending")
       const index = JSON.parse(await fs.readFile(path.join(root.workspace.workspacePath, "runs", "index.json"), "utf-8"))
       expect(index.runs.filter((item: { runID: string }) => item.runID === reconRunID(root.workspace.id))).toHaveLength(1)
     },
