@@ -41,6 +41,7 @@ import { useRenderer } from "@opentui/solid"
 import { createStore, produce } from "solid-js/store"
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
+import { Log } from "@/util/log"
 
 type ThemeColors = {
   primary: RGBA
@@ -294,8 +295,11 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     })
 
     function init() {
-      resolveSystemTheme()
-      getCustomThemes()
+      // Built-in themes are available immediately. Palette and custom-theme
+      // discovery are optional enhancements and must never gate the whole TUI.
+      setStore("ready", true)
+      void resolveSystemTheme()
+      void getCustomThemes()
         .then((custom) => {
           setStore(
             produce((draft) => {
@@ -303,46 +307,46 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
             }),
           )
         })
-        .catch(() => {
-          setStore("active", "cyberstrike")
-        })
-        .finally(() => {
-          if (store.active !== "system") {
-            setStore("ready", true)
-          }
+        .catch((error) => {
+          Log.Default.warn("custom theme discovery failed; using built-in themes", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+          if (!DEFAULT_THEMES[store.active]) setStore("active", "cyberstrike")
         })
     }
 
     onMount(init)
 
-    function resolveSystemTheme() {
-      console.log("resolveSystemTheme")
-      renderer
-        .getPalette({
-          size: 16,
+    async function resolveSystemTheme() {
+      let timeout: Timer | undefined
+      try {
+        const colors = await Promise.race([
+          renderer.getPalette({ size: 16 }),
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => reject(new Error("Terminal palette query timed out")), 1500)
+          }),
+        ])
+
+        if (!colors.palette[0]) {
+          throw new Error("Terminal did not return an ANSI color palette")
+        }
+
+        setStore(
+          produce((draft) => {
+            draft.themes.system = generateSystem(colors, store.mode)
+          }),
+        )
+      } catch (error) {
+        Log.Default.warn("system theme detection failed; using CyberStrike theme", {
+          error: error instanceof Error ? error.message : String(error),
         })
-        .then((colors) => {
-          console.log(colors.palette)
-          if (!colors.palette[0]) {
-            if (store.active === "system") {
-              setStore(
-                produce((draft) => {
-                  draft.active = "cyberstrike"
-                  draft.ready = true
-                }),
-              )
-            }
-            return
-          }
-          setStore(
-            produce((draft) => {
-              draft.themes.system = generateSystem(colors, store.mode)
-              if (store.active === "system") {
-                draft.ready = true
-              }
-            }),
-          )
-        })
+        if (store.active === "system") setStore("active", "cyberstrike")
+      } finally {
+        if (timeout) clearTimeout(timeout)
+        // Keep the context unblocked even if the terminal does not implement
+        // OSC palette queries or OpenTUI rejects the request.
+        setStore("ready", true)
+      }
     }
 
     const renderer = useRenderer()
