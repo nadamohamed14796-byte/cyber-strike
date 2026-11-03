@@ -70,7 +70,7 @@ This is the first canonical consolidation batch: 29 existing skill files expande
 |---|---|
 | IDOR/BOLA, object/tenant authorization | `attack-idor-automation`; existing WSTG authorization/API testing skills |
 | CORS, GraphQL, JWT, redirects, cache/host header, prototype pollution, race conditions, rate limits, request smuggling, SSRF, SSTI, subdomain takeover, WebSocket, XXE | Matching existing `attack-*` skill with the same CyberStrike name |
-| Recon execution and conditional infrastructure/web techniques (subdomains, ASN, origin, ports, vhosts, CMS, visual, GitLab, mail, logs) | `/recon` + `recon-master` router/chapters; existing WSTG reconnaissance/configuration skills |
+| Recon execution and conditional infrastructure/web techniques (subdomains, ASN, origin, ports, vhosts, CMS, visual, GitLab, mail, logs) | `/recon` + `recon-master` router/chapters; JavaScript acquisition/endpoints → `attack-javascript-analysis`; source disclosure → `attack-source-leak`; vulnerability checks → the matching authorized specialist |
 | API no-auth, API misconfiguration, mass assignment, GraphQL and gRPC testing | Existing WSTG API skills plus `attack-graphql` and `attack-idor-automation` where semantically appropriate |
 | Authentication, ATO, password reset, MFA, OAuth/SAML/session | Existing WSTG authentication/authorization/session skills and `attack-jwt` where relevant |
 | Business logic and workflow integrity | Existing WSTG business-logic skills; `attack-race-condition` only for concurrency hypotheses |
