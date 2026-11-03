@@ -173,7 +173,7 @@ Continue with independent, relevant sources while they can add meaningful covera
 
 **Coverage tags:** `recon`, `asn`, `cidr`, `dns`, `infrastructure`, `asset-inventory`
 
-**Related security workflows:** `attack-subdomain-takeover`, `attack-host-header`, `attack-minio-s3`
+**Conditional handoffs only when independently observed:** `attack-subdomain-takeover` for a first-party CNAME to an orphaned provider resource; `attack-host-header` for attributable web-host routing evidence; `attack-minio-s3` for a first-party object-storage endpoint.
 
 **Legacy source:** `recon-asn-infrastructure` v"1.0.0"; credited to cyberstrike-official.
 
@@ -301,7 +301,7 @@ For every IP/prefix/ASN pivot, retain the organization attribution source, relat
 
 **Coverage tags:** `recon`, `origin-ip`, `CDN`, `reverse-proxy`, `DNS`
 
-**Related security workflows:** `attack-host-header`, `attack-cache-poison`
+**Conditional handoffs only when independently observed:** `attack-host-header` when the origin/Host authority changes application routing or trust decisions; `attack-cache-poison` only when a separate cache-key or cache-trust-boundary signal exists.
 
 **Potential significance:** an attributable origin may expose a control difference from the normal edge. This chapter records a candidate differential; it does not confirm a bypass or finding.
 
