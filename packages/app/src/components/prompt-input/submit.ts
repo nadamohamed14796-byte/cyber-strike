@@ -167,7 +167,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         globalSync.set(
           "project",
           produce((draft) => {
-            const project = draft.find((item) => item.worktree === projectDirectory)
+            const project = draft.find(
+              (item) => item.worktree === projectDirectory || item.sandboxes?.includes(projectDirectory),
+            )
             if (!project) return
             project.sandboxes ??= []
             if (!project.sandboxes.includes(createdWorktree.directory)) {
