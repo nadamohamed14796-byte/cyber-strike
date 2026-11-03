@@ -4,8 +4,8 @@ description: "Route evidence-triggered reconnaissance work to eleven detailed pr
 category: information-gathering
 version: "2.4.0"
 author: "CyberStrike contributors"
-tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, asn, cidr, origin-ip, vhost, ports, services, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, error-logs, asset-inventory, scope, evidence, tool-selection, asset-attribution, application-clustering]
-signals: [scope-confirmed-root-domain, passive-subdomain-candidates, wildcard-dns, certificate-transparency-name, dns-cname-change, asn-attribution, origin-ip-candidate, cdn-edge-detected, authorized-port-range, virtual-host-routing, cms-fingerprint, application-visual-cluster, attributable-gitlab-project, organization-mail-domain, exposed-debug-or-error-log]
+tags: [recon, reconnaissance, passive-recon, active-recon, osint, subdomain, dns, wildcard-dns, asn, cidr, origin-ip, vhost, ports, services, service-discovery, http, tls, crawling, endpoints, cms, gitlab, email-security, visual-recon, visual-clustering, error-logs, asset-inventory, scope, evidence, tool-selection, asset-attribution, application-clustering, authorization, access-control]
+signals: [scope-confirmed-root-domain, passive-subdomain-candidates, wildcard-dns, certificate-transparency-name, dns-cname-change, asn-attribution, origin-ip-candidate, cdn-edge-detected, authorized-port-range, virtual-host-routing, cms-fingerprint, application-visual-cluster, visual-admin-route, tenant-object-reference, authentication-flow-difference, attributable-gitlab-project, organization-mail-domain, exposed-debug-or-error-log]
 tech_stack: [dns, http, tls, tcp, javascript, api, cloud, browser, git, smtp]
 prerequisites: []
 chains_with:
