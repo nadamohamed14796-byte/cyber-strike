@@ -15,19 +15,45 @@ import { Truncate } from "../tool/truncation"
 
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
-  await Plugin.init()
-  ShareNext.init()
-  Format.init()
-  await LSP.init()
-  FileWatcher.init()
-  File.init()
-  Vcs.init()
-  Snapshot.init()
-  Truncate.init()
 
-  Bus.subscribe(Command.Event.Executed, async (payload) => {
-    if (payload.properties.name === Command.Default.INIT) {
-      await Project.setInitialized(Instance.project.id)
+  async function stage<T>(name: string, fn: () => T | Promise<T>): Promise<T> {
+    const startedAt = Date.now()
+    Log.Default.debug("instance bootstrap stage", { stage: name, status: "started" })
+    try {
+      const result = await fn()
+      Log.Default.debug("instance bootstrap stage", {
+        stage: name,
+        status: "completed",
+        duration: Date.now() - startedAt,
+      })
+      return result
+    } catch (error) {
+      Log.Default.error("instance bootstrap stage", {
+        stage: name,
+        status: "failed",
+        duration: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
+      throw error
     }
-  })
+  }
+
+  await stage("plugin-init", () => Plugin.init())
+  await stage("share-next-init", () => ShareNext.init())
+  await stage("format-init", () => Format.init())
+  await stage("lsp-init", () => LSP.init())
+  await stage("file-watcher-init", () => FileWatcher.init())
+  await stage("file-init", () => File.init())
+  await stage("vcs-init", () => Vcs.init())
+  await stage("snapshot-init", () => Snapshot.init())
+  await stage("truncate-init", () => Truncate.init())
+
+  await stage("command-event-subscription", () =>
+    Bus.subscribe(Command.Event.Executed, async (payload) => {
+      if (payload.properties.name === Command.Default.INIT) {
+        await Project.setInitialized(Instance.project.id)
+      }
+    }),
+  )
 }
