@@ -1,5 +1,6 @@
-import { createEffect, createMemo, Show } from "solid-js"
+import { createEffect, createMemo, onCleanup, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
+import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 
 const EXTENSION_TASKS_TITLES = new Set([
@@ -16,9 +17,27 @@ const EXTENSION_TASKS_TITLES = new Set([
 export function CapturedRequestAnalysisPanel() {
   const params = useParams()
   const navigate = useNavigate()
+  const sdk = useSDK()
   const sync = useSync()
 
   const parentID = () => params.id ?? ""
+
+  // The global session index intentionally loads root sessions only. A broker
+  // child created before this page mounts therefore cannot be discovered from
+  // sync.data.session alone. Hydrate direct children through the dedicated API.
+  createEffect(() => {
+    const parent = parentID()
+    if (!parent) return
+    let active = true
+    onCleanup(() => {
+      active = false
+    })
+    void sdk.client.session.children({ sessionID: parent }).then((result) => {
+      if (!active) return
+      const broker = (result.data ?? []).find((item) => EXTENSION_TASKS_TITLES.has(item.title ?? ""))
+      if (broker) return sync.session.sync(broker.id)
+    }).catch(() => {})
+  })
 
   const brokerSession = createMemo(() =>
     (sync.data.session ?? []).find(
