@@ -67,6 +67,15 @@ export namespace Rpc {
     >()
     const listeners = new Map<string, Set<(data: any) => void>>()
     let id = 0
+    let failure: Error | undefined
+    const failPending = (error: unknown) => {
+      if (failure) return
+      failure = error instanceof Error ? error : new Error(String(error))
+      for (const [requestId, request] of pending) {
+        pending.delete(requestId)
+        request.reject(failure)
+      }
+    }
     target.onmessage = async (evt) => {
       const parsed = JSON.parse(evt.data)
       if (parsed.type === "rpc.result" || parsed.type === "rpc.error") {
@@ -97,6 +106,7 @@ export namespace Rpc {
     }
     return {
       call<Method extends keyof T>(method: Method, input: Parameters<T[Method]>[0]): Promise<ReturnType<T[Method]>> {
+        if (failure) return Promise.reject(failure)
         const requestId = id++
         return new Promise((resolve, reject) => {
           pending.set(requestId, { resolve, reject })
@@ -108,6 +118,7 @@ export namespace Rpc {
           }
         })
       },
+      fail: failPending,
       on<Data>(event: string, handler: (data: Data) => void) {
         let handlers = listeners.get(event)
         if (!handlers) {
