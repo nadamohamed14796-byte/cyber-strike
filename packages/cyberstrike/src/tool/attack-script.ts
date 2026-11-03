@@ -69,9 +69,7 @@ const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> =
   },
 }
 
-export const AttackScriptTool = Tool.define("attack_script", {
-  description: `Execute one registered bundled Python script for a specialized task beyond http_replay. Available scripts: ${Object.keys(AVAILABLE_SCRIPTS).join(", ")}. Load the community-tool-selection skill and read the TOOLING_CATALOG.md companion using the returned Base directory and skill_files before calling it; never resolve it against the target workspace. The runner enforces persisted target scope for network-capable scripts and requires an explicitly running vulnerability_testing checkpoint for race, upload, takeover, SSRF-listener, and cloud write tests. Supply target_url as the canonical in-scope workspace context for ssrf_listener and github_dorker. Wayback --probe is refused because this script does not apply per-URL scope checks; use scoped request tools instead. Some scripts make state-changing requests or upload active payloads; never use them during default reconnaissance, and never run write/concurrency/upload modes without explicit program authorization. Use --json-output for machine-readable output.`,
-  parameters: z.object({
+const AttackScriptParameters = z.object({
     script: z.enum(Object.keys(AVAILABLE_SCRIPTS) as [string, ...string[]]).describe(
       "Script to execute. Options: " +
         Object.entries(AVAILABLE_SCRIPTS)
@@ -81,7 +79,28 @@ export const AttackScriptTool = Tool.define("attack_script", {
     args: z.array(z.string()).describe("Arguments to pass to the script"),
     target_url: z.string().url().optional().describe("Canonical in-scope target workspace context; required for ssrf_listener and github_dorker"),
     timeout_seconds: z.number().optional().default(120).describe("Maximum execution time in seconds (default: 120)"),
-  }),
+  })
+
+type AttackScriptMetadata = {
+  script: z.infer<typeof AttackScriptParameters>["script"]
+  exitCode: number
+  hasStderr: boolean
+  blocked?: boolean
+  scopeDenied?: boolean
+  testingDenied?: boolean
+  reason?: string
+  target?: string
+  manifest?: string
+}
+
+type AttackScriptBlockMetadata = Pick<
+  AttackScriptMetadata,
+  "scopeDenied" | "testingDenied" | "reason" | "target" | "manifest"
+>
+
+export const AttackScriptTool = Tool.define<typeof AttackScriptParameters, AttackScriptMetadata>("attack_script", {
+  description: `Execute one registered bundled Python script for a specialized task beyond http_replay. Available scripts: ${Object.keys(AVAILABLE_SCRIPTS).join(", ")}. Load the community-tool-selection skill and read the TOOLING_CATALOG.md companion using the returned Base directory and skill_files before calling it; never resolve it against the target workspace. The runner enforces persisted target scope for network-capable scripts and requires an explicitly running vulnerability_testing checkpoint for race, upload, takeover, SSRF-listener, and cloud write tests. Supply target_url as the canonical in-scope workspace context for ssrf_listener and github_dorker. Wayback --probe is refused because this script does not apply per-URL scope checks; use scoped request tools instead. Some scripts make state-changing requests or upload active payloads; never use them during default reconnaissance, and never run write/concurrency/upload modes without explicit program authorization. Use --json-output for machine-readable output.`,
+  parameters: AttackScriptParameters,
   async execute(params) {
     const { directory: scriptsDir, searched: scriptDirectoriesSearched } = await resolveScriptsDir()
     const scriptPath = path.join(scriptsDir, `${params.script}.py`)
@@ -96,7 +115,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       }
     }
 
-    const denied = (reason: string, metadata: Record<string, unknown> = {}) => ({
+    const denied = (reason: string, metadata: AttackScriptBlockMetadata = {}) => ({
       title: `attack_script: ${params.script} — refused`,
       output: "No script was executed. " + reason,
       metadata: { script: params.script, exitCode: -1, hasStderr: false, blocked: true, ...metadata },
