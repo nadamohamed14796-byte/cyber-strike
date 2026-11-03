@@ -134,7 +134,7 @@ export namespace ModelsDev {
     // Provider discovery runs during startup. A stalled models.dev request must
     // never keep the CLI/TUI loading forever; custom providers from config can
     // still be registered even when the remote catalogue is unavailable.
-    const result = await fetch(`${url()}/api.json`, {
+    const remoteData = await fetch(`${url()}/api.json`, {
       signal: AbortSignal.timeout(10 * 1000),
       headers: {
         "User-Agent": Installation.USER_AGENT,
