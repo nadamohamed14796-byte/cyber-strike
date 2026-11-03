@@ -1746,7 +1746,7 @@ export const InjectProbeTool = Tool.define("inject_probe", {
           "URL: " + resolved.url.toString(),
           "Reason: " + testingGate.reason,
           "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before retrying.",
-        ].join("\\n"),
+        ].join("\n"),
         metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
       }
     }
