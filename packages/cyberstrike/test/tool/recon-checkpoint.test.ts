@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision, reconScopeFingerprint } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision, reconPhaseStartDecision, reconScopeFingerprint } from "../../src/target/recon-gate"
+import { nextTodo } from "../../src/tool/todo"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -33,6 +34,36 @@ function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPh
 test("recon run identity is stable across session resumes", () => {
   expect(reconRunID("target-root-1")).toBe(reconRunID("target-root-1"))
   expect(reconRunID("target-root-1")).not.toBe(reconRunID("different-target"))
+})
+
+test("persisted recon checklist tags are recognized and retain the active item", () => {
+  const state = records("pending")
+  state.scope_validation = { status: "complete" }
+  state.workspace_setup = { status: "complete" }
+  state.asset_discovery = { status: "running" }
+  const previous = [{
+    content: "[recon:asset_discovery] 3. Collect and merge in-scope assets",
+    status: "in_progress",
+    priority: "high",
+  }, {
+    content: "Unrelated user task",
+    status: "pending",
+    priority: "high",
+  }]
+  const reconciled = reconcileReconTodoChecklist(previous, state, "asset_discovery")
+  expect(reconciled.filter((todo) => todo.content.startsWith("[recon:")).length).toBe(10)
+  expect(reconciled.find((todo) => todo.content.startsWith("[recon:asset_discovery]"))?.status).toBe("in_progress")
+  expect(reconciled.some((todo) => todo.content === "Unrelated user task")).toBe(true)
+  expect(reconciled.some((todo) => todo.content.startsWith("[recon:parameter_fuzzing]"))).toBe(false)
+})
+
+test("recon todo scheduler prioritizes the active checklist before unrelated high-priority tasks", () => {
+  const selected = nextTodo([
+    { content: "Unrelated urgent task", status: "pending", priority: "high" },
+    { content: "[recon:url_collection] Collect and merge URLs", status: "in_progress", priority: "high" },
+    { content: "[recon:javascript_analysis] Analyze JavaScript", status: "pending", priority: "high" },
+  ])
+  expect(selected?.content).toContain("[recon:url_collection]")
 })
 
 test("begin resumes running phases and does not restart resolved work", () => {
