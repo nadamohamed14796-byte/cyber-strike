@@ -69,24 +69,6 @@ async function dispatch(
     const reporter = reporterID ? await Agent.get(reporterID) : undefined
     if (!reporter) return { started: false, mode, reason: "reporting agent is not registered: " + String(ctx.agent) }
 
-    // Impact Hunter may run active validation and must never be auto-dispatched
-    // during recon-only collection. Require the explicit vulnerability-testing
-    // checkpoint for both proof-gap and approved-impact investigations.
-    const workspace = finding.target_id
-      ? TargetMemory.list().find((item) => item.id === finding.target_id)
-      : undefined
-    if (!workspace) {
-      return { started: false, mode, reason: "Impact Hunter requires a finding linked to an existing target workspace." }
-    }
-    const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
-    if (!testingGate.allowed) {
-      return {
-        started: false,
-        mode,
-        reason: "Impact Hunter was not dispatched because explicit vulnerability_testing is not active: " + testingGate.reason,
-      }
-    }
-
     const preferredRequestID = requestIDFromRecentPromptTexts(
       ctx.messages
         .filter((message) => message.info.role === "user")
@@ -102,6 +84,23 @@ async function dispatch(
     })
     if (!gate.allowed) {
       return { started: false, mode, reason: gate.reason ?? "Impact Hunter evidence gate did not pass" }
+    }
+
+    // Validate the finding evidence first, then require the explicit active-testing
+    // checkpoint. Recon-only reporting must never launch a tester automatically.
+    const workspace = finding.target_id
+      ? TargetMemory.list().find((item) => item.id === finding.target_id)
+      : undefined
+    if (!workspace) {
+      return { started: false, mode, reason: "Impact Hunter requires a finding linked to an existing target workspace." }
+    }
+    const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        started: false,
+        mode,
+        reason: "Impact Hunter was not dispatched because explicit vulnerability_testing is not active: " + testingGate.reason,
+      }
     }
 
     const description = "Impact Hunter finding " + finding.id
