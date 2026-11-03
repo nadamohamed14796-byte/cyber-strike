@@ -38,7 +38,7 @@ export type ReconPhaseRecord = {
 export type ReconRunManifest = {
   schemaVersion: 1
   /** Ordered lifecycle version; missing indicates a pre-evidence-first checkpoint. */
-  phaseOrderVersion?: 2
+  phaseOrderVersion?: number
   targetURL: string
   targetID: string
   sessionID: string
@@ -103,7 +103,7 @@ export function reconRunID(targetID: string): string {
 export function initialReconRun(targetURL: string, targetID: string, sessionID: string): ReconRunManifest {
   const phases = Object.fromEntries(RECON_PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<ReconPhase, ReconPhaseRecord>
   const now = new Date().toISOString()
-  return { schemaVersion: 1, phaseOrderVersion: 2, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
+  return { schemaVersion: 1, phaseOrderVersion: 3, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
 }
 
 export function parseReconRun(raw: string, workspaceID: string, targetURL: string): ReconRunManifest {
@@ -130,7 +130,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   if (!phases) throw new Error("Recon run manifest has no phase records; refusing to overwrite it.")
 
   const missingPhases = introducedPhases.filter((phase) => !Object.prototype.hasOwnProperty.call(phases, phase))
-  const needsPhaseOrderMigration = parsed.phaseOrderVersion !== 2
+  const needsPhaseOrderMigration = parsed.phaseOrderVersion !== 3
   if (missingPhases.length || needsPhaseOrderMigration) {
     for (const phase of missingPhases) {
       phases[phase] = {
@@ -152,7 +152,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
       ? RECON_PHASES.indexOf("javascript_analysis")
       : earliestMissing
     const migrationReason = needsPhaseOrderMigration
-      ? "Re-run required after recon phase order migrated to evidence-first version 2."
+      ? "Re-run required after recon phase order migrated to evidence-first version 3."
       : "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + "."
     for (const phase of RECON_PHASES.slice(revalidateFrom)) {
       const previous = phases[phase]
@@ -169,7 +169,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     parsed.currentPhase = RECON_PHASES[resumeFrom] ?? null
     parsed.updatedAt = new Date().toISOString()
   }
-  parsed.phaseOrderVersion = 2
+  parsed.phaseOrderVersion = 3
   parsed.phases = phases as Record<ReconPhase, ReconPhaseRecord>
   return parsed
 }
