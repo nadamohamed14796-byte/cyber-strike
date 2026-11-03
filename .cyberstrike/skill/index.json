@@ -232,7 +232,7 @@
     },
     {
       "name": "recon-master",
-      "description": "Professional scope-aware reconnaissance handbook with one workflow, conditional specialist procedures, clear evidence standards, and phase-based outputs.",
+      "description": "Route evidence-triggered reconnaissance to eleven detailed procedures with shared scope, provenance, coverage, and specialist handoff contracts.",
       "verified": "unverified",
       "tags": [
         "recon",
@@ -260,7 +260,9 @@
         "asset-inventory",
         "scope",
         "evidence",
-        "tool-selection"
+        "tool-selection",
+        "asset-attribution",
+        "application-clustering"
       ],
       "tech_stack": [
         "dns",
@@ -276,6 +278,7 @@
       ],
       "cwe_ids": [],
       "files": [
+        "RECON_CHAPTERS.md",
         "RECON_PHASE_TOOL_MATRIX.md",
         "SKILL.md"
       ],
