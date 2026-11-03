@@ -182,3 +182,29 @@ test("an already aborted run never enters the scheduler", async () => {
   expect(taskStarted).toBe(false)
   expect(scheduler.stats()).toMatchObject({ active: 0, pending: 0 })
 })
+
+
+test("cancellation wins after slot assignment but before the task callback starts", async () => {
+  const scheduler = createTaskScheduler({ maxConcurrent: 1, maxPerLane: 1 })
+  const controller = new AbortController()
+  let taskStarted = false
+  let cancellations = 0
+
+  const result = scheduler.enqueue(
+    "lane",
+    async () => { taskStarted = true },
+    undefined,
+    controller.signal,
+    () => { cancellations++ },
+  )
+  expect(result).toBe("started")
+
+  // enqueue() grants the slot synchronously, while its task callback is queued
+  // in a microtask. Abort in that gap; the callback must never run.
+  controller.abort()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  expect(taskStarted).toBe(false)
+  expect(cancellations).toBe(1)
+  expect(scheduler.stats()).toMatchObject({ active: 0, pending: 0 })
+})

@@ -149,27 +149,36 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
     }
 
     let started = false
+    let executionStarted = false
     let cancelled = false
     let entry!: ScheduledEntry
     const cleanup = () => signal?.removeEventListener("abort", onAbort)
     const onAbort = () => {
-      if (started || cancelled) return
-      const index = pending.indexOf(entry)
-      if (index < 0) return
-      pending.splice(index, 1)
+      if (executionStarted || cancelled) return
+      if (!started) {
+        const index = pending.indexOf(entry)
+        if (index < 0) return
+        pending.splice(index, 1)
+      }
+      // A slot may have been assigned while the task callback is still waiting
+      // for its microtask. Cancellation wins until the callback actually starts.
       cancelled = true
       cleanup()
       cancel()
-      drain()
+      if (!started) drain()
     }
 
     entry = {
       lane,
       start: (release) => {
         started = true
-        cleanup()
         void Promise.resolve()
-          .then(task)
+          .then(() => {
+            if (cancelled) return
+            executionStarted = true
+            cleanup()
+            return task()
+          })
           .catch((error) => {
             try {
               onError?.(error)
