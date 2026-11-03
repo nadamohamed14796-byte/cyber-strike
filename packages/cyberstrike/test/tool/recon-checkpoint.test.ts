@@ -320,6 +320,26 @@ test("vulnerability-testing tools require an explicit testing checkpoint and com
   })
 })
 
+test("parameter fuzzing is opt-in and cannot run before verified endpoint inventory", () => {
+  const state = records("complete")
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(false)
+  state.parameter_fuzzing = { status: "running" }
+  state.endpoint_inventory = { status: "pending" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(false)
+  state.endpoint_inventory = { status: "complete" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state)).toEqual({
+    allowed: true,
+    reason: "explicit parameter_fuzzing checkpoint and prerequisites passed",
+  })
+})
+
+test("parameter fuzzing cannot be started through an unresolved earlier phase", () => {
+  const state = records("complete")
+  state.parameter_fuzzing = { status: "running" }
+  state.javascript_analysis = { status: "failed", reason: "analysis incomplete" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(false)
+})
+
 test("ordinary recon tool choice is independent of the active phase", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
