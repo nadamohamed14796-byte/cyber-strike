@@ -321,7 +321,6 @@ export namespace Worktree {
 
   function queueStartScripts(directory: string, input: { projectID: string; extra?: string }) {
     setTimeout(() => {
-      let readyEmitted = false
       const start = async () => {
         await runStartScripts(directory, input)
       }
@@ -356,6 +355,7 @@ export namespace Worktree {
     const projectID = Instance.project.id
     const extra = input?.startCommand?.trim()
     setTimeout(() => {
+      let readyEmitted = false
       const start = async () => {
         const populated = await $`git reset --hard`.quiet().nothrow().cwd(info.directory)
         if (populated.exitCode !== 0) {
