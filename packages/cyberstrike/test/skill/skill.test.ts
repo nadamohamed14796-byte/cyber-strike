@@ -139,6 +139,47 @@ description: Second test skill.
   })
 })
 
+test("derives skill descriptions from a Markdown Description section", async () => {
+  await using tmp = await tmpdir({
+    git: true,
+    init: async (dir) => {
+      const skillDir = path.join(dir, ".cyberstrike", "skill", "cis-audit-control")
+      await Bun.write(
+        path.join(skillDir, "SKILL.md"),
+        `---
+name: cis-audit-control
+category: cis-logging
+tags: [cis, ubuntu, auditd]
+---
+
+# Audit control
+
+## Description
+
+The audit log directory contains audit log files and must be protected from unauthorized modification.
+
+## Rationale
+
+Audit evidence must remain available for forensic analysis.
+`,
+      )
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const metadata = (await Skill.all()).find((skill) => skill.name === "cis-audit-control")
+      expect(metadata?.description).toBe(
+        "The audit log directory contains audit log files and must be protected from unauthorized modification.",
+      )
+
+      const loaded = await Skill.get("cis-audit-control")
+      expect(loaded?.description).toBe(metadata?.description)
+      expect(loaded?.content).toContain("## Rationale")
+    },
+  })
+})
 test("skips skills with missing frontmatter", async () => {
   await using tmp = await tmpdir({
     git: true,
