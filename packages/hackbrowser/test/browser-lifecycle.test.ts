@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { closeBrowserOnSetupFailure } from "../src/browser-lifecycle.ts"
+import { closeBrowserOnSetupFailure, waitForBrowserClose } from "../src/browser-lifecycle.ts"
 
 test("closes the browser when context/page setup fails and preserves the setup error", async () => {
   const setupError = new Error("newPage failed")
