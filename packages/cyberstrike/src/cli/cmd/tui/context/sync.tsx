@@ -34,7 +34,7 @@ import type { Path } from "@cyberstrike-io/sdk"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
-  fallback: (
+  fallback: () => (
     <box flexDirection="column" gap={1} padding={2}>
       <text fg="#fab283">CyberStrike</text>
       <text fg="#808080">Connecting to the local engine and loading workspace data…</text>
