@@ -194,6 +194,10 @@ export const TuiThreadCommand = cmd({
       // values cannot tell us whether the user requested an HTTP server.
       // Keep ordinary TUI startup on the lower-overhead worker RPC transport.
       const globalConfig = await Config.global()
+      const serverConfigured =
+        globalConfig?.server?.port !== undefined ||
+        globalConfig?.server?.hostname !== undefined ||
+        globalConfig?.server?.mdns === true
       const explicitlySet = (name: string) =>
         process.argv.some((value) => value === `--${name}` || value.startsWith(`--${name}=`))
       const shouldStartServer =
@@ -202,12 +206,12 @@ export const TuiThreadCommand = cmd({
         explicitlySet("mdns") ||
         explicitlySet("mdns-domain") ||
         explicitlySet("cors") ||
-        globalConfig?.server !== undefined ||
+        serverConfigured ||
         networkOpts.mdns ||
         networkOpts.hostname !== "127.0.0.1"
       Log.Default.info("TUI startup stage", {
         stage: shouldStartServer ? "server-start-selected" : "direct-rpc-selected",
-        serverConfigured: globalConfig?.server !== undefined,
+        serverConfigured,
         networkOpts,
       })
 
