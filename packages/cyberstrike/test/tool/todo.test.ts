@@ -64,4 +64,18 @@ describe("todo snapshot reconciliation", () => {
     expect(result.todos).toEqual([item("New task", "pending", "high")])
     expect(result.preserved).toEqual([])
   })
+
+  test("preserves completed recon checklist entries omitted from later snapshots", () => {
+    const completed = item("[recon:javascript_analysis] Analyze every JavaScript asset", "completed", "high")
+    const result = mergeTodoSnapshot(
+      [completed, item("Ordinary completed task", "completed")],
+      [item("[recon:endpoint_inventory] Build endpoint inventory", "pending", "high")],
+    )
+
+    expect(result.todos).toEqual([
+      item("[recon:endpoint_inventory] Build endpoint inventory", "pending", "high"),
+      completed,
+    ])
+    expect(result.preserved).toEqual([completed])
+  })
 })
