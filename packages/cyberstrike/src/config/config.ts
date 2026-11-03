@@ -31,7 +31,6 @@ import { Event } from "../server/event"
 import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
 import { iife } from "@/util/iife"
-import { Control } from "@/control"
 
 export namespace Config {
   const ModelId = z.string().meta({ $ref: "https://models.dev/model-schema.json#/$defs/Model" })
@@ -152,9 +151,10 @@ export namespace Config {
       }
     }
 
-    const token = await Control.token()
-    if (token) {
-    }
+    // Do not refresh the optional Control account token while resolving project
+    // configuration. Config loading is on the critical TUI startup path, and
+    // this token was not used here; refreshing it introduced an unnecessary
+    // network dependency before the interface could become ready.
 
     // Global user config overrides remote config.
     result = merge(result, await global())
