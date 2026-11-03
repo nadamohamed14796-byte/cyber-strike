@@ -47,9 +47,7 @@ jobs:
           git diff --exit-code -- .cyberstrike/skill/index.json || { git --no-pager diff -- .cyberstrike/skill/index.json; exit 1; }
 
       - name: Install Chromium for browser integration tests
-        run: |
-          PLAYWRIGHT_VERSION="$(node -p 'require("./package.json").devDependencies["@playwright/test"]')"
-          bunx "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Run unit tests
         run: bun turbo test
@@ -70,9 +68,11 @@ jobs:
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
 
-      - name: Install Chromium for Playwright
+      - name: Install Chromium for app Playwright version
         working-directory: packages/app
-        run: bunx playwright install --with-deps chromium
+        run: |
+          PLAYWRIGHT_VERSION="$(node -p 'require("./package.json").devDependencies["@playwright/test"]')"
+          bunx "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
 
       - name: Run app browser E2E without external model credentials
         working-directory: packages/app
