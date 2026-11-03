@@ -139,10 +139,17 @@ export const TuiThreadCommand = cmd({
           Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
         ),
       })
-      worker.onerror = (e) => {
-        Log.Default.error(e)
-      }
       const client = Rpc.client<typeof rpc>(worker)
+      worker.onerror = (e) => {
+        const error = e.error instanceof Error ? e.error : new Error(e.message || "CyberStrike worker failed")
+        Log.Default.error("TUI worker failed", { error })
+        client.fail(error)
+      }
+      worker.onmessageerror = () => {
+        const error = new Error("CyberStrike worker sent an unreadable message")
+        Log.Default.error("TUI worker message could not be deserialized", { error })
+        client.fail(error)
+      }
       process.on("uncaughtException", (e) => {
         Log.Default.error(e)
       })
