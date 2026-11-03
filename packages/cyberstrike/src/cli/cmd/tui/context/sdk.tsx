@@ -116,7 +116,6 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
       if (timer) clearTimeout(timer)
     })
 
-    const internalFetch = props.fetch ?? globalThis.fetch
-    return { client: sdk, event: emitter, url: props.url, fetch: internalFetch }
+    return { client: sdk, event: emitter, url: props.url, fetch: fetchWithTimeout }
   },
 })
