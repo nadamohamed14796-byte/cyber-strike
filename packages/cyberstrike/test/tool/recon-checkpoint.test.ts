@@ -209,6 +209,33 @@ test("deferred is accepted as a persisted checkpoint status", () => {
   expect(parsed.phases.vulnerability_testing.status).toBe("deferred")
 })
 
+test("phase-order version 2 checkpoints reopen JavaScript and every downstream phase", () => {
+  const legacy = initialReconRun("https://example.com", "target-root-1", "session-1")
+  legacy.phaseOrderVersion = 2
+  legacy.currentPhase = "reporting"
+  for (const phase of phases) {
+    legacy.phases[phase] = {
+      status: "complete",
+      summary: "Previously completed under the old phase order",
+      artifacts: ["runs/legacy-" + phase + ".json"],
+    }
+  }
+
+  const migrated = parseReconRun(JSON.stringify(legacy), "target-root-1", "https://example.com")
+  expect(migrated.phaseOrderVersion).toBe(3)
+  expect(migrated.currentPhase).toBe("javascript_analysis")
+  expect(migrated.phases.scope_validation.status).toBe("complete")
+  expect(migrated.phases.workspace_setup.status).toBe("complete")
+  expect(migrated.phases.asset_discovery.status).toBe("complete")
+  expect(migrated.phases.live_hosts_ports.status).toBe("complete")
+  expect(migrated.phases.url_collection.status).toBe("complete")
+  for (const phase of phases.slice(phases.indexOf("javascript_analysis"))) {
+    expect(migrated.phases[phase].status).toBe("pending")
+    expect(migrated.phases[phase].artifacts).toEqual(["runs/legacy-" + phase + ".json"])
+    expect(migrated.phases[phase].reason).toContain("evidence-first version 3")
+  }
+})
+
 test("legacy manifests migrate to require parameter discovery and revalidate downstream phases", () => {
   const legacy = initialReconRun("https://example.com", "target-root-1", "session-1")
   delete legacy.phaseOrderVersion
