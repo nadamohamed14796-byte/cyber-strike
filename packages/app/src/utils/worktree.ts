@@ -36,8 +36,9 @@ export const Worktree = {
   pending(directory: string) {
     const key = normalize(directory)
     const current = state.get(key)
-    if (current && current.status !== "pending") return
+    if (current && current.status !== "pending") return false
     state.set(key, { status: "pending" })
+    return true
   },
   ready(directory: string) {
     const key = normalize(directory)

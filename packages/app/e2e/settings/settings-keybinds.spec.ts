@@ -225,7 +225,7 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
 
     await closeDialog(page, dialog)
 
-    await page.keyboard.press(`${modKey}+Shift+N`)
+    await page.keyboard.press(`${modKey}+Shift+KeyM`)
     await page.waitForTimeout(200)
 
     const newUrl = page.url()

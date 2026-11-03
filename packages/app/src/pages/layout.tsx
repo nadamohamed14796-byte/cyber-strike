@@ -1635,8 +1635,8 @@ export default function Layout(props: ParentProps) {
     const key = workspaceKey(created.directory)
     const root = workspaceKey(local)
 
-    setBusy(created.directory, true)
-    WorktreeState.pending(created.directory)
+    const pending = WorktreeState.pending(created.directory)
+    setBusy(created.directory, pending)
     setStore("workspaceExpanded", key, true)
     if (key !== created.directory) {
       setStore("workspaceExpanded", created.directory, true)
