@@ -74,25 +74,26 @@ def scalar(meta: str, key: str) -> str | None:
 
 def body_description(text: str) -> str | None:
     """Read the first prose paragraph in a Markdown Description section."""
-    body = re.sub(r"\\A---\\r?\\n.*?\\r?\\n---\\s*", "", text, count=1, flags=re.DOTALL)
+    body = re.sub(r"\A---\r?\n.*?\r?\n---\s*", "", text, count=1, flags=re.DOTALL)
     match = re.search(
-        r"^#{1,6}\\s+description\\s*#*\\s*\\r?\\n(.*?)(?=^#{1,6}\\s+|\\Z)",
+        r"^#{1,6}\s+description\s*#*\s*\r?\n(.*?)(?=^#{1,6}\s+|\Z)",
         body,
         re.IGNORECASE | re.MULTILINE | re.DOTALL,
     )
     if not match:
         return None
-    section = re.sub(r"```.*?```", " ", match.group(1), flags=re.DOTALL)
-    for paragraph in re.split(r"\\n\\s*\\n", section):
-        description = re.sub(r"^\\s*(?:[-*+]\\s+|>\\s*)", "", paragraph, flags=re.MULTILINE)
-        description = re.sub(r"\\[([^\\]]+)\\]\\([^)]+\\)", r"\\1", description)
-        description = re.sub(r"`([^`]+)`", r"\\1", description)
+    section = re.sub(r"\x60{3}.*?\x60{3}", " ", match.group(1), flags=re.DOTALL)
+    for paragraph in re.split(r"\n\s*\n", section):
+        description = re.sub(r"^\s*(?:[-*+]\s+|>\s*)", "", paragraph, flags=re.MULTILINE)
+        description = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", description)
+        description = re.sub(r"\x60([^\x60]+)\x60", r"\1", description)
         description = re.sub(r"<[^>]+>", " ", description)
         description = re.sub(r"[*_~]{1,3}", "", description)
-        description = re.sub(r"\\s+", " ", description).strip()
+        description = re.sub(r"\s+", " ", description).strip()
         if description:
             return description[:512]
     return None
+
 
 def yaml_list(meta: str, key: str) -> list[str]:
     lines = meta.splitlines()
