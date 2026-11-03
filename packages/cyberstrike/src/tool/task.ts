@@ -615,6 +615,18 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
               error: error instanceof Error ? error.message : String(error),
             })
           },
+          ctx.abort,
+          () => {
+            // The prompt was persisted before entering the bounded scheduler.
+            // Remove this not-yet-started child so cancellation cannot leave a
+            // ghost task with a saved user turn but no worker behind it.
+            void Session.remove(session.id).catch((error) => {
+              console.error("[task] failed to remove cancelled queued subagent", {
+                sessionID: session.id,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            })
+          },
         )
         return {
           title: params.description,
@@ -645,7 +657,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         (caller?.mode === "subagent" || callerID === "impact-hunter") && callerID !== "proxy-agent"
       const result = isManagedSubagent
         ? await SessionPrompt.prompt(promptInput)
-        : await AgentTaskConcurrency.run(taskLane, () => SessionPrompt.prompt(promptInput))
+        : await AgentTaskConcurrency.run(taskLane, () => SessionPrompt.prompt(promptInput), ctx.abort)
 
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
