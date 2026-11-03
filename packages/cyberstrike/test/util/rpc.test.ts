@@ -16,7 +16,7 @@ type RpcMessageTarget = {
 async function dispatch(target: RpcMessageTarget, payload: unknown) {
   const handler = target.onmessage
   if (!handler) throw new Error("RPC message handler is not registered")
-  await Reflect.apply(handler, target, [
+  await Reflect.apply(handler, target as unknown as Worker, [
     new MessageEvent("message", { data: JSON.stringify(payload) }),
   ])
 }
