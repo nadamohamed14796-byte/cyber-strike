@@ -138,8 +138,8 @@ export const AttackScriptTool = Tool.define("attack_script", {
       if (!params.target_url) return denied("Provide target_url so this script is anchored to the authorized target workspace.")
     } else if (params.script === "subdomain_takeover") {
       if (!first) return denied("Provide a domain or an in-scope subdomain file.")
-      const inputFile = Bun.file(first)
-      const domains = await inputFile.exists()
+      const inputFile = first.includes("://") ? undefined : Bun.file(first)
+      const domains = inputFile && await inputFile.exists()
         ? (await inputFile.text()).split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
         : [first]
       if (!domains.length) return denied("The supplied subdomain file contains no candidate hosts.")
