@@ -112,7 +112,7 @@ test("manual Impact Hunter dispatch is blocked without the explicit vulnerabilit
           sessionID: session.id,
           method: "POST",
           normalizedPath: "/api/home",
-          rawRequest: "POST /api/home HTTP/1.1\\r\\nHost: task-gate.example.test\\r\\n\\r\\n",
+          rawRequest: "POST /api/home HTTP/1.1\r\nHost: task-gate.example.test\r\n\r\n",
           scheme: "https",
           host: "task-gate.example.test",
           origin: target,
@@ -142,7 +142,7 @@ test("manual Impact Hunter dispatch is blocked without the explicit vulnerabilit
             "finding_id: " + finding.id,
             "target_id: " + workspace.id,
             "supporting_request_ids: " + request!.id,
-          ].join("\\n"),
+          ].join("\n"),
         } as any, manualCtx)).rejects.toThrow("explicit vulnerability_testing checkpoint is not active")
         expect(await Session.children(session.id)).toHaveLength(0)
       } finally {
