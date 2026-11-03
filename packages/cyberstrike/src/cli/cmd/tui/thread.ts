@@ -21,12 +21,37 @@ function createWorkerFetch(client: RpcClient): typeof fetch {
   const fn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = new Request(input, init)
     const body = request.body ? await request.text() : undefined
-    const result = await client.call("fetch", {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries()),
-      body,
-    })
+    const result = await new Promise<{ status: number; headers: Record<string, string>; body: string }>(
+      (resolve, reject) => {
+        const cleanup = () => request.signal.removeEventListener("abort", onAbort)
+        const onAbort = () => {
+          cleanup()
+          reject(request.signal.reason ?? new DOMException("Request aborted", "AbortError"))
+        }
+        if (request.signal.aborted) {
+          onAbort()
+          return
+        }
+        request.signal.addEventListener("abort", onAbort, { once: true })
+        client
+          .call("fetch", {
+            url: request.url,
+            method: request.method,
+            headers: Object.fromEntries(request.headers.entries()),
+            body,
+          })
+          .then(
+            (value) => {
+              cleanup()
+              resolve(value)
+            },
+            (error) => {
+              cleanup()
+              reject(error)
+            },
+          )
+      },
+    )
     return new Response(result.body, {
       status: result.status,
       headers: result.headers,
