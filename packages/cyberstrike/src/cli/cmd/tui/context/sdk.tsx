@@ -17,11 +17,22 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     events?: EventSource
   }) => {
     const abort = new AbortController()
+    const baseFetch = props.fetch ?? globalThis.fetch
+    // Bound request setup so a stalled local API/server cannot leave startup
+    // and the initial TUI synchronization in a permanent loading state.
+    // Streaming responses are reconnected by the event loop below.
+    const fetchWithTimeout: typeof fetch = (input, init) => {
+      const signals = [init?.signal, AbortSignal.timeout(15_000)].filter(Boolean) as AbortSignal[]
+      return baseFetch(input, {
+        ...init,
+        signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals),
+      })
+    }
     const sdk = createCyberstrikeClient({
       baseUrl: props.url,
       signal: abort.signal,
       directory: props.directory,
-      fetch: props.fetch,
+      fetch: fetchWithTimeout,
       headers: props.headers,
     })
 
