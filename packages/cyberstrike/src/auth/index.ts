@@ -1,4 +1,5 @@
 import path from "path"
+import fs from "fs/promises"
 import { Global } from "../global"
 import z from "zod"
 
@@ -42,6 +43,16 @@ export namespace Auth {
   }
 
   export async function all(): Promise<Record<string, Info>> {
+    // Never read special files: reading a FIFO as JSON can block application startup.
+    let stat: Awaited<ReturnType<typeof fs.stat>>
+    try {
+      stat = await fs.stat(filepath)
+    } catch (error: any) {
+      if (error.code === "ENOENT" || error.code === "EACCES") return {}
+      throw error
+    }
+    if (!stat.isFile()) return {}
+    if (stat.size > 1024 * 1024) throw new Error(`Auth file is unexpectedly large (${stat.size} bytes): ${filepath}`)
     const file = Bun.file(filepath)
     const data = await file.json().catch(() => ({}) as Record<string, unknown>)
     return Object.entries(data).reduce(
