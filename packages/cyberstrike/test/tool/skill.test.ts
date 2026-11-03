@@ -347,6 +347,7 @@ Use this skill.
 `,
         )
         await Bun.write(path.join(skillDir, "scripts", "demo.txt"), "demo")
+        await Bun.write(path.join(skillDir, "RECON_CHAPTERS.md"), "## 01. Example recon procedure\\n")
         await fs.mkdir(path.join(skillDir, "reference"), { recursive: true })
         for (let index = 0; index < 15; index++) {
           await Bun.write(path.join(skillDir, "reference", "part-" + index + ".md"), "reference " + index)
@@ -385,6 +386,7 @@ Use this skill.
           expect(result.output).toContain(`<skill_content name="tool-skill" verified="unverified">`)
           expect(result.output).toContain(`Base directory for this skill: ${pathToFileURL(dir).href}`)
           expect(result.output).toContain(`<file>${file}</file>`)
+          expect(result.output).toContain(`<file>${path.resolve(dir, "RECON_CHAPTERS.md")}</file>`)
           expect(result.output).toContain(path.resolve(dir, "reference", "part-0.md"))
           expect(result.output).toContain(path.resolve(dir, "reference", "part-14.md"))
           expect(result.output).not.toContain("file list is sampled")
