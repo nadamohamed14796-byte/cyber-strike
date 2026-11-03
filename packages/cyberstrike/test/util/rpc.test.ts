@@ -96,6 +96,25 @@ describe("util.rpc", () => {
     })
   })
 
+  test("rejects in-flight and future calls after the worker fails", async () => {
+    const sent: string[] = []
+    const target = {
+      postMessage(message: string) {
+        sent.push(message)
+      },
+      onmessage: null as ((this: Worker, event: MessageEvent<any>) => unknown) | null,
+    }
+    const client = Rpc.client<{ read: (input: string) => Promise<string> }>(target)
+    const failure = new Error("worker exited during startup")
+
+    const pending = client.call("read", "first")
+    client.fail(failure)
+
+    await expect(pending).rejects.toBe(failure)
+    await expect(client.call("read", "second")).rejects.toBe(failure)
+    expect(sent).toHaveLength(1)
+  })
+
   test("resolves successful calls and continues delivering events", async () => {
     const sent: string[] = []
     const target = {
