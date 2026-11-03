@@ -99,7 +99,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
     const denied = (reason: string, metadata: Record<string, unknown> = {}) => ({
       title: `attack_script: ${params.script} — refused`,
       output: "No script was executed. " + reason,
-      metadata: { script: params.script, exitCode: -1, blocked: true, ...metadata },
+      metadata: { script: params.script, exitCode: -1, hasStderr: false, blocked: true, ...metadata },
     })
     const normalizeTarget = (value: string): string | undefined => {
       try {
