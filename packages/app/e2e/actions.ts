@@ -3,7 +3,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { execSync } from "node:child_process"
-import { modKey, serverUrl } from "./utils"
+import { createSdk, modKey, serverUrl } from "./utils"
 import {
   sessionItemSelector,
   dropdownMenuTriggerSelector,
@@ -18,7 +18,6 @@ import {
   workspaceItemSelector,
   workspaceMenuTriggerSelector,
 } from "./selectors"
-import type { createSdk } from "./utils"
 
 export async function defocus(page: Page) {
   await page
@@ -207,6 +206,9 @@ export async function createTestProject() {
 }
 
 export async function cleanupTestProject(directory: string) {
+  // Release project-scoped watchers, searches, and services before deleting the
+  // temporary worktree. Otherwise an in-flight file scan can observe ENOENT.
+  await createSdk(directory).instance.dispose({ directory }).catch(() => undefined)
   await fs.rm(directory, { recursive: true, force: true }).catch(() => undefined)
 }
 
