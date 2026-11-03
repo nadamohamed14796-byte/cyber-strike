@@ -66,7 +66,7 @@ test("Impact Hunter proof-gap dispatch is suppressed during recon-only collectio
           sessionID: session.id,
           method: "GET",
           normalizedPath: "/api/search",
-          rawRequest: "GET /api/search?q=fixture HTTP/1.1\\r\\nHost: example.com\\r\\n\\r\\n",
+          rawRequest: "GET /api/search?q=fixture HTTP/1.1\r\nHost: example.com\r\n\r\n",
           scheme: "https",
           host: "example.com",
           origin: "https://example.com",
