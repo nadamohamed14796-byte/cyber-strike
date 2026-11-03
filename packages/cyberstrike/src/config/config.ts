@@ -1421,6 +1421,7 @@ export namespace Config {
   export type Info = z.output<typeof Info>
 
   export const global = lazy(async () => {
+    log.debug("global config load started", { directory: Global.Path.config })
     let result: Info = pipe(
       {},
       mergeDeep(await loadFile(path.join(Global.Path.config, "config.json"))),
@@ -1429,7 +1430,16 @@ export namespace Config {
     )
 
     const legacy = path.join(Global.Path.config, "config")
-    if (existsSync(legacy)) {
+    // The legacy TOML path predates loadFile's regular-file guard. Importing a
+    // FIFO/device here can block the CLI before its TUI is even constructed.
+    // Only import a small, regular file; ignore absent or special paths.
+    const legacyStat = await fs.stat(legacy).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT" && error.code !== "EACCES") {
+        log.warn("could not inspect legacy config path", { path: legacy, error })
+      }
+      return undefined
+    })
+    if (legacyStat?.isFile() && legacyStat.size <= 1024 * 1024) {
       await import(pathToFileURL(legacy).href, {
         with: {
           type: "toml",
@@ -1443,9 +1453,19 @@ export namespace Config {
           await Bun.write(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
           await fs.unlink(legacy)
         })
-        .catch(() => {})
+        .catch((error) => {
+          log.warn("legacy config migration failed; keeping JSON configuration", {
+            path: legacy,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
+    } else if (legacyStat && !legacyStat.isFile()) {
+      log.warn("skipping legacy config path that is not a regular file", { path: legacy })
+    } else if (legacyStat && legacyStat.size > 1024 * 1024) {
+      log.warn("skipping oversized legacy config file", { path: legacy, bytes: legacyStat.size })
     }
 
+    log.debug("global config load completed", { directory: Global.Path.config })
     return result
   })
 
