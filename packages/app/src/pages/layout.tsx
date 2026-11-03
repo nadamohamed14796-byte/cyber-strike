@@ -1635,6 +1635,19 @@ export default function Layout(props: ParentProps) {
     const key = workspaceKey(created.directory)
     const root = workspaceKey(local)
 
+    // The server persists the worktree, but the current global project snapshot
+    // is not guaranteed to refresh before the ready event arrives. Register it
+    // immediately so it remains in the sidebar after pending state clears.
+    globalSync.set(
+      "project",
+      produce((draft) => {
+        const current = draft.find((item) => item.worktree === local)
+        if (!current) return
+        current.sandboxes ??= []
+        if (!current.sandboxes.includes(created.directory)) current.sandboxes.push(created.directory)
+      }),
+    )
+
     const pending = WorktreeState.pending(created.directory)
     setBusy(created.directory, pending)
     setStore("workspaceExpanded", key, true)
