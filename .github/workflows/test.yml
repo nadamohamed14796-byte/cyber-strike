@@ -69,6 +69,7 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Install Chromium for Playwright
+        working-directory: packages/app
         run: bunx playwright install --with-deps chromium
 
       - name: Run app browser E2E without external model credentials
