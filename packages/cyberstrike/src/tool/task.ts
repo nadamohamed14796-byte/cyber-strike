@@ -109,7 +109,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // approval/validation/ledger gate below; ordinary task-spawning privileges
       // and scope/request enforcement remain separate.
       const impactHandoff = isInternalImpactHandoff({
-        subagentType: params.subagent_type,
+        subagentType: agent.id,
         background: params.background,
         caller: callerID,
         callerMode: caller?.mode,
@@ -117,7 +117,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Every Impact Hunter launch is evidence-gated, including explicit
       // @-invocations that bypass ordinary task permissions.
-      if (params.subagent_type === "impact-hunter") {
+      if (agent.id === "impact-hunter") {
         const promptLines = params.prompt.split("\n").map((line) => line.trim())
         const promptField = (name: string) => promptLines
           .find((line) => line.startsWith(name + ":"))
