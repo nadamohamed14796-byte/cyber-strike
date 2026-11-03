@@ -20,6 +20,11 @@ afterEach(() => {
 describe("util.rpc", () => {
   test("returns handler exceptions to the caller instead of leaving requests pending", async () => {
     const responses: string[] = []
+    Object.defineProperty(scope, "onmessage", {
+      configurable: true,
+      writable: true,
+      value: null,
+    })
     Object.defineProperty(scope, "postMessage", {
       configurable: true,
       writable: true,
