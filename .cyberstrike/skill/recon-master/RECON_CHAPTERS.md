@@ -299,7 +299,7 @@ Only when the exact candidate address and method are explicitly in scope, make a
 
 If policy permits a read-only comparison, preserve the same benign request semantics and the same owner-provided test identity on both paths. Record differences in authentication response, routing, cache directives, or service behavior as candidate signals only. Do not attempt to evade a WAF, send exploit payloads, or use high-volume requests.
 
-##### 5. Assess practical impact
+##### 5. Record potential significance and prepare handoff
 
 A potential issue exists only when evidence suggests that a material control or unintended service exposure differs at the origin. Record the exact differential and hand it to the relevant specialist for independent validation. If the origin is intentionally public and appears to enforce the same controls, retain it as inventory context only.
 
@@ -310,7 +310,7 @@ A potential issue exists only when evidence suggests that a material control or 
 - An IP address, historical DNS record, different certificate, or default virtual-host page alone is not a vulnerability.
 
 #### Output contract
-Return each origin candidate with its source, freshness, ownership confidence, scope decision, and reachability status. Where comparison is permitted, preserve paired edge/origin request and response references with the same path, method, Host, TLS SNI, identity, and relevant headers. Classify the result as inventory-only, control-difference verified, blocked, or inconclusive; state the exact control and observed difference.
+Return each origin candidate with its source, freshness, ownership confidence, scope decision, and reachability status. Where comparison is permitted, preserve paired edge/origin request and response references with the same path, method, Host, TLS SNI, identity, and relevant headers. Classify the result as inventory-only, edge/origin response-difference observed, blocked, or inconclusive; state the exact observed difference and the specialist validation still required.
 
 #### Evidence Requirements
 
@@ -716,10 +716,10 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 | Signal | Triage value | Follow-up |
 |---|---|---|
 | Distinct login portal | Potential separate identity boundary | Map SSO, tenant, and role flows |
-| Admin-like interface | High-value functionality candidate | Verify access control using test roles |
-| API documentation page | Endpoint inventory | Compare declared and observed auth controls |
+| Admin-like interface | High-value functionality candidate | Record visible roles/workflows; hand off to the authorization specialist for separately authorized test-role validation |
+| API documentation page | Endpoint inventory | Record declared endpoints/auth requirements; route deeper authorization checks to the API specialist |
 | Similar screenshots across hosts | Possible shared application deployment | Check hostname-specific configuration |
-| Unique upload/billing/tenant workflow | Business logic surface | Build a workflow map and test invariants |
+| Unique upload/billing/tenant workflow | Business logic surface | Map the visible workflow and trust boundary; hand off invariant testing to the business-logic specialist |
 | Browser error or parked page | Usually low value | Confirm DNS and attribution before discarding |
 | Different title only | Weak fingerprint | Corroborate with DOM/assets and repeat capture |
 
