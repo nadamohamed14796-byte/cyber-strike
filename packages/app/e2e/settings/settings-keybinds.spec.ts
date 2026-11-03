@@ -211,7 +211,9 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
     await keybindButton.click()
     await expect(keybindButton).toHaveText(/press/i)
 
-    await page.keyboard.press(`${modKey}+Shift+KeyM`)
+    // Ctrl/Cmd+Shift+M is intercepted by Chromium's profile switcher.
+    // Use a non-browser-reserved combination to test the app's keybind router.
+    await page.keyboard.press(`${modKey}+Alt+KeyM`)
     await page.waitForTimeout(100)
 
     const newKeybind = await keybindButton.textContent()
@@ -221,12 +223,12 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
       const raw = localStorage.getItem("settings.v3")
       return raw ? JSON.parse(raw) : null
     })
-    expect(stored?.keybinds?.["session.new"]).toBe("mod+shift+m")
+    expect(stored?.keybinds?.["session.new"]).toBe("mod+alt+m")
 
     await closeDialog(page, dialog)
 
-    await page.keyboard.press(`${modKey}+Shift+KeyM`)
-    await page.waitForTimeout(200)
+    await page.keyboard.press(`${modKey}+Alt+KeyM`)
+    await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(session.id)
 
     const newUrl = page.url()
     expect(newUrl).toMatch(/\/session\/[^/?#]+$/)
