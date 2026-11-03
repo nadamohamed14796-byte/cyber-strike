@@ -148,7 +148,9 @@ Preserve the contributing source references when several sources identify the sa
 
 Continue with independent, relevant sources while they can add meaningful coverage. Do not repeat an unchanged source/query after a deterministic failure or a completed zero-result response; choose a materially different source or record the unresolved coverage gap. There is no fixed candidate-count ceiling, but scope, rate, and safety controls remain authoritative.
 
-#### Additional references
+
+
+#### References
 
 - https://github.com/projectdiscovery/subfinder
 - https://github.com/owasp-amass/amass
@@ -157,8 +159,6 @@ Continue with independent, relevant sources while they can add meaningful covera
 - https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://www.rfc-editor.org/rfc/rfc1034
-
----
 
 ## 03. ASN and infrastructure mapping
 
@@ -267,28 +267,20 @@ These are asset-attribution outcomes, not vulnerability verdicts. Vulnerability 
 ##### Stop and handoff
 
 Stop on scope ambiguity, unexpected user data, service degradation, secret exposure, or prohibited behavior. Return the exact relationship, source/time, attribution class, confidence, explicit scope decision, exclusions, and the next evidence needed. Start a chained skill only when its trigger has been independently observed.
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/asn-infrastructure-mapping/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/asn-infrastructure-mapping/SKILL.md)
 - [RIPE NCC — IP and ASN resources](https://www.ripe.net/)
 - [BGP.tools](https://bgp.tools/)
 - [RFC 9082 — RDAP Query Format](https://www.rfc-editor.org/rfc/rfc9082)
-
-#### Additional validation refinements
-
-##### Ownership-confidence ladder and scan boundary
-For every IP/prefix/ASN pivot, retain the organization attribution source, relationship type (owned subsidiary, provider, shared cloud/CDN, stale historical link), observation date, and confidence. Corroborate with first-party asset lists, RDAP/RIR records, certificates, DNS, and product branding before assigning ownership; ASN membership alone never authorizes scanning every announced address. Keep passive-only leads separate from active-scan candidates and record why a candidate passes the target's actual program scope. Use new IPs to discover relationships, not to widen scope implicitly. Route confirmed public service exposure to service discovery and cloud-owned resource policy questions to cloud assessment.
-
-#### Additional references
-
 - https://github.com/projectdiscovery/asnmap
 - https://docs.ripe.net/
 - https://stat.ripe.net/docs/
 - https://owasp.org/www-project-web-security-testing-guide/
 
----
-
-## 04. Origin IP exposure assessment
+IP exposure assessment
 
 
 ### Chapter profile
@@ -319,7 +311,7 @@ Resolve A/AAAA/CNAME records, record certificate and HTTP behavior, and identify
 
 ##### 2. Collect passive origin candidates
 
-Correlate historical DNS, certificate transparency, organization-owned DNS records, public service metadata, passive scan results, favicon fingerprints, and attributable ASN/IP information. Analytics identifiers may be used only as weak search pivots when already observed in first-party content; shared IDs and favicon matches are not ownership proof. Treat old DNS records, mail servers, and unrelated addresses in a shared prefix as candidates until independently corroborated.
+Correlate historical DNS, certificate transparency, organization-owned DNS records, first-party deployment/configuration references, observed redirects, public service metadata, passive scan results, favicon fingerprints, and attributable ASN/IP information. Analytics identifiers may be used only as weak search pivots when already observed in first-party content; shared IDs and favicon matches are not ownership proof. Treat old DNS records, mail servers, and unrelated addresses in a shared prefix as candidates until independently corroborated.
 
 ##### 3. Confirm candidate identity without bypass assumptions
 
@@ -369,43 +361,18 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 - Treat exposed origin IPs as informational unless direct access changes security posture.
 
 
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/origin-ip-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/origin-ip-discovery/SKILL.md)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [RFC 6066: TLS Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066)
-
-
-#### Additional validation refinements
-
-##### Origin attribution versus bypass claims
-Build candidate origins from historical DNS, certificate/deployment metadata, first-party configuration, and observed redirects, but score each by freshness and organization attribution. A CDN/origin relationship does not automatically permit direct-origin requests; verify the candidate is in program scope and that testing the origin is allowed. If permitted, compare one harmless public path through the normal edge and candidate origin, recording TLS, Host/routing, authentication, and applicable controls. Do not bypass a WAF to access protected content or treat an origin IP as a security bug by itself. Confirm a meaningful difference before chaining to host-header, cache, or access-control review.
-
-
-#### Additional references
-
 - https://docs.projectdiscovery.io/
 - https://docs.securitytrails.com/
 - https://docs.censys.com/
 - https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/
 - https://owasp.org/www-project-web-security-testing-guide/
-
----
-
-## 05. Port and service discovery
-
-
-### Chapter profile
-
-**Purpose:** Classify services on confirmed target infrastructure and prioritize web, API, management, and unusual-port exposures using bounded probes.
-
-**Prerequisites:** An attributable host or IP explicitly authorized for service discovery
-
-**Technology:** `TCP`, `UDP`, `HTTP`, `TLS`, `DNS`, `Linux`
-
-**Coverage tags:** `recon`, `ports`, `services`, `network`, `HTTP`, `TLS`
-
-**Legacy source:** `recon-port-service-discovery` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -415,7 +382,7 @@ Identify reachable services and distinguish expected public application surfaces
 
 ##### 1. Establish host attribution and scan boundaries
 
-Use confirmed target addresses, document included ports and rate limits, and exclude shared-provider ranges unless explicitly listed. Prefer DNS-derived and first-party confirmed IPs over broad ASN expansion. Record the time window and source address of the scan.
+For each candidate, retain the exact DNS/resolver result, attribution source, scope basis, ownership class, and service-discovery confidence. Use only confirmed target addresses and explicitly authorized ports; document rate/concurrency limits and scan vantage point. Exclude shared-provider ranges unless explicitly listed, and prefer DNS-derived/first-party confirmed IPs over broad ASN expansion.
 
 ##### 2. Start with low-impact TCP discovery
 
@@ -474,44 +441,19 @@ For a suspected issue, preserve one benign handshake or read-only response and r
 - Avoid high-rate full-range scans unless explicitly allowed; broad scanning is not a substitute for targeted validation.
 - Do not infer that all addresses within a hosting provider's ASN belong to the target.
 
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/port-service-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/port-service-discovery/SKILL.md)
 - [Nmap Reference Guide](https://nmap.org/book/man.html)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
-
-#### Additional validation refinements
-
-##### Service fingerprint and owner gate
-For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.
-
-#### Additional references
-
 - https://github.com/projectdiscovery/naabu
 - https://github.com/projectdiscovery/tlsx
 - https://github.com/projectdiscovery/httpx
 - https://nmap.org/download.html
 - https://nmap.org/book/man.html
 - https://owasp.org/www-project-web-security-testing-guide/
-
----
-
-## 06. Virtual-host enumeration
-
-
-### Chapter profile
-
-**Purpose:** Identify virtual hosts and tenant-specific applications on confirmed infrastructure using DNS, TLS, HTTP Host behavior, and response clustering.
-
-**Prerequisites:** A confirmed target domain or attributable server IP
-
-**Technology:** `HTTP`, `TLS`, `DNS`, `reverse-proxy`
-
-**Coverage tags:** `recon`, `virtual-host`, `HTTP`, `TLS`, `DNS`
-
-**Related security workflows:** `attack-host-header`
-
-**Legacy source:** `recon-vhost-enumeration` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -521,7 +463,7 @@ Identify hostnames routed by a shared web server or reverse proxy, then classify
 
 ##### 1. Establish response fingerprints
 
-Capture a baseline for the canonical hostname and a random nonexistent hostname. Record status, redirect, title, body hash/length, certificate names, server headers, and a stable application marker. This identifies default virtual hosts and wildcard DNS behavior.
+Capture a baseline for the canonical hostname, a known-invalid Host value, and a random nonexistent path. Keep IP, TLS SNI, path, and request headers constant while varying only the authority/Host dimension. Record status, redirect, title, body hash/length, certificate names, server headers, cookies, and a stable application marker. This identifies default virtual hosts, wildcard DNS, and soft-404 behavior.
 
 ##### 2. Generate candidate hostnames
 
@@ -574,44 +516,17 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - Keep host discovery separate from vulnerability claims.
 
 
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/vhost-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/vhost-enumeration/SKILL.md)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110)
 - [RFC 6066: TLS Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066)
-
-
-#### Additional validation refinements
-
-##### Vhost baseline and soft-404 control
-Establish stable fingerprints for a known host, a known-invalid host header, and a random nonexistent path. Vary only the authority/Host dimension while keeping IP, TLS SNI, path, and request headers clear in the notes. Record status, title, body hash/length, redirects, cookies, and server-selected application; a different title or 200 alone may be a default virtual host. Confirm a discovered vhost through product-specific content or a second source and re-check program scope before active tests. Route valid applications to web recon and host-derived links to host-header review; do not treat shared reverse-proxy routing as a vulnerability without a security consequence.
-
-
-#### Additional references
-
 - https://docs.projectdiscovery.io/tools/httpx/overview
 - https://github.com/ffuf/ffuf
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://portswigger.net/web-security/host-header
-
----
-
-## 07. CMS and component fingerprinting
-
-
-### Chapter profile
-
-**Purpose:** Fingerprint CMS platforms, versions, themes, plugins, and exposed administrative surfaces using corroborated passive and low-impact signals.
-
-**Prerequisites:** A confirmed in-scope asset and authorization for the specific procedure.
-
-**Technology:** `HTTP`, `HTML`, `JavaScript`, `DNS`
-
-**Coverage tags:** `recon`, `CMS`, `WordPress`, `Drupal`, `Joomla`, `fingerprinting`
-
-**Related security workflows:** `attack-wordpress`, `attack-source-leak`, `attack-information-disclosure`
-
-**Legacy source:** `recon-cms-detection` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -643,7 +558,7 @@ Review public plugin/theme asset paths, frontend bundles, REST routes, GraphQL s
 
 ##### 5. Prepare the specialist handoff
 
-Map a corroborated component/version to a credible advisory and record the affected-version range, advisory prerequisites, and evidence that the component/path is present. Do not run a proof-of-concept or exploit from this Recon chapter. A version match is a lead, not proof that the vulnerable code path is reachable or that the application is exploitable.
+Maintain separate confidence for CMS identity, component identity/version, deployment ownership, and advisory applicability. Map a corroborated component/version to a credible advisory and record the affected-version range, prerequisites, and evidence that the component/path is present. Do not run a proof-of-concept or exploit from this Recon chapter. A version match is a lead, not proof that the vulnerable code path is reachable or that the application is exploitable; the specialist must independently verify the affected code path.
 
 #### Output contract
 
@@ -691,43 +606,18 @@ Map a corroborated component/version to a credible advisory and record the affec
 - Keeping CMS core, themes, and plugins current, and restricting admin/login routes by network or MFA, reduces both the fingerprinting surface and the exploitability of anything found.
 
 
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/cms-detection/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/cms-detection/SKILL.md)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [NIST National Vulnerability Database](https://nvd.nist.gov/)
-
-
-#### Additional validation refinements
-
-##### Fingerprint-to-vulnerability gate
-Maintain independent confidence for CMS identity, component identity/version, deployment ownership, and vulnerability applicability. Corroborate a fingerprint with multiple signals and account for reverse-proxy caches, custom themes, backported fixes, and misleading banners. Before invoking a version-specific skill, verify the affected component is reachable and that the preconditions are plausible; do not map a scanner's version label directly to a confirmed CVE. Use passive/GET-only probes where possible, preserve response hashes and the exact fingerprint source, and stop when no meaningful permitted observation remains. Chain to the CMS-specific skill only after identity evidence, then require that skill's independent proof gate.
-
-
-#### Additional references
-
 - https://github.com/urbanadventurer/WhatWeb
 - https://wpscan.com/
 - https://github.com/RetireJS/retire.js
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/vavkamil/awesome-bugbounty-tools
-
----
-
-## 08. Visual reconnaissance and application clustering
-
-
-### Chapter profile
-
-**Purpose:** Use screenshots, page titles, visual clustering, and browser-observed behavior to prioritize web assets and identify distinct applications.
-
-**Prerequisites:** A confirmed in-scope asset and authorization for the specific procedure.
-
-**Technology:** `HTTP`, `browser`, `TLS`
-
-**Coverage tags:** `recon`, `screenshots`, `visual-triage`, `web-enumeration`
-
-**Legacy source:** `recon-visual-recon` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -747,7 +637,7 @@ Deduplicate URLs by canonical hostname and path, remove malformed entries, and c
 
 ##### 2. Capture consistent snapshots
 
-Use a headless browser or screenshot tool with a consistent viewport, wait condition, and timeout. Record URL, final URL, title, status, screenshot path, timestamp, and any TLS/certificate errors. Avoid submitting forms or triggering state changes during automated capture.
+Use a headless browser or screenshot tool with a consistent viewport, wait condition, timeout, and auth context. Record URL, final URL, title, status, screenshot path and content hash, timestamp, and any TLS/certificate errors. Avoid submitting forms or triggering state changes during automated capture.
 
 ##### 3. Cluster applications
 
@@ -819,32 +709,13 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 Capture consistent screenshots at the same viewport and auth context, then cluster only as a navigation aid—not as proof that two apps share code or ownership. Retain URL, screenshot hash/path, title, favicon/theme fingerprint, response status, and comparison rationale. Convert each visual anomaly into one question (different tenant, admin console, old version, hidden workflow, unexpected login state) and verify with normal HTTP evidence. Avoid screenshotting personal information and redact account names/IDs. Route admin-specific paths to BFLA, tenant/object references to IDOR, and visually different auth flows to the authentication specialist only after the request behavior corroborates the visual clue.
 
 
-#### Additional references
+
+
+#### References
 
 - https://github.com/sensepost/gowitness
 - https://github.com/michenriksen/aquatone
 - https://github.com/vavkamil/awesome-bugbounty-tools
-
----
-
-## 09. Public GitLab project reconnaissance
-
-
-### Chapter profile
-
-**Purpose:** Inventory public GitLab projects, groups, package artifacts, CI configuration, and exposed metadata with ownership verification.
-
-**Prerequisites:** A confirmed organization namespace or public GitLab instance
-
-**Technology:** `GitLab`, `Git`, `HTTP`, `CI/CD`
-
-**Coverage tags:** `recon`, `GitLab`, `source-code`, `CI/CD`, `information-disclosure`
-
-**Related security workflows:** `attack-source-leak`, `cicd-attacks`
-
-**Specialist validation threshold:** a public artifact appears to expose a sensitive private asset or secret-like material. This chapter records redacted evidence only; the source-leak/information-disclosure specialist independently validates impact without using the secret.
-
-**Legacy source:** `recon-gitlab-public-recon` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -862,7 +733,7 @@ Review project descriptions, default branches, tags/releases, package registries
 
 ##### 3. Inspect high-value files and history
 
-Prioritize deployment manifests, CI variables references, Dockerfiles, infrastructure-as-code, environment templates, configuration files, backup artifacts, and scripts that reveal trust boundaries. Review commit history where public and relevant; avoid cloning huge unrelated repositories or collecting private user data.
+Prioritize deployment manifests, CI variables references, Dockerfiles, infrastructure-as-code, environment templates, configuration files, backup artifacts, and scripts that reveal trust boundaries. Review commit history where public and relevant; record repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Avoid cloning huge unrelated repositories or collecting private user data.
 
 ##### 4. Analyze CI/CD trust boundaries
 
@@ -928,112 +799,20 @@ Persist a read-only inventory of attributable GitLab groups/projects, project id
 Confirm namespace/organization attribution and public visibility before pivoting through group projects, forks, issue attachments, packages, snippets, build artifacts, and commit history. Preserve repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Secret-like matches must be recorded as type plus redacted fingerprint; do not test or reuse credentials or access projects beyond what is public and authorized. Distinguish public code disclosure from an exploitable credential or CI trust boundary. Route workflow/runner problems to CI/CD review, first-party JavaScript to JS analysis, and secret candidates to evidence-safe triage without invoking them.
 
 
-#### Additional references
+
+
+#### References
 
 - https://github.com/gitleaks/gitleaks
 - https://docs.gitlab.com/cli/
 - https://git-scm.com/docs
 - https://github.com/vavkamil/awesome-bugbounty-tools
-
----
-
-## 10. Email domain security assessment
-
-
-### Chapter profile
-
-**Purpose:** Assess SPF, DKIM, DMARC, MX, MTA-STS, TLS-RPT, and mail transport configuration for domain spoofing and delivery risks.
-
-**Prerequisites:** A confirmed organization-owned domain
-
-**Technology:** `DNS`, `SMTP`, `TLS`
-
-**Coverage tags:** `email-security`, `SPF`, `DKIM`, `DMARC`, `DNS`, `SMTP`
-
-**Related security workflows:** `attack-exchange-owa`, `attack-oauth`
-
-**Specialist validation threshold:** recipient-side evidence from a separately authorized, controlled, non-deceptive test may establish impersonation impact. This Recon chapter performs no mail sending and records posture plus the required specialist validation.
-
-**Legacy source:** `recon-email-security` v"1.0.0"; credited to cyberstrike-official.
-
-#### Objective
-
-Evaluate whether DNS policy and mail authentication allow sender impersonation or expose weaknesses in mail transport. DNS posture alone does not prove that a spoofed message will reach an inbox; receiver policy, alignment, and actual message authentication results matter.
-
-#### Methodology
-
-##### 1. Inventory mail identity and routing
-
-Collect MX records, SPF TXT records, the _dmarc policy, DKIM selectors known from legitimate messages or provider documentation, and MTA-STS/TLS-RPT records. Record DNS TTLs and delegated subdomains. Assess the organizational domain and mail-sending subdomains separately.
-
-##### 2. Evaluate SPF correctly
-
-Check for one valid SPF record, syntax errors, excessive DNS lookups, unintended broad mechanisms, and the terminal qualifier. The qualifiers -all, ~all, ?all, and +all have materially different semantics. SPF authorizes sending hosts for the SMTP envelope domain; it does not alone authenticate the visible From header and must be interpreted with DMARC alignment.
-
-##### 3. Evaluate DKIM coverage
-
-Review DKIM signatures from legitimate organization mail and verify selector DNS records, key strength, and signing-domain alignment. A missing guessed selector is not proof DKIM is absent; selectors are sender-specific. A published key proves configuration, not that every mail stream is signed.
-
-##### 4. Evaluate DMARC policy and alignment
-
-Parse p, sp, pct, adkim, aspf, rua, and ruf. Determine whether the visible From domain aligns with SPF and/or DKIM. Assess root-domain and subdomain policy. p=none requests monitoring rather than enforcement, but does not automatically prove successful impersonation or total lack of receiver-side protection.
-
-##### 5. Evaluate transport controls
-
-Inspect MTA-STS policy and TLS-RPT reporting configuration where published. Check MX host TLS behavior with a normal protocol-aware client, certificate validity, and support for modern TLS. Separate transport encryption posture from sender identity authentication.
-
-##### 6. Prepare a safe validation handoff
-
-Prefer passive DNS and analysis of legitimate, owner-provided test messages. Do not send spoofed or test mail from this Recon procedure. If recipient-side testing is separately authorized, record the required controlled mailbox, sender/domain, and evidence to be collected, then hand off that test plan without sending the message.
-
-#### Security significance and handoff triggers
-
-- SPF/DKIM/DMARC or transport-policy observations may indicate impersonation or downgrade risk; record domain/subdomain scope and the exact technical basis.
-- A weak DNS record alone is not proof that an email will be spoofed or delivered.
-- MX presence, a missing guessed DKIM selector, or p=none without recipient-side evidence is not proof of compromise.
-- This chapter reports posture and validation requirements; it does not send mail or confirm successful impersonation.
-
-#### Output contract
-Record the organization-owned mail domain and each observed MX, SPF, DKIM selector/result, DMARC policy/alignment, MTA-STS, TLS-RPT, and relevant TLS posture observation with DNS provenance, TTL/freshness, and validation limits. Separate missing/misconfigured policy from demonstrated exploitability. Do not send unsolicited mail or create a separate mail inventory when the canonical asset record can hold the observations.
-
-#### Evidence Requirements
-
-- Sanitized DNS outputs with timestamps and TTLs.
-- Parsed SPF/DMARC values and lookup-count analysis.
-- If a separate mail test is approved and performed by the authorized owner/specialist, its sanitized Authentication-Results, From, Return-Path, DKIM d=, and DMARC alignment result. This chapter does not send that test message.
-- Never include recipient personal data, session material, or deceptive-message content in reusable artifacts.
-
-#### Email Control Matrix
-
-| Control | Strong posture | Weak signal | Interpretation caveat |
-|---|---|---|---|
-| SPF | One valid record, narrow senders, deliberate terminal policy | Permissive +all, invalid record, excessive lookups | SPF authenticates envelope sender, not visible From alone |
-| DKIM | Relevant streams signed with aligned domain and adequate key | Unsigned stream or misaligned signature | Unknown selector does not mean no DKIM |
-| DMARC | p=reject after monitoring, correct alignment and subdomain policy | p=none, partial rollout, weak alignment | Receiver handling can differ; policy is not delivery proof |
-| MX | Expected mail providers only | Stale/unexpected MX | MX is routing metadata, not spoofing proof |
-| MTA-STS | Valid policy with enforce mode where appropriate | Missing/expired policy or testing mode | Applies to SMTP transport, not sender identity |
-| TLS-RPT | Reports configured and reviewed | No reporting visibility | Reporting absence is usually hardening, not direct exploit |
-| Subdomains | Explicit sending and DMARC strategy | Unmanaged subdomain mail | Parent policy and sp behavior must be checked |
-
-#### Verification and False Positives
-
-- Re-query DNS from independent resolvers and account for TTL/propagation.
-- Check for duplicate SPF records and parse nested includes rather than judging one TXT string.
-- Evaluate SPF and DKIM alignment with the exact visible From domain.
-- Distinguish transport TLS findings from spoofing findings.
-- Do not infer that any third-party service allowed by SPF can freely send as the domain; provider-side account/domain verification controls matter.
-- Avoid claims of complete spoofing without a controlled recipient-side result or strong technical proof.
-
-
-#### References
-
 - Source merged: [uphiago/recon-skills — recon/email-security/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/email-security/SKILL.md)
 - [RFC 7208 — SPF](https://www.rfc-editor.org/rfc/rfc7208)
 - [RFC 6376 — DKIM](https://www.rfc-editor.org/rfc/rfc6376)
 - [RFC 7489 — DMARC](https://www.rfc-editor.org/rfc/rfc7489)
 - [RFC 8461 — MTA-STS](https://www.rfc-editor.org/rfc/rfc8461)
 - [RFC 8460 — TLS Reporting](https://www.rfc-editor.org/rfc/rfc8460)
-
 
 #### Additional validation refinements
 
@@ -1063,7 +842,7 @@ For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/ali
 
 **Coverage tags:** `information-disclosure`, `error-logs`, `debug`, `secrets-hygiene`, `PHP`
 
-**Related security workflows:** `attack-information-disclosure`, `attack-source-leak`, `attack-phpinfo-exposure`
+**Related security workflows:** `attack-information-disclosure`, `attack-source-leak`, `attack-phpinfo-exposure`, `attack-metrics-exposure`
 
 **Relevant weakness classes:** `CWE-200`, `CWE-532`
 
@@ -1091,7 +870,7 @@ Use HEAD or range requests when supported, impose strict byte/time limits, and a
 
 ##### 4. Classify disclosed material
 
-Classify findings into internal filesystem paths and deployment layout; stack traces, framework versions, and component names; SQL statements or schema names; internal hostnames/IPs; email addresses and user identifiers; secret-like strings, tokens, cookies, database connection strings, or signing material; and user-submitted data accidentally logged.
+Classify candidate disclosures into internal filesystem paths and deployment layout; stack traces, framework versions, and component names; SQL statements or schema names; internal hostnames/IPs; email addresses and user identifiers; secret-like strings, tokens, cookies, database connection strings, or signing material; and user-submitted data accidentally logged. Immediately redact internal URLs, query values, personal data, cookies, tokens, and secret contents; preserve only the data category, location, and minimal redacted fingerprint.
 
 Treat pattern matches as candidates only. Never test a discovered credential against a service; confirm validity through an owner-provided verification channel or metadata that does not expose or use the secret.
 
@@ -1143,22 +922,15 @@ For each candidate, record the in-scope URL/resource, response/access context, t
 - If evidence contains secrets, stop collection, redact immediately, and follow the engagement's sensitive-data handling process.
 
 
+
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/error-log-mining/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/error-log-mining/SKILL.md)
 - [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
 - [CWE-200: Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
 - [CWE-532: Insertion of Sensitive Information into Log File](https://cwe.mitre.org/data/definitions/532.html)
-
-
-#### Additional validation refinements
-
-##### Log validation without collecting secrets
-First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to information-disclosure triage with the observed data category and unresolved impact question.
-
-
-#### Additional references
-
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 - https://github.com/vavkamil/awesome-bugbounty-tools
+
