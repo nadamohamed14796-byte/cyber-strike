@@ -12,6 +12,7 @@ import {
   parseReconRun as parseRun,
   reconRunID,
   reconScopeFingerprint,
+  reconScopeFingerprintForWorkspace,
   reconPhaseStartDecision,
   type ReconPhase,
   type ReconPhaseRecord,
@@ -27,34 +28,7 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
-/** Load the effective authorization chain for a selected workspace, rejecting broken or cross-root ancestry. */
-async function scopeFingerprintForWorkspace(start: Workspace, expectedRootID: string): Promise<string> {
-  const byID = new Map(TargetMemory.list().map((item) => [item.id, item]))
-  const visited = new Set<string>()
-  const scopes: TargetScope[] = []
-  let current: Workspace | undefined = start
-  let foundExpectedRoot = false
-  while (current) {
-    if (visited.has(current.id)) throw new Error("target workspace ancestry contains a cycle; scope validation cannot be trusted")
-    visited.add(current.id)
-    if (current.id === expectedRootID) foundExpectedRoot = true
-    const scope = await TargetMemory.getScope(current.targetURL)
-    if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
-      throw new Error("workspace " + current.targetURL + " has no configured persisted scope")
-    }
-    scopes.push(scope)
-    if (!current.parentTargetID) break
-    const parent = byID.get(current.parentTargetID)
-    if (!parent) throw new Error("parent target workspace is missing; refusing to weaken inherited scope")
-    current = parent
-  }
-  if (!foundExpectedRoot || current?.id !== expectedRootID) {
-    throw new Error("the starting asset resolves to a different canonical program workspace; re-check it under the current root")
-  }
-  return reconScopeFingerprint(scopes)
-}
-
-/** Turn a saved, supported scope entry into one concrete URL candidate for initial checkpoint setup. */
+/** Turn a saved, supported scope entryto one concrete URL candidate for initial checkpoint setup. */
 function scopeEntryURL(entry: string): string | undefined {
   let value = entry.trim().replace(/^(?:url|domain|wildcard|api|ip address|cidr)\s*:\s*/i, "")
   if (!value || /^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
@@ -348,7 +322,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               if (!decision.allowed || !decision.workspace) {
                 invalidationReason = "The previously validated starting asset no longer passes persisted scope: " + decision.reason
               } else {
-                const currentFingerprint = await scopeFingerprintForWorkspace(decision.workspace, workspace.id)
+                const currentFingerprint = await reconScopeFingerprintForWorkspace(decision.workspace, workspace.id)
                 if (savedFingerprint && currentFingerprint !== savedFingerprint) {
                   invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
                 } else if (!savedFingerprint || validatedTarget !== scopeValidation.scopeValidationTarget) {
@@ -570,7 +544,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the starting asset is not authorized by the persisted manifest: " + targetDecision.reason, metadata: { saved: false, reason: "scope_validation_target_out_of_scope", target: parsedValidationTarget.href } }
           }
           try {
-            validatedScopeFingerprint = await scopeFingerprintForWorkspace(targetDecision.workspace, workspace.id)
+            validatedScopeFingerprint = await reconScopeFingerprintForWorkspace(targetDecision.workspace, workspace.id)
           } catch (error) {
             return {
               title: "Scope validation rejected",
