@@ -950,7 +950,7 @@ Confirm namespace/organization attribution and public visibility before pivoting
 
 **Coverage tags:** `email-security`, `SPF`, `DKIM`, `DMARC`, `DNS`, `SMTP`
 
-**Related security workflows:** `attack-information-disclosure`
+**Related security workflows:** `attack-exchange-owa`, `attack-oauth`
 
 **Specialist validation threshold:** recipient-side evidence from a separately authorized, controlled, non-deceptive test may establish impersonation impact. This Recon chapter performs no mail sending and records posture plus the required specialist validation.
 
