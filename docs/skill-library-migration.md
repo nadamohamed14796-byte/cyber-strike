@@ -6,7 +6,7 @@ Merge the useful methods from CyberStrike's existing skills and the two upstream
 - https://github.com/elementalsouls/Claude-BugHunter
 - https://github.com/uphiago/recon-skills
 
-The expected result is one comprehensive, CyberStrike-native file per canonical skill area—not parallel files named after upstream skills. Reconnaissance is the approved umbrella exception: one `recon-master` entry contains the eleven ordered specialist chapters.
+The expected result is one comprehensive, CyberStrike-native entry per canonical skill area—not parallel files named after upstream skills. Reconnaissance is the approved umbrella exception: one `recon-master` router selects eleven ordered specialist procedures from its on-demand `RECON_CHAPTERS.md` companion. The skill entry remains singular; the companion is reference content, not a separately loadable skill.
 
 ## Non-negotiable rules
 
