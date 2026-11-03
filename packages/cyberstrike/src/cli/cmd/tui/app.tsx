@@ -47,7 +47,11 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
     let timeout: NodeJS.Timeout
 
     const cleanup = () => {
-      process.stdin.setRawMode(false)
+      if (process.stdin.isTTY) {
+        try {
+          process.stdin.setRawMode(false)
+        } catch {}
+      }
       process.stdin.removeListener("data", handler)
       clearTimeout(timeout)
     }
@@ -88,14 +92,17 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
       }
     }
 
-    process.stdin.setRawMode(true)
-    process.stdin.on("data", handler)
-    process.stdout.write("\x1b]11;?\x07")
-
-    timeout = setTimeout(() => {
-      cleanup()
+    try {
+      process.stdin.setRawMode(true)
+      process.stdin.on("data", handler)
+      process.stdout.write("\x1b]11;?\x07")
+      timeout = setTimeout(() => {
+        cleanup()
+        resolve("dark")
+      }, 1000)
+    } catch {
       resolve("dark")
-    }, 1000)
+    }
   })
 }
 
@@ -110,24 +117,33 @@ export function tui(input: {
   events?: EventSource
   onExit?: () => Promise<void>
 }) {
-  // promise to prevent immediate exit
-  return new Promise<void>(async (resolve) => {
+  // Keep the renderer alive until onExit, while allowing startup failures to
+  // reject the returned promise instead of leaving callers pending forever.
+  return (async () => {
     const unguard = win32InstallCtrlCGuard()
-    win32DisableProcessedInput()
+    try {
+      win32DisableProcessedInput()
 
-    const mode = await getTerminalBackgroundColor()
+      const mode = await getTerminalBackgroundColor()
 
-    // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
-    // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
-    win32DisableProcessedInput()
+      // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
+      // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
+      win32DisableProcessedInput()
 
-    const onExit = async () => {
-      unguard?.()
-      await input.onExit?.()
-      resolve()
-    }
+      return await new Promise<void>((resolve) => {
+        let exiting = false
+        const onExit = async () => {
+          if (exiting) return
+          exiting = true
+          try {
+            await input.onExit?.()
+          } finally {
+            unguard?.()
+            resolve()
+          }
+        }
 
-    render(
+        render(
       () => {
         return (
           <ErrorBoundary
@@ -191,8 +207,13 @@ export function tui(input: {
           },
         },
       },
-    )
-  })
+        )
+      })
+    } catch (error) {
+      unguard?.()
+      throw error
+    }
+  })()
 }
 
 function App() {
@@ -251,10 +272,6 @@ function App() {
     renderer.clearSelection()
   }
   const [terminalTitleEnabled, setTerminalTitleEnabled] = createSignal(kv.get("terminal_title_enabled", true))
-
-  createEffect(() => {
-    console.log(JSON.stringify(route.data))
-  })
 
   // Update terminal window title based on current route and session
   createEffect(() => {
