@@ -30,6 +30,31 @@ test("network attack scripts require persisted scope and an active vulnerability
   })
 })
 
+test("cloud storage enumeration cannot probe generated third-party bucket hosts outside scope", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      await TargetMemory.configureScope("https://cloud-gate.example.test", {
+        include: ["cloud-gate.example.test"],
+        authorizationSource: "Cloud storage scope fixture",
+        authorizationReference: "https://cloud-gate.example.test/security",
+      })
+      const tool = await AttackScriptTool.init()
+      const result = await tool.execute({
+        script: "cloud_storage_enum",
+        args: ["cloud-gate.example.test"],
+        timeout_seconds: 5,
+      } as never)
+
+      expect(result.metadata.scopeDenied).toBe(true)
+      expect(result.metadata.exitCode).toBe(-1)
+      expect(result.output).toContain("No script was executed.")
+      expect(result.output).toContain("s3.amazonaws.com")
+    },
+  })
+})
+
 test("Wayback active probing is refused until each archived URL can be scope-checked", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
