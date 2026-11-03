@@ -260,84 +260,114 @@ export namespace File {
     ),
   }
 
-  const state = Instance.state(async () => {
-    type Entry = { files: string[]; dirs: string[] }
-    let cache: Entry = { files: [], dirs: [] }
-    let fetching = false
+  const state = Instance.state(
+    async () => {
+      type Entry = { files: string[]; dirs: string[] }
+      const directory = Instance.directory
+      let cache: Entry = { files: [], dirs: [] }
+      let fetching = false
+      let disposed = false
+      const abort = new AbortController()
+      let activeScan: Promise<void> | undefined
 
-    const isGlobalHome = Instance.directory === Global.Path.home && Instance.project.id === "global"
+      const isGlobalHome = directory === Global.Path.home && Instance.project.id === "global"
 
-    const fn = async (result: Entry) => {
-      // Disable scanning if in root of file system
-      if (Instance.directory === path.parse(Instance.directory).root) return
-      fetching = true
+      const fn = async (result: Entry) => {
+        if (disposed || directory === path.parse(directory).root) return
+        fetching = true
+        try {
+          if (isGlobalHome) {
+            const dirs = new Set<string>()
+            const ignore = new Set<string>()
 
-      if (isGlobalHome) {
-        const dirs = new Set<string>()
-        const ignore = new Set<string>()
+            if (process.platform === "darwin") ignore.add("Library")
+            if (process.platform === "win32") ignore.add("AppData")
 
-        if (process.platform === "darwin") ignore.add("Library")
-        if (process.platform === "win32") ignore.add("AppData")
+            const ignoreNested = new Set(["node_modules", "dist", "build", "target", "vendor"])
+            const shouldIgnore = (name: string) => name.startsWith(".") || ignore.has(name)
+            const shouldIgnoreNested = (name: string) => name.startsWith(".") || ignoreNested.has(name)
 
-        const ignoreNested = new Set(["node_modules", "dist", "build", "target", "vendor"])
-        const shouldIgnore = (name: string) => name.startsWith(".") || ignore.has(name)
-        const shouldIgnoreNested = (name: string) => name.startsWith(".") || ignoreNested.has(name)
+            const top = await fs.promises
+              .readdir(directory, { withFileTypes: true })
+              .catch(() => [] as fs.Dirent[])
 
-        const top = await fs.promises
-          .readdir(Instance.directory, { withFileTypes: true })
-          .catch(() => [] as fs.Dirent[])
+            for (const entry of top) {
+              if (disposed || abort.signal.aborted) return
+              if (!entry.isDirectory()) continue
+              if (shouldIgnore(entry.name)) continue
+              dirs.add(entry.name + "/")
 
-        for (const entry of top) {
-          if (!entry.isDirectory()) continue
-          if (shouldIgnore(entry.name)) continue
-          dirs.add(entry.name + "/")
+              const base = path.join(directory, entry.name)
+              const children = await fs.promises
+                .readdir(base, { withFileTypes: true })
+                .catch(() => [] as fs.Dirent[])
+              if (disposed || abort.signal.aborted) return
+              for (const child of children) {
+                if (!child.isDirectory()) continue
+                if (shouldIgnoreNested(child.name)) continue
+                dirs.add(entry.name + "/" + child.name + "/")
+              }
+            }
 
-          const base = path.join(Instance.directory, entry.name)
-          const children = await fs.promises.readdir(base, { withFileTypes: true }).catch(() => [] as fs.Dirent[])
-          for (const child of children) {
-            if (!child.isDirectory()) continue
-            if (shouldIgnoreNested(child.name)) continue
-            dirs.add(entry.name + "/" + child.name + "/")
+            if (!disposed && !abort.signal.aborted) {
+              result.dirs = Array.from(dirs).toSorted()
+              cache = result
+            }
+            return
           }
-        }
 
-        result.dirs = Array.from(dirs).toSorted()
-        cache = result
-        fetching = false
-        return
+          const set = new Set<string>()
+          for await (const file of Ripgrep.files({ cwd: directory, signal: abort.signal })) {
+            if (disposed || abort.signal.aborted) return
+            result.files.push(file)
+            let current = file
+            while (true) {
+              const dir = path.dirname(current)
+              if (dir === ".") break
+              if (dir === current) break
+              current = dir
+              if (set.has(dir)) continue
+              set.add(dir)
+              result.dirs.push(dir + "/")
+            }
+          }
+          if (!disposed && !abort.signal.aborted) cache = result
+        } finally {
+          fetching = false
+        }
       }
 
-      const set = new Set<string>()
-      for await (const file of Ripgrep.files({ cwd: Instance.directory })) {
-        result.files.push(file)
-        let current = file
-        while (true) {
-          const dir = path.dirname(current)
-          if (dir === ".") break
-          if (dir === current) break
-          current = dir
-          if (set.has(dir)) continue
-          set.add(dir)
-          result.dirs.push(dir + "/")
-        }
+      const startScan = (result: Entry) => {
+        if (disposed || fetching) return
+        const scan = fn(result)
+        activeScan = scan
+        void scan.catch((error) => {
+          // Disposal intentionally aborts the inventory scan. Keep genuine scan
+          // failures visible, but never let a background scan become an
+          // unhandled rejection during project close or instance teardown.
+          if (disposed || abort.signal.aborted) return
+          log.error("project file inventory scan failed", { directory, error })
+        })
       }
-      cache = result
-      fetching = false
-    }
-    fn(cache)
 
-    return {
-      async files() {
-        if (!fetching) {
-          fn({
-            files: [],
-            dirs: [],
-          })
-        }
-        return cache
-      },
-    }
-  })
+      startScan(cache)
+
+      return {
+        async files() {
+          if (!fetching && !disposed) {
+            startScan({ files: [], dirs: [] })
+          }
+          return cache
+        },
+        async dispose() {
+          disposed = true
+          abort.abort()
+          await activeScan?.catch(() => undefined)
+        },
+      }
+    },
+    async (entry) => entry.dispose(),
+  )
 
   export function init() {
     state()

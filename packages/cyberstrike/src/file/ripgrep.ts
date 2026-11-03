@@ -217,7 +217,9 @@ export namespace Ripgrep {
   }) {
     input.signal?.throwIfAborted()
 
-    const args = [await filepath(), "--files", "--glob=!.git/*"]
+    const executable = await filepath()
+    input.signal?.throwIfAborted()
+    const args = [executable, "--files", "--glob=!.git/*"]
     if (input.follow) args.push("--follow")
     if (input.hidden !== false) args.push("--hidden")
     if (input.maxDepth !== undefined) args.push(`--max-depth=${input.maxDepth}`)
@@ -230,12 +232,14 @@ export namespace Ripgrep {
     // Bun.spawn should throw this, but it incorrectly reports that the executable does not exist.
     // See https://github.com/oven-sh/bun/issues/24012
     if (!(await fs.stat(input.cwd).catch(() => undefined))?.isDirectory()) {
+      input.signal?.throwIfAborted()
       throw Object.assign(new Error(`No such file or directory: '${input.cwd}'`), {
         code: "ENOENT",
         errno: -2,
         path: input.cwd,
       })
     }
+    input.signal?.throwIfAborted()
 
     const proc = Bun.spawn(args, {
       cwd: input.cwd,
