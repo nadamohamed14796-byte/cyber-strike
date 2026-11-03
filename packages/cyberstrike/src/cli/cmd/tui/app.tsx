@@ -38,6 +38,7 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
+import { Log } from "@/util/log"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -125,7 +126,12 @@ export function tui(input: {
     try {
       win32DisableProcessedInput()
 
+      Log.Default.info("TUI startup stage", {
+        stage: "terminal-color-query-start",
+        stdinTTY: process.stdin.isTTY,
+      })
       const mode = await getTerminalBackgroundColor()
+      Log.Default.info("TUI startup stage", { stage: "terminal-color-query-complete", mode })
 
       // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
       // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
@@ -144,6 +150,7 @@ export function tui(input: {
           }
         }
 
+        Log.Default.info("TUI startup stage", { stage: "opentui-render-start" })
         render(
       () => {
         return (
@@ -209,6 +216,7 @@ export function tui(input: {
         },
       },
         )
+        Log.Default.info("TUI startup stage", { stage: "opentui-render-returned" })
       })
     } catch (error) {
       unguard?.()
