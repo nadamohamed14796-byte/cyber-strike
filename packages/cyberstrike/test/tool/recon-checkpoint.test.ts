@@ -17,11 +17,11 @@ const phases: ReconPhase[] = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
-  "directory_fuzzing",
-  "parameter_discovery",
-  "parameter_fuzzing",
   "javascript_analysis",
+  "parameter_discovery",
+  "directory_fuzzing",
   "endpoint_inventory",
+  "parameter_fuzzing",
   "vulnerability_testing",
   "reporting",
 ]
@@ -71,23 +71,27 @@ test("scope must be completed, not unavailable, before discovery or testing", ()
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("scope_validation")
 })
 
-test("phase order separates directory and parameter fuzzing from passive discovery", () => {
-  expect(phases.indexOf("directory_fuzzing")).toBe(phases.indexOf("url_collection") + 1)
-  expect(phases.indexOf("parameter_discovery")).toBe(phases.indexOf("directory_fuzzing") + 1)
-  expect(phases.indexOf("parameter_fuzzing")).toBe(phases.indexOf("parameter_discovery") + 1)
-  expect(phases.indexOf("javascript_analysis")).toBe(phases.indexOf("parameter_fuzzing") + 1)
-  expect(phases.indexOf("endpoint_inventory")).toBe(phases.indexOf("javascript_analysis") + 1)
+test("evidence-first phase order analyzes JavaScript before parameter and path discovery", () => {
+  expect(phases.indexOf("javascript_analysis")).toBe(phases.indexOf("url_collection") + 1)
+  expect(phases.indexOf("parameter_discovery")).toBe(phases.indexOf("javascript_analysis") + 1)
+  expect(phases.indexOf("directory_fuzzing")).toBe(phases.indexOf("parameter_discovery") + 1)
+  expect(phases.indexOf("endpoint_inventory")).toBe(phases.indexOf("directory_fuzzing") + 1)
+  expect(phases.indexOf("parameter_fuzzing")).toBe(phases.indexOf("endpoint_inventory") + 1)
+  expect(phases.indexOf("vulnerability_testing")).toBe(phases.indexOf("parameter_fuzzing") + 1)
 })
 
-test("directory and parameter fuzzing are ordered prerequisites", () => {
+test("JavaScript, parameter discovery, and path discovery follow the evidence-first order", () => {
   const state = records("complete")
+  state.javascript_analysis = { status: "pending" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
+  state.javascript_analysis = { status: "complete" }
   state.directory_fuzzing = { status: "pending" }
-  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("directory_fuzzing")
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("directory_fuzzing")
   state.directory_fuzzing = { status: "complete" }
   state.parameter_fuzzing = { status: "pending" }
-  expect(unresolvedReconPrerequisites("javascript_analysis", state)).toContain("parameter_fuzzing")
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("parameter_fuzzing")
   state.parameter_fuzzing = { status: "complete" }
-  expect(unresolvedReconPrerequisites("javascript_analysis", state)).toEqual([])
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
 
 test("workspace setup cannot be bypassed by marking it unavailable", () => {
@@ -156,6 +160,7 @@ test("deferred is accepted as a persisted checkpoint status", () => {
 
 test("legacy manifests migrate to require parameter discovery and revalidate downstream phases", () => {
   const legacy = initialReconRun("https://example.com", "target-root-1", "session-1")
+  delete legacy.phaseOrderVersion
   delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).directory_fuzzing
   delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).parameter_discovery
   delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).parameter_fuzzing
@@ -228,12 +233,12 @@ test("canonical inventories reject empty, failure-only, and log-shaped output", 
   expect(validateCanonicalInventoryContent("parameter_discovery", "incomplete: source timed out").valid).toBe(true)
 })
 
-test("completion prerequisites keep phases from silently skipping unfinished work", () => {
+test("completion prerequisites keep path discovery from skipping unfinished parameter discovery", () => {
   const state = records("complete")
-  state.directory_fuzzing = { status: "pending" }
-  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("directory_fuzzing")
-  state.directory_fuzzing = { status: "unavailable", reason: "No eligible path-discovery method was available" }
-  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
+  state.parameter_discovery = { status: "pending" }
+  expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toContain("parameter_discovery")
+  state.parameter_discovery = { status: "unavailable", reason: "No eligible parameter source was available" }
+  expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toEqual([])
 })
 
 test("canonical inventories reject malformed rows, mixed errors, and duplicates", () => {
