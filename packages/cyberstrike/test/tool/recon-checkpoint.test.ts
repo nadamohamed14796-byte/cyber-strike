@@ -122,7 +122,7 @@ test("evidence-first phase order analyzes JavaScript before parameter and path d
   expect(phases.indexOf("vulnerability_testing")).toBe(phases.indexOf("parameter_fuzzing") + 1)
 })
 
-test("JavaScript, parameter discovery, and path discovery follow the evidence-first order", () => {
+test("JavaScript, parameter discovery, path discovery, and endpoint inventory follow the evidence-first order", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "pending" }
   expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
@@ -130,9 +130,16 @@ test("JavaScript, parameter discovery, and path discovery follow the evidence-fi
   state.directory_fuzzing = { status: "pending" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("directory_fuzzing")
   state.directory_fuzzing = { status: "complete" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
+})
+
+test("parameter fuzzing is optional before vulnerability testing unless it was started", () => {
+  const state = records("complete")
   state.parameter_fuzzing = { status: "pending" }
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
+  state.parameter_fuzzing = { status: "running" }
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("parameter_fuzzing")
-  state.parameter_fuzzing = { status: "complete" }
+  state.parameter_fuzzing = { status: "deferred", reason: "Not requested" }
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
 
@@ -142,14 +149,16 @@ test("workspace setup cannot be bypassed by marking it unavailable", () => {
   expect(unresolvedReconPrerequisites("asset_discovery", state)).toContain("workspace_setup")
 })
 
-test("failed and unavailable non-scope phases do not block independent downstream work", () => {
+test("failed and blocked phases require an explicit partial handoff before checklist progression", () => {
   const state = records("complete")
-  state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
-  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
-  state.live_hosts_ports = { status: "failed", reason: "Scanner failed" }
-  expect(unresolvedReconPrerequisites("url_collection", state)).not.toContain("live_hosts_ports")
-  state.live_hosts_ports = { status: "blocked", reason: "Tool unavailable" }
-  expect(unresolvedReconPrerequisites("url_collection", state)).not.toContain("live_hosts_ports")
+  state.javascript_analysis = { status: "failed", reason: "Analysis process failed" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
+  state.javascript_analysis = { status: "blocked", reason: "No compatible analyzer" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
+  state.javascript_analysis = { status: "partial", reason: "Static evidence preserved; remaining gaps recorded" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
+  state.live_hosts_ports = { status: "unavailable", reason: "No eligible HTTP/TLS hosts" }
+  expect(unresolvedReconPrerequisites("url_collection", state)).toEqual([])
 })
 
 test("parameter discovery is a distinct prerequisite before endpoint inventory", () => {
