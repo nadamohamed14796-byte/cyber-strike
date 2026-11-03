@@ -255,7 +255,7 @@ export function reconPhaseStartDecision(
  * The checkpoint owns workflow order and prerequisites, not a phase-to-tool
  * allowlist. The phase inferred from a CLI name or tool wrapper is advisory.
  * Normal recon/support tools may contribute to the single active checkpoint;
- * actions classified as vulnerability testing still require that explicit
+ * actions classified as active testing still require the matching explicit
  * checkpoint to be active after endpoint inventory is complete.
  */
 export function reconPhaseExecutionDecision(
@@ -289,7 +289,7 @@ export function reconPhaseExecutionDecision(
   return { allowed: true, reason: "explicit " + requiredPhase + " checkpoint and prerequisites passed" }
 }
 
-/** Checkpoint gate for explicit vulnerability-testing tools.
+/** Checkpoint gate for explicit active-testing tools.
  *
  * Ordinary recon callers must enforce persisted scope for each concrete request;
  * their availability does not depend on a checkpoint file or phase status.
@@ -332,7 +332,7 @@ export async function reconPhaseGate(
   if (run.phases.scope_validation.status !== "complete") {
     return {
       allowed: false,
-      reason: "Target scope validation must be completed before vulnerability testing can run. Ordinary reconnaissance tools are not blocked by this testing checkpoint.",
+      reason: "Target scope validation must be completed before active testing can run. Ordinary reconnaissance tools are not blocked by this testing checkpoint.",
       manifestPath,
     }
   }
