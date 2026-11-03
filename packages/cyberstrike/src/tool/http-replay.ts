@@ -505,7 +505,7 @@ async function recordReplayObservation(input: {
 
 const REPLAY_DESC = `Replay a captured request with field-level mutations, sent through the structured (fetch) backend — no shell, so payloads land as request DATA byte-for-byte.
 
-Resolve request_id, apply mutations[] (set/add/remove query & header, set body/method/target, body-merge, body-set-field, body-remove-field, set-cookie, remove-cookie, set-path-param — each value optionally passed through an encode pipeline), then send once (governed: timeout, retry only on transient+idempotent, budget, circuit breaker). Returns FACTS: status, timing, response headers/body preview, error-signature hits, and (if you pass a marker) whether that marker reflected raw vs html-encoded — plus a redacted curl template; sensitive headers, tokens, and binary bodies are omitted. It never decides "vulnerable"; you judge the observations.
+Resolve request_id, apply mutations[] (set/add/remove query & header, set body/method/target, body-merge, body-set-field, body-remove-field, set-cookie, remove-cookie, set-path-param — each value optionally passed through an encode pipeline), then send once (governed: timeout, retry only on transient+idempotent, budget, circuit breaker). Returns FACTS: status, timing, response headers/body preview, error-signature hits, and (if you pass a marker) whether that marker reflected raw vs html-encoded — plus a redacted curl template; sensitive headers, tokens, and binary bodies are omitted. It never decides "vulnerable"; you judge the observations. This tool sends active replay requests: use it only while the persisted `parameter_fuzzing` or `vulnerability_testing` checkpoint is explicitly running after endpoint inventory is complete. Scope checks still apply to the request and every redirect.
 
 Special modes:
 - **credential**: Swap auth headers — pass a session credential ID and the engine strips all auth headers from the captured request and injects the credential's headers. Use for cross-credential IDOR testing.
@@ -861,7 +861,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
 const RAW_DESC = `Send an EXACT byte sequence over a raw TCP/TLS socket — no normalization. This is the byte-exact backend for request smuggling / desync, intentionally-malformed messages, duplicate/odd-case headers, and Host-header overrides that http_replay (fetch) would normalize away.
 
-Provide request_id (PRIMARY) to derive host/port/TLS from a captured request; by default it sends that request's raw bytes, or pass raw to send bytes you crafted. For an endpoint the crawl never captured, pass target_url (FALLBACK) together with raw instead. Give exactly one of request_id / target_url. Returns the parsed response (status/headers/body) with timing. Host must be one the crawl already captured.`
+Provide request_id (PRIMARY) to derive host/port/TLS from a captured request; by default it sends that request's raw bytes, or pass raw to send bytes you crafted. For an endpoint the crawl never captured, pass target_url (FALLBACK) together with raw instead. Give exactly one of request_id / target_url. This byte-exact active test requires an explicitly running `vulnerability_testing` checkpoint after endpoint inventory is complete. Returns the parsed response (status/headers/body) with timing. Host must be one the crawl already captured.`
 
 export const HttpReplayRawTool = Tool.define("http_replay_raw", {
   description: RAW_DESC,
