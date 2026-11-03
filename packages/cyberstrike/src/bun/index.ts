@@ -64,6 +64,9 @@ export namespace BunProc {
         stdout,
         stderr,
       })
+      if (code !== 0) {
+        throw new Error(`Command failed with exit code ${code}: ${cmd.join(" ")}`)
+      }
     } catch (error) {
       // Ensure a timed-out child cannot keep the CLI alive. Drain both pipes and
       // wait for process termination before propagating the failure.
@@ -72,9 +75,6 @@ export namespace BunProc {
       throw error
     } finally {
       if (timeout) clearTimeout(timeout)
-    }
-    if (code !== 0) {
-      throw new Error(`Command failed with exit code ${result.exitCode}`)
     }
     return result
   }
