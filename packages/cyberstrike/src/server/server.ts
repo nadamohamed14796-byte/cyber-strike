@@ -255,7 +255,15 @@ export namespace Server {
             directory,
             init: InstanceBootstrap,
             async fn() {
-              await recoverPendingRequests()
+              // Recovery may need to recreate child sessions and enqueue many
+              // captured requests. It must not hold every API request (or TUI
+              // startup) behind that background maintenance work.
+              void recoverPendingRequests().catch((error) => {
+                log.error("captured request recovery failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                })
+              })
               return next()
             },
           })
