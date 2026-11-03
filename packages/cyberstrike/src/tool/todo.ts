@@ -19,7 +19,8 @@ export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) 
   const hasTodo = (content: string) => next.some((todo) => todo.content === content.trim())
   const preserved = previous.filter(
     (todo) =>
-      (todo.status === "pending" || todo.status === "in_progress") &&
+      ((todo.status === "pending" || todo.status === "in_progress") ||
+        /^\\[recon:[a-z_]+\\]/.test(todo.content.trim())) &&
       !hasTodo(todo.content),
   )
   return { todos: [...next, ...preserved], preserved }
