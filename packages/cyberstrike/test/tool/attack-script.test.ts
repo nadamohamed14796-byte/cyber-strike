@@ -4,6 +4,16 @@ import { TargetMemory } from "../../src/target"
 import { AttackScriptTool } from "../../src/tool/attack-script"
 import { tmpdir } from "../fixture/fixture"
 
+const testContext = {
+  sessionID: "test_session",
+  messageID: "test_message",
+  agent: "test",
+  abort: new AbortController().signal,
+  messages: [],
+  ask: async () => {},
+  metadata: () => {},
+} as never
+
 test("network attack scripts require persisted scope and an active vulnerability-testing checkpoint", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
@@ -20,7 +30,7 @@ test("network attack scripts require persisted scope and an active vulnerability
         script: "race_tester",
         args: [target + "/api/checkout"],
         timeout_seconds: 5,
-      } as never)
+      } as never, testContext)
 
       expect(result.metadata.testingDenied).toBe(true)
       expect(result.metadata.exitCode).toBe(-1)
@@ -45,7 +55,7 @@ test("cloud storage enumeration cannot probe generated third-party bucket hosts 
         script: "cloud_storage_enum",
         args: ["cloud-gate.example.test"],
         timeout_seconds: 5,
-      } as never)
+      } as never, testContext)
 
       expect(result.metadata.scopeDenied).toBe(true)
       expect(result.metadata.exitCode).toBe(-1)
@@ -65,7 +75,7 @@ test("Wayback active probing is refused until each archived URL can be scope-che
         script: "wayback_endpoints",
         args: ["example.test", "--probe"],
         timeout_seconds: 5,
-      } as never)
+      } as never, testContext)
 
       expect(result.metadata.blocked).toBe(true)
       expect(result.metadata.exitCode).toBe(-1)
