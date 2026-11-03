@@ -9,17 +9,17 @@ export const RECON_PHASES = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
-  "directory_fuzzing",
-  "parameter_discovery",
-  "parameter_fuzzing",
   "javascript_analysis",
+  "parameter_discovery",
+  "directory_fuzzing",
   "endpoint_inventory",
+  "parameter_fuzzing",
   "vulnerability_testing",
   "reporting",
 ] as const
 
 export type ReconPhase = typeof RECON_PHASES[number]
-export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable" | "deferred"
+export type ReconPhaseStatus = "pending" | "running" | "complete" | "partial" | "blocked" | "failed" | "unavailable" | "deferred"
 
 export type ReconPhaseRecord = {
   status: ReconPhaseStatus
@@ -37,6 +37,8 @@ export type ReconPhaseRecord = {
 
 export type ReconRunManifest = {
   schemaVersion: 1
+  /** Ordered lifecycle version; missing indicates a pre-evidence-first checkpoint. */
+  phaseOrderVersion?: 2
   targetURL: string
   targetID: string
   sessionID: string
@@ -73,14 +75,14 @@ export function reconRunID(targetID: string): string {
 export function initialReconRun(targetURL: string, targetID: string, sessionID: string): ReconRunManifest {
   const phases = Object.fromEntries(RECON_PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<ReconPhase, ReconPhaseRecord>
   const now = new Date().toISOString()
-  return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
+  return { schemaVersion: 1, phaseOrderVersion: 2, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
 }
 
 export function parseReconRun(raw: string, workspaceID: string, targetURL: string): ReconRunManifest {
   const parsed = JSON.parse(raw) as ReconRunManifest
   const phases = parsed?.phases as Partial<Record<ReconPhase, ReconPhaseRecord>> | undefined
   const validStatus = (record: ReconPhaseRecord | undefined) =>
-    !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable", "deferred"].includes(record.status)
+    !!record && ["pending", "running", "complete", "partial", "blocked", "failed", "unavailable", "deferred"].includes(record.status)
   // Three phases were added as explicit checkpoints. Older manifests are migrated
   // in memory, and downstream completion is invalidated from the earliest missing phase.
   const introducedPhases = ["directory_fuzzing", "parameter_discovery", "parameter_fuzzing"] as const
@@ -100,32 +102,54 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   if (!phases) throw new Error("Recon run manifest has no phase records; refusing to overwrite it.")
 
   const missingPhases = introducedPhases.filter((phase) => !Object.prototype.hasOwnProperty.call(phases, phase))
-  if (missingPhases.length) {
+  const needsPhaseOrderMigration = parsed.phaseOrderVersion !== 2
+  if (missingPhases.length || needsPhaseOrderMigration) {
     for (const phase of missingPhases) {
       phases[phase] = {
         status: "pending",
         reason: "New required recon phase: " + phase + ". Existing downstream completion must be revalidated.",
       }
     }
-    const earliestMissing = Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
-    for (const phase of RECON_PHASES.slice(earliestMissing + 1)) {
+
+    // The evidence-first lifecycle analyzes JavaScript before parameter and path
+    // discovery. Old manifests may claim those later phases are complete in the
+    // previous order, so preserve their artifacts but reopen from JavaScript.
+    const earliestMissing = missingPhases.length
+      ? Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
+      : RECON_PHASES.length
+    const revalidateFrom = needsPhaseOrderMigration || missingPhases.includes("directory_fuzzing")
+      ? RECON_PHASES.indexOf("javascript_analysis")
+      : earliestMissing + 1
+    const resumeFrom = needsPhaseOrderMigration || missingPhases.includes("directory_fuzzing")
+      ? RECON_PHASES.indexOf("javascript_analysis")
+      : earliestMissing
+    const migrationReason = needsPhaseOrderMigration
+      ? "Re-run required after recon phase order migrated to evidence-first version 2."
+      : "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + "."
+    for (const phase of RECON_PHASES.slice(revalidateFrom)) {
       const previous = phases[phase]
       if (previous && previous.status !== "pending") {
         phases[phase] = {
           ...previous,
           status: "pending",
+          startedAt: undefined,
           finishedAt: undefined,
-          reason: "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + ".",
+          reason: migrationReason,
         }
       }
     }
+    parsed.currentPhase = RECON_PHASES[resumeFrom] ?? null
+    parsed.updatedAt = new Date().toISOString()
   }
+  parsed.phaseOrderVersion = 2
   parsed.phases = phases as Record<ReconPhase, ReconPhaseRecord>
   return parsed
 }
 
 function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable" || status === "deferred" || status === "failed" || status === "blocked"
+  // Failed/blocked phases need a materially changed retry or explicit partial
+  // handoff. Their evidence remains preserved, but downstream completion waits.
+  return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
 /** Reset downstream checkpoints when a previously deferred phase is explicitly reopened. */
@@ -145,17 +169,57 @@ export function unresolvedReconPrerequisites(
   phase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): ReconPhase[] {
-  const earlier = RECON_PHASES.slice(0, RECON_PHASES.indexOf(phase))
-  const unresolved = earlier.filter((item) =>
-    item === "scope_validation" || item === "workspace_setup" ||
-    (phase === "vulnerability_testing" && item === "endpoint_inventory")
-      ? phases[item].status !== "complete"
-      : !terminal(phases[item].status),
-  )
-  if (phase !== "scope_validation" && phase !== "workspace_setup" && phases.scope_validation.status !== "complete" && !unresolved.includes("scope_validation")) {
-    unresolved.unshift("scope_validation")
+  const index = RECON_PHASES.indexOf(phase)
+  const earlier = RECON_PHASES.slice(0, index)
+  const unresolved: ReconPhase[] = []
+
+  // Persisted authorization and the canonical workspace are hard prerequisites.
+  if (phase !== "scope_validation" && phases.scope_validation.status !== "complete") {
+    unresolved.push("scope_validation")
   }
-  return unresolved
+  if (phase !== "scope_validation" && phase !== "workspace_setup" &&
+      phases.workspace_setup.status !== "complete") {
+    unresolved.push("workspace_setup")
+  }
+
+  for (const prior of earlier) {
+    if (prior === "scope_validation" || prior === "workspace_setup") continue
+    // Parameter fuzzing and vulnerability testing are optional; a pending phase
+    // means the user did not request it. Once explicitly started, it must resolve
+    // before reporting can close.
+    if (phase === "reporting" &&
+        (prior === "parameter_fuzzing" || prior === "vulnerability_testing") &&
+        phases[prior].status === "pending") continue
+    if (phase === "vulnerability_testing" && prior === "parameter_fuzzing" &&
+        phases[prior].status === "pending") continue
+
+    // Both active-testing phases require a verified endpoint inventory, not merely
+    // a failed/unavailable marker for the inventory phase.
+    if ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") &&
+        prior === "endpoint_inventory") {
+      if (phases.endpoint_inventory.status !== "complete") unresolved.push("endpoint_inventory")
+      continue
+    }
+    if (!terminal(phases[prior].status)) unresolved.push(prior)
+  }
+  return [...new Set(unresolved)]
+}
+
+/** Decide whether a checkpoint phase may begin after earlier phases are verified or handed off. */
+export function reconPhaseStartDecision(
+  phase: ReconPhase,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+): { allowed: boolean; reason: string; unresolved: ReconPhase[] } {
+  const unresolved = unresolvedReconPrerequisites(phase, phases)
+  if (unresolved.length > 0) {
+    return {
+      allowed: false,
+      reason: "Checklist is waiting for earlier phase(s) to be resolved: " +
+        unresolved.map((item) => item + "=" + phases[item].status).join(", "),
+      unresolved,
+    }
+  }
+  return { allowed: true, reason: "earlier phases are resolved and hard prerequisites passed", unresolved: [] }
 }
 
 /** Pure execution decision used by the runtime gate and unit tests.
@@ -170,32 +234,31 @@ export function reconPhaseExecutionDecision(
   requiredPhase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): { allowed: boolean; reason: string } {
-  // The checkpoint tracks progress; it must not restrict ordinary recon tools to
-  // a preassigned phase or block useful collection because a prior phase is stale.
-  // Authorization is still enforced by reconPhaseGate and each request-level tool.
-  if (requiredPhase !== "vulnerability_testing") {
+  // Ordinary recon tools remain independent of checkpoint labels. Only explicit
+  // active-testing phases require a running opt-in checkpoint.
+  if (requiredPhase !== "parameter_fuzzing" && requiredPhase !== "vulnerability_testing") {
     return {
       allowed: true,
       reason: "ordinary reconnaissance tools are not restricted by checkpoint phase or prerequisite status",
     }
   }
 
-  // Vulnerability testing remains explicitly opt-in and must follow endpoint inventory.
-  if (phases.vulnerability_testing.status !== "running") {
+  const label = requiredPhase === "vulnerability_testing" ? "Vulnerability testing" : "Parameter fuzzing"
+  if (phases[requiredPhase].status !== "running") {
     return {
       allowed: false,
-      reason: "Vulnerability testing is opt-in; explicitly begin vulnerability_testing only after endpoint_inventory is complete and the user has requested targeted testing.",
+      reason: label + " is opt-in; explicitly begin " + requiredPhase + " only after endpoint_inventory is complete and the user has requested active testing.",
     }
   }
-  if (phases.scope_validation.status !== "complete" ||
-      phases.workspace_setup.status !== "complete" ||
-      phases.endpoint_inventory.status !== "complete") {
+  const unresolved = unresolvedReconPrerequisites(requiredPhase, phases)
+  if (unresolved.length > 0) {
     return {
       allowed: false,
-      reason: "Vulnerability testing requires completed scope validation, workspace setup, and endpoint inventory.",
+      reason: label + " requires earlier phases to be complete or explicitly handed off: " +
+        unresolved.map((item) => item + "=" + phases[item].status).join(", "),
     }
   }
-  return { allowed: true, reason: "explicit vulnerability-testing checkpoint and prerequisites passed" }
+  return { allowed: true, reason: "explicit " + requiredPhase + " checkpoint and prerequisites passed" }
 }
 
 /** Checkpoint gate for explicit vulnerability-testing tools.
@@ -218,10 +281,9 @@ export async function reconPhaseGate(
   }
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + reconRunID(root.id) + ".json")
 
-  // Request-level scope checks happen in each caller before this gate. Do not
-  // require a phase manifest for ordinary recon collectors such as subfinder,
-  // crt.sh lookups, URL collection, and passive fingerprinting.
-  if (requiredPhase !== "vulnerability_testing") {
+  // Request-level scope checks happen in each caller before this gate. Ordinary
+  // recon collectors do not require a phase manifest; active-testing phases do.
+  if (requiredPhase !== "parameter_fuzzing" && requiredPhase !== "vulnerability_testing") {
     return {
       allowed: true,
       reason: "ordinary recon tools are not blocked by checkpoint status; request-level scope checks remain required",
@@ -246,10 +308,10 @@ export async function reconPhaseGate(
       manifestPath,
     }
   }
-  if (requiredPhase === "vulnerability_testing" && run.phases.vulnerability_testing.status !== "running") {
+  if (run.phases[requiredPhase].status !== "running") {
     return {
       allowed: false,
-      reason: "Vulnerability testing is opt-in. The recon handoff leaves this phase deferred; explicitly begin vulnerability_testing only after the user requests targeted testing.",
+      reason: requiredPhase + " is opt-in. The recon handoff leaves active-testing phases deferred; explicitly begin " + requiredPhase + " only after the user requests active testing.",
       manifestPath,
     }
   }
