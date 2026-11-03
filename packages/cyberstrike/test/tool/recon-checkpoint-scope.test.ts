@@ -4,6 +4,12 @@ import path from "node:path"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
 import { ReconCheckpointTool, reconRunID } from "../../src/tool/recon-checkpoint"
+import {
+  initialReconRun,
+  RECON_PHASES,
+  reconPhaseGate,
+  reconScopeFingerprintForWorkspace,
+} from "../../src/target/recon-gate"
 import { tmpdir } from "../fixture/fixture"
 
 test("program-root scope can authorize a separate domain without requiring the root hostname itself in scope", async () => {
@@ -240,6 +246,56 @@ test("resume fingerprints an asset's full inherited scope chain, not only the pr
       expect(phases.scope_validation.status).toBe("pending")
       expect(phases.scope_validation.reason).toContain("scope or exclusions changed")
       expect(phases.workspace_setup.status).toBe("pending")
+    },
+  })
+})
+
+
+test("active testing revalidates the full scope fingerprint even when the original asset remains allowed", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://program-active-gate.example.test"
+      const startingAsset = "https://api.active-gate.example.net/"
+      const authorizationSource = "Active gate scope regression fixture"
+      const authorizationReference = "https://program-active-gate.example.test/policy"
+      const root = await TargetMemory.configureScope(targetURL, {
+        include: ["api.active-gate.example.net"],
+        authorizationSource,
+        authorizationReference,
+      })
+      const scopeDecision = await TargetMemory.checkURLScope(startingAsset)
+      expect(scopeDecision.allowed).toBe(true)
+      expect(scopeDecision.workspace?.id).toBe(root.workspace.id)
+      const fingerprint = await reconScopeFingerprintForWorkspace(scopeDecision.workspace!, root.workspace.id)
+
+      const run = initialReconRun(root.workspace.targetURL, root.workspace.id, "ses_recon_active_gate")
+      for (const phase of RECON_PHASES) run.phases[phase] = { status: "complete" }
+      run.phases.scope_validation = {
+        status: "complete",
+        scopeValidationTarget: startingAsset,
+        scopeFingerprint: fingerprint,
+      }
+      run.phases.parameter_fuzzing = { status: "running", startedAt: new Date().toISOString() }
+      run.currentPhase = "parameter_fuzzing"
+      const manifest = "runs/recon-" + reconRunID(root.workspace.id) + ".json"
+      await TargetMemory.writeWorkspaceFile(root.workspace, manifest, JSON.stringify(run, null, 2) + "\n")
+
+      const beforeChange = await reconPhaseGate(root.workspace, "parameter_fuzzing")
+      expect(beforeChange.allowed).toBe(true)
+
+      // The original asset remains authorized, but the effective policy changed.
+      await TargetMemory.configureScope(targetURL, {
+        include: ["api.active-gate.example.net", "new-api.active-gate.example.net"],
+        authorizationSource,
+        authorizationReference,
+      })
+      expect((await TargetMemory.checkURLScope(startingAsset)).allowed).toBe(true)
+
+      const afterChange = await reconPhaseGate(root.workspace, "parameter_fuzzing")
+      expect(afterChange.allowed).toBe(false)
+      expect(afterChange.reason).toContain("scope or exclusions changed")
     },
   })
 })
