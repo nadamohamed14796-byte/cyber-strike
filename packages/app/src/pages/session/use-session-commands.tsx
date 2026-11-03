@@ -77,7 +77,8 @@ export const useSessionCommands = (input: SessionCommandContext) => {
     sessionCommand({
       id: "session.new",
       title: input.language.t("command.session.new"),
-      keybind: "mod+shift+s",
+      // Avoid browser-native Ctrl/Cmd+Shift+S (Save Page) interception.
+      keybind: "mod+alt+s",
       slash: "new",
       onSelect: async () => {
         try {
