@@ -56,6 +56,13 @@ const [serverPort, webPort] = await Promise.all([freePort(), freePort()])
 
 const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-e2e-"))
 const keepSandbox = process.env.CYBERSTRIKE_E2E_KEEP_SANDBOX === "1"
+// Keep Playwright's browser binaries in the host cache. The E2E backend uses an
+// isolated XDG_CACHE_HOME for project data, but Playwright resolves browser
+// installs from its own cache; pointing it at the temporary sandbox makes the
+// browser installed by CI disappear from the child runner's expected path.
+const playwrightBrowsersPath =
+  process.env.PLAYWRIGHT_BROWSERS_PATH ??
+  path.join(process.env.XDG_CACHE_HOME ?? path.join(os.homedir(), ".cache"), "ms-playwright")
 
 const serverEnv = {
   ...process.env,
@@ -77,6 +84,7 @@ const serverEnv = {
 
 const runnerEnv = {
   ...serverEnv,
+  PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPath,
   PLAYWRIGHT_SERVER_HOST: "127.0.0.1",
   PLAYWRIGHT_SERVER_PORT: String(serverPort),
   VITE_CYBERSTRIKE_SERVER_HOST: "127.0.0.1",
