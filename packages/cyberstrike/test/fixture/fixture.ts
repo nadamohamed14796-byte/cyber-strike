@@ -19,91 +19,11 @@ export async function tmpdir<T>(options?: TmpDirOptions<T>) {
   const dirpath = sanitizePath(path.join(os.tmpdir(), "cyberstrike-test-" + Math.random().toString(36).slice(2)))
   await fs.mkdir(dirpath, { recursive: true })
   if (options?.git) {
-    await import { $ } from "bun"
-import * as fs from "fs/promises"
-import os from "os"
-import path from "path"
-import type { Config } from "../../src/config/config"
-
-// Strip null bytes from paths (defensive fix for CI environment issues)
-function sanitizePath(p: string): string {
-  return p.replace(/\0/g, "")
-}
-
-type TmpDirOptions<T> = {
-  git?: boolean
-  config?: Partial<Config.Info>
-  init?: (dir: string) => Promise<T>
-  dispose?: (dir: string) => Promise<T>
-}
-export async function tmpdir<T>(options?: TmpDirOptions<T>) {
-  const dirpath = sanitizePath(path.join(os.tmpdir(), "cyberstrike-test-" + Math.random().toString(36).slice(2)))
-  await fs.mkdir(dirpath, { recursive: true })
-git init`.cwd(dirpath).quiet()
+    await $`git init`.cwd(dirpath).quiet()
     // Test repositories must not depend on the runner's global Git identity.
-    await import { $ } from "bun"
-import * as fs from "fs/promises"
-import os from "os"
-import path from "path"
-import type { Config } from "../../src/config/config"
-
-// Strip null bytes from paths (defensive fix for CI environment issues)
-function sanitizePath(p: string): string {
-  return p.replace(/\0/g, "")
-}
-
-type TmpDirOptions<T> = {
-  git?: boolean
-  config?: Partial<Config.Info>
-  init?: (dir: string) => Promise<T>
-  dispose?: (dir: string) => Promise<T>
-}
-export async function tmpdir<T>(options?: TmpDirOptions<T>) {
-  const dirpath = sanitizePath(path.join(os.tmpdir(), "cyberstrike-test-" + Math.random().toString(36).slice(2)))
-  await fs.mkdir(dirpath, { recursive: true })
-git config --local user.name "CyberStrike Test"`.cwd(dirpath).quiet()
-    await import { $ } from "bun"
-import * as fs from "fs/promises"
-import os from "os"
-import path from "path"
-import type { Config } from "../../src/config/config"
-
-// Strip null bytes from paths (defensive fix for CI environment issues)
-function sanitizePath(p: string): string {
-  return p.replace(/\0/g, "")
-}
-
-type TmpDirOptions<T> = {
-  git?: boolean
-  config?: Partial<Config.Info>
-  init?: (dir: string) => Promise<T>
-  dispose?: (dir: string) => Promise<T>
-}
-export async function tmpdir<T>(options?: TmpDirOptions<T>) {
-  const dirpath = sanitizePath(path.join(os.tmpdir(), "cyberstrike-test-" + Math.random().toString(36).slice(2)))
-  await fs.mkdir(dirpath, { recursive: true })
-git config --local user.email "cyberstrike-tests@example.invalid"`.cwd(dirpath).quiet()
-    await import { $ } from "bun"
-import * as fs from "fs/promises"
-import os from "os"
-import path from "path"
-import type { Config } from "../../src/config/config"
-
-// Strip null bytes from paths (defensive fix for CI environment issues)
-function sanitizePath(p: string): string {
-  return p.replace(/\0/g, "")
-}
-
-type TmpDirOptions<T> = {
-  git?: boolean
-  config?: Partial<Config.Info>
-  init?: (dir: string) => Promise<T>
-  dispose?: (dir: string) => Promise<T>
-}
-export async function tmpdir<T>(options?: TmpDirOptions<T>) {
-  const dirpath = sanitizePath(path.join(os.tmpdir(), "cyberstrike-test-" + Math.random().toString(36).slice(2)))
-  await fs.mkdir(dirpath, { recursive: true })
-git commit --allow-empty -m "root commit ${dirpath}"`.cwd(dirpath).quiet()
+    await $`git config --local user.name "CyberStrike Test"`.cwd(dirpath).quiet()
+    await $`git config --local user.email "cyberstrike-tests@example.invalid"`.cwd(dirpath).quiet()
+    await $`git commit --allow-empty -m "root commit ${dirpath}"`.cwd(dirpath).quiet()
   }
   if (options?.config) {
     await Bun.write(
