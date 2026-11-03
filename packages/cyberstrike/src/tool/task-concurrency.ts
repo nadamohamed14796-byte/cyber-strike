@@ -66,16 +66,63 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
     }
   }
 
-  function acquire(lane: string): Promise<() => void> {
-    return new Promise((resolve) => {
-      pending.push({ lane, start: resolve })
+  function abortError(): Error {
+    const error = new Error("Task was aborted before an execution slot became available.")
+    error.name = "AbortError"
+    return error
+  }
+
+  function acquire(lane: string, signal?: AbortSignal): Promise<() => void> {
+    return new Promise<() => void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(abortError())
+        return
+      }
+
+      let settled = false
+      let entry!: ScheduledEntry
+      const cleanup = () => signal?.removeEventListener("abort", onAbort)
+      const onAbort = () => {
+        if (settled) return
+        const index = pending.indexOf(entry)
+        if (index < 0) return
+        pending.splice(index, 1)
+        settled = true
+        cleanup()
+        reject(abortError())
+        drain()
+      }
+
+      entry = {
+        lane,
+        start: (release) => {
+          if (settled) {
+            release()
+            return
+          }
+          settled = true
+          cleanup()
+          resolve(release)
+        },
+      }
+
+      signal?.addEventListener("abort", onAbort, { once: true })
+      if (signal?.aborted) {
+        settled = true
+        cleanup()
+        reject(abortError())
+        return
+      }
+
+      pending.push(entry)
       drain()
     })
   }
 
-  async function run<T>(lane: string, task: () => Promise<T>): Promise<T> {
-    const release = await acquire(lane)
+  async function run<T>(lane: string, task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const release = await acquire(lane, signal)
     try {
+      if (signal?.aborted) throw abortError()
       return await task()
     } finally {
       release()
@@ -86,14 +133,52 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
     lane: string,
     task: () => Promise<unknown>,
     onError?: (error: unknown) => void,
-  ): "started" | "queued" {
+    signal?: AbortSignal,
+    onCancel?: () => void,
+  ): "started" | "queued" | "cancelled" {
+    const cancel = () => {
+      try {
+        onCancel?.()
+      } catch {
+        // Cancellation cleanup must never corrupt scheduler accounting.
+      }
+    }
+    if (signal?.aborted) {
+      cancel()
+      return "cancelled"
+    }
+
     let started = false
-    pending.push({
+    let executionStarted = false
+    let cancelled = false
+    let entry!: ScheduledEntry
+    const cleanup = () => signal?.removeEventListener("abort", onAbort)
+    const onAbort = () => {
+      if (executionStarted || cancelled) return
+      if (!started) {
+        const index = pending.indexOf(entry)
+        if (index < 0) return
+        pending.splice(index, 1)
+      }
+      // A slot may have been assigned while the task callback is still waiting
+      // for its microtask. Cancellation wins until the callback actually starts.
+      cancelled = true
+      cleanup()
+      cancel()
+      if (!started) drain()
+    }
+
+    entry = {
       lane,
       start: (release) => {
         started = true
         void Promise.resolve()
-          .then(task)
+          .then(() => {
+            if (cancelled) return
+            executionStarted = true
+            cleanup()
+            return task()
+          })
           .catch((error) => {
             try {
               onError?.(error)
@@ -103,9 +188,19 @@ export function createTaskScheduler(options: TaskSchedulerOptions) {
           })
           .finally(release)
       },
-    })
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true })
+    if (signal?.aborted) {
+      cancelled = true
+      cleanup()
+      cancel()
+      return "cancelled"
+    }
+
+    pending.push(entry)
     drain()
-    return started ? "started" : "queued"
+    return started ? "started" : cancelled ? "cancelled" : "queued"
   }
 
   return {
