@@ -50,6 +50,7 @@ jobs:
           test -f "$BIN_DIR/data/ebpf/dep_scan.py"
           test -f ".cyberstrike/skill/SKILL_GUIDE.md"
           test -f "$BIN_DIR/skill/SKILL_GUIDE.md"
+          test ! -e "$BIN_DIR/skill/skill"
           test -f "packages/cyberstrike/script/install-linux-artifact.sh"
           # build.ts already copies and verifies the complete skill catalog.
           # Do not copy it again into skill/skill inside the portable archive.
