@@ -244,32 +244,31 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 - Treat WHOIS organization strings, PTR names, and brand-name matches as weak signals unless corroborated.
 - Prefer targeted service checks over high-rate scans of broad ranges.
 
-#### Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
+#### Attribution and scope gate
 
-Do not impose an arbitrary fixed ceiling on meaningful attribution hypotheses. Continue materially distinct, authorized passive checks while evidence can change the conclusion; deduplicate repeated sources and equivalent observations. Stop when attribution is resolved, relevant sources are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. ASN membership alone never authorizes active scanning.
+Use this chapter to establish whether infrastructure is related to the organization, not to validate vulnerabilities. Continue materially distinct passive attribution checks while they can change the ownership conclusion; deduplicate repeated sources and equivalent observations. Stop when attribution is resolved, relevant sources are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. ASN membership alone never authorizes active scanning.
 
-Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
-
-##### Skill-specific hypothesis order
+##### Evidence-driven attribution order
 
 1. Anchor discovery to verified organization names, registered entities, known domains, and current RIR/ASN evidence; a matching company string or IP hostname is not sufficient ownership proof.
 2. Collect passive ASN, prefix, BGP, reverse-DNS, certificate, and provider metadata first; preserve source URLs and observation timestamps for each candidate.
 3. Normalize prefixes and hostnames, deduplicate shared CDN/cloud edges, and separate directly registered infrastructure from reseller, SaaS, shared hosting, and third-party service providers.
-4. Promote a prefix to active testing only when written scope clearly covers it; do not sweep every IP in an ASN or infer permission from routing/WHOIS ownership.
-5. Return candidate prefixes with attribution confidence, evidence provenance, explicit exclusions, validation status, and narrow next steps; hand confirmed web assets to the relevant recon/attack skill rather than claiming a vulnerability.
+4. Keep candidate prefixes passive unless the written scope explicitly includes the exact network range and the requested network-discovery method. Do not sweep every IP in an ASN or infer permission from routing/WHOIS ownership.
+5. Return candidate prefixes with attribution confidence, evidence provenance, explicit exclusions, and narrow next steps. Send confirmed organization-owned web assets to the relevant recon chapter; do not claim a vulnerability.
 
-##### Verdict gates
+##### Attribution outcomes
 
-- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated using a controlled identity/fixture and a meaningful control.
-- **Likely / needs corroboration:** independent indicators support the candidate, but the consequence or root cause remains uncertain.
-- **Unconfirmed:** evidence is generic, ambiguous, cached, or not tied to a security property.
-- **Refuted / false positive:** a relevant negative control or valid implementation/policy explanation accounts for the observation. Document tested branches; do not claim all imaginable variants were exhausted.
-- Scanner alerts, version strings, banner text, status codes, and response length alone are not proof.
+- **Corroborated first-party:** current first-party ownership evidence plus an independent technical or corporate relationship.
+- **Strong candidate:** multiple independent indicators exist, but current ownership or scope is not yet established.
+- **Shared provider / third party:** evidence indicates a CDN, cloud, reseller, SaaS, or multi-tenant service; keep it separate from first-party assets.
+- **Historical / unresolved:** stale, indirect, or conflicting evidence; retain as a passive lead only.
+- **Unrelated / refuted:** reliable evidence identifies a different organization or service owner.
 
-##### Stop, cleanup, and handoff
+These are asset-attribution outcomes, not vulnerability verdicts. Vulnerability validation belongs to the authorized specialist lifecycle.
 
-Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
+##### Stop and handoff
 
+Stop on scope ambiguity, unexpected user data, service degradation, secret exposure, or prohibited behavior. Return the exact relationship, source/time, attribution class, confidence, explicit scope decision, exclusions, and the next evidence needed. Start a chained skill only when its trigger has been independently observed.
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/asn-infrastructure-mapping/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/asn-infrastructure-mapping/SKILL.md)
@@ -307,13 +306,13 @@ For every IP/prefix/ASN pivot, retain the organization attribution source, relat
 
 **Related security workflows:** `attack-host-header`, `attack-cache-poison`
 
-**Impact qualification:** medium: A confirmed origin bypasses a security control that is demonstrably enforced only at the edge.
+**Potential significance:** an attributable origin may expose a control difference from the normal edge. This chapter records a candidate differential; it does not confirm a bypass or finding.
 
 **Legacy source:** `recon-origin-ip-discovery` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
-Determine whether an application origin is directly addressable and whether direct-origin access bypasses a material control such as edge authentication, WAF policy, rate limiting, or cache behavior. Discovering an IP alone is not a vulnerability.
+Determine whether a candidate origin is attributable to the application and directly reachable. Record any observable difference from the normal edge as a lead for separately authorized validation; discovering an IP alone is not a vulnerability.
 
 #### Testing Methodology
 
@@ -327,22 +326,21 @@ Correlate historical DNS, certificate transparency, organization-owned DNS recor
 
 ##### 3. Confirm candidate identity without bypass assumptions
 
-Where testing is authorized, connect to a candidate IP while preserving the expected TLS SNI and HTTP Host for the confirmed domain. Compare certificate, redirect, body marker, and application behavior with the edge baseline. Do not treat a TLS mismatch or default virtual-host page as proof that the candidate is the origin.
+Only when the exact candidate address and method are explicitly in scope, make a low-volume, benign request with the expected TLS SNI and HTTP Host. Compare certificate, redirect, and stable application marker with the edge baseline. Do not use the candidate to bypass access controls or treat a TLS mismatch/default virtual-host page as proof of origin identity.
 
 ##### 4. Compare security controls
 
-Use the same benign request and controlled identity through edge and candidate origin. Compare authentication, WAF behavior, rate-limit response, cache directives, and route availability. Do not run destructive payloads or high-volume tests to establish a differential.
+If policy permits a read-only comparison, preserve the same benign request semantics and the same owner-provided test identity on both paths. Record differences in authentication response, routing, cache directives, or service behavior as candidate signals only. Do not attempt to evade a WAF, send exploit payloads, or use high-volume requests.
 
 ##### 5. Assess practical impact
 
-A reportable issue requires a control that can be bypassed or an unintended service/data exposure at the origin. Document the precise difference and the minimum route needed to prove it. If the origin is intentionally public and enforces the same controls, record it as an inventory result only.
+A potential issue exists only when evidence suggests that a material control or unintended service exposure differs at the origin. Record the exact differential and hand it to the relevant specialist for independent validation. If the origin is intentionally public and appears to enforce the same controls, retain it as inventory context only.
 
-#### What Constitutes a Finding
+#### Security significance and handoff triggers
 
-- Direct origin access bypasses a material security control or exposes a private service.
-- The candidate IP is attributable to the same application, not merely the same cloud provider.
-- The edge/origin comparison is reproducible with identical request semantics.
-- An IP address, historical DNS record, or different certificate alone is not a vulnerability.
+- A candidate origin must be attributable to the same application, not merely the same cloud provider.
+- An observed edge/origin difference is a lead for a specialist; this Recon chapter does not confirm a security-control bypass.
+- An IP address, historical DNS record, different certificate, or default virtual-host page alone is not a vulnerability.
 
 #### Output contract
 Return each origin candidate with its source, freshness, ownership confidence, scope decision, and reachability status. Where comparison is permitted, preserve paired edge/origin request and response references with the same path, method, Host, TLS SNI, identity, and relevant headers. Classify the result as inventory-only, control-difference verified, blocked, or inconclusive; state the exact control and observed difference.
@@ -351,7 +349,7 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 
 - DNS/passive-source provenance and timestamp.
 - Sanitized edge and origin request/response pairs, including Host and SNI context.
-- Exact control that differs and a minimal impact demonstration.
+- Exact observed difference, paired request context, and the specialist validation still required; do not claim impact from the recon comparison alone.
 - Redact tokens and private application data.
 
 #### Origin Attribution Matrix
@@ -661,9 +659,9 @@ Use static asset versions, readme/changelog files where publicly served, API met
 
 Review public plugin/theme asset paths, frontend bundles, REST routes, GraphQL schemas, and references in source code. Prioritize components that are reachable and materially affect authentication, file handling, template rendering, or data access. Avoid brute forcing large extension lists when passive evidence is sufficient.
 
-##### 5. Verify the security condition
+##### 5. Prepare the specialist handoff
 
-Map a confirmed component/version to a credible advisory, then verify the vulnerable precondition and affected code path with a minimal non-destructive test. A component being outdated is not automatically a reportable exploitable issue without impact and applicable policy.
+Map a corroborated component/version to a credible advisory and record the affected-version range, advisory prerequisites, and evidence that the component/path is present. Do not run a proof-of-concept or exploit from this Recon chapter. A version match is a lead, not proof that the vulnerable code path is reachable or that the application is exploitable.
 
 #### Output contract
 
@@ -676,8 +674,8 @@ Map a confirmed component/version to a credible advisory, then verify the vulner
 
 - Response excerpts or asset paths that establish the fingerprint.
 - Version evidence and a corroborating signal.
-- Advisory identifier and exact affected-version range for any vulnerability claim.
-- A minimal proof of the security condition, with secrets and user data redacted.
+- Advisory identifier, exact affected-version range, and evidence that the affected component/path is present.
+- State explicitly that applicability/impact validation remains pending with the relevant specialist; redact secrets and user data.
 
 #### Fingerprint Confidence Matrix
 
@@ -906,15 +904,15 @@ Look for untrusted merge-request code running with privileged runners, unsafe ar
 
 Use local secret-scanning tools on the minimum relevant repository content. Treat matches as unverified candidates; redact immediately and do not authenticate to third-party services with discovered material. Determine likely type and location from context, and ask the owner to verify/revoke through their normal process.
 
-##### 6. Confirm impact and report
+##### 6. Prepare a specialist handoff
 
-A report should identify the public asset, why it belongs to the organization, what non-public information or control gap is exposed, and the smallest sanitized proof. For a CI/CD issue, describe the trust relationship and permission consequence without triggering a deployment or modifying pipelines.
+Record the public asset, ownership evidence, affected file/commit/artifact, and the suspected non-public information or CI/CD trust boundary. For a CI/CD concern, describe the observed trust relationship and the permission question without triggering a deployment, modifying pipelines, or claiming a privilege boundary was crossed.
 
-#### What Constitutes a Finding
+#### Security significance and handoff triggers
 
-- A public repository or artifact unintentionally exposes non-public source, internal configuration, personal data, or secret material.
-- A CI/CD configuration defect allows untrusted contributors or jobs to cross a meaningful deployment or privilege boundary.
-- A repository name, public README, intentionally published SDK, public client identifier, or stale placeholder secret alone is not a vulnerability.
+- An attributable public repository/artifact contains material that appears non-public, or its CI/CD configuration raises a concrete trust-boundary question.
+- Public visibility alone, a repository name, public README, intentionally published SDK, client identifier, or stale placeholder secret is not a vulnerability.
+- This chapter records read-only evidence and a candidate; the relevant source-leak/CI specialist must validate the boundary and impact independently.
 
 #### Output contract
 Persist a read-only inventory of attributable GitLab groups/projects, project identifiers, public visibility, relevant files/commits, release or package artifacts, and CI configuration references. Record source URL, observed time, project ownership confidence, and last-seen revision. For secret-shaped material, retain only type, location, detector, and a redacted fingerprint—never the value. Link each candidate to the canonical asset/evidence record and a concrete safe next step.
@@ -1021,16 +1019,16 @@ Parse p, sp, pct, adkim, aspf, rua, and ruf. Determine whether the visible From 
 
 Inspect MTA-STS policy and TLS-RPT reporting configuration where published. Check MX host TLS behavior with a normal protocol-aware client, certificate validity, and support for modern TLS. Separate transport encryption posture from sender identity authentication.
 
-##### 6. Validate practical impact carefully
+##### 6. Prepare a safe validation handoff
 
-Prefer passive DNS and analysis of legitimate test messages. If active spoofing validation is explicitly approved, use a controlled mailbox and a clearly labeled non-deceptive test message; do not target employees, customers, or third parties. Preserve the recipient's Authentication-Results and relevant message headers, then stop.
+Prefer passive DNS and analysis of legitimate, owner-provided test messages. Do not send spoofed or test mail from this Recon procedure. If recipient-side testing is separately authorized, record the required controlled mailbox, sender/domain, and evidence to be collected, then hand off that test plan without sending the message.
 
-#### What Constitutes a Finding
+#### Security significance and handoff triggers
 
-- A reproducible policy gap creates a meaningful impersonation risk, supported by alignment analysis or a permitted controlled test.
-- SPF/DKIM/DMARC syntax or policy weaknesses are described accurately with domain and subdomain scope.
-- A weak DNS record alone should be rated by practical impact and recipient behavior, not by a simplistic "spoofable" label.
-- MX presence, a missing guessed DKIM selector, or p=none without impact context is not by itself proof of compromise.
+- SPF/DKIM/DMARC or transport-policy observations may indicate impersonation or downgrade risk; record domain/subdomain scope and the exact technical basis.
+- A weak DNS record alone is not proof that an email will be spoofed or delivered.
+- MX presence, a missing guessed DKIM selector, or p=none without recipient-side evidence is not proof of compromise.
+- This chapter reports posture and validation requirements; it does not send mail or confirm successful impersonation.
 
 #### Output contract
 Record the organization-owned mail domain and each observed MX, SPF, DKIM selector/result, DMARC policy/alignment, MTA-STS, TLS-RPT, and relevant TLS posture observation with DNS provenance, TTL/freshness, and validation limits. Separate missing/misconfigured policy from demonstrated exploitability. Do not send unsolicited mail or create a separate mail inventory when the canonical asset record can hold the observations.
@@ -1039,7 +1037,7 @@ Record the organization-owned mail domain and each observed MX, SPF, DKIM select
 
 - Sanitized DNS outputs with timestamps and TTLs.
 - Parsed SPF/DMARC values and lookup-count analysis.
-- If approved, a controlled test message's sanitized Authentication-Results, From, Return-Path, DKIM d=, and DMARC alignment result.
+- If a separate mail test is approved and performed by the authorized owner/specialist, its sanitized Authentication-Results, From, Return-Path, DKIM d=, and DMARC alignment result. This chapter does not send that test message.
 - Never include recipient personal data, session material, or deceptive-message content in reusable artifacts.
 
 #### Email Control Matrix
@@ -1139,20 +1137,20 @@ Classify findings into internal filesystem paths and deployment layout; stack tr
 
 Treat pattern matches as candidates only. Never test a discovered credential against a service; confirm validity through an owner-provided verification channel or metadata that does not expose or use the secret.
 
-##### 5. Determine reachability and impact
+##### 5. Classify reachability and sensitivity
 
-Establish whether unauthenticated users can retrieve the log, whether it is current, and whether the content reveals a meaningful attack path. A path or version disclosure may be informational; a live secret or sensitive record can raise severity, but must be handled with minimal evidence and immediate redaction.
+Record whether an unauthenticated request can retrieve the resource, whether it appears current, and which information categories are exposed. Treat paths, versions, stack traces, and secret-like patterns as candidate signals only. Do not test any secret or infer severity without separate authorized validation and impact review.
 
 ##### 6. Identify root cause
 
 Check production debug settings, web-server deny rules, deployment packaging, log rotation and permissions, public static-file mappings, backup/sync jobs, and CMS plugin/theme behavior. Recommend removing logs from web roots and preventing future writes to publicly served locations.
 
-#### What Constitutes a Finding
+#### Security significance and handoff triggers
 
-- A real log is retrievable by an unauthorized user and contains non-public information.
-- Impact is based on the exact disclosed content and its sensitivity, not the file name or byte size.
-- A valid secret should not be copied into a report; identify the secret type, location, and minimal redacted fingerprint instead.
-- A generic error page, empty log, public sample log, or stale benign stack trace may not justify a security finding.
+- A real log/debug artifact appears retrievable outside its intended access boundary and contains non-public information.
+- Describe the exact data category and sensitivity; do not infer impact from the file name, byte size, or pattern match alone.
+- A secret must never be copied into notes/reports or tested; retain only the secret type, location, and minimal redacted fingerprint.
+- A generic error page, empty log, public sample, or stale benign stack trace is not a confirmed finding. Route a meaningful exposure candidate to the information-disclosure specialist for independent triage.
 
 #### Output contract
 For each candidate, record the in-scope URL/resource, response/access context, timestamp, content classification, minimal redacted proof reference, random-path or equivalent control, exposure status, sensitivity category, and safe next action. Preserve only the minimum sanitized evidence needed to establish the access boundary; do not retain full logs, credentials, tokens, session IDs, or customer data.
