@@ -6,6 +6,7 @@ import path from "path"
 import { UI } from "@/cli/ui"
 import { iife } from "@/util/iife"
 import { Log } from "@/util/log"
+import { Config } from "@/config/config"
 import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
 import type { Event } from "@cyberstrike-io/sdk/v2"
 import type { EventSource } from "./context/sdk"
@@ -189,13 +190,26 @@ export const TuiThreadCommand = cmd({
       Log.Default.info("TUI startup stage", { stage: "network-options-start" })
       const networkOpts = await resolveNetworkOptions(args)
       Log.Default.info("TUI startup stage", { stage: "network-options-complete", networkOpts })
+      // Network options have defaults (notably port=4096), so their resolved
+      // values cannot tell us whether the user requested an HTTP server.
+      // Keep ordinary TUI startup on the lower-overhead worker RPC transport.
+      const globalConfig = await Config.global()
+      const explicitlySet = (name: string) =>
+        process.argv.some((value) => value === `--${name}` || value.startsWith(`--${name}=`))
       const shouldStartServer =
-        process.argv.includes("--port") ||
-        process.argv.includes("--hostname") ||
-        process.argv.includes("--mdns") ||
+        explicitlySet("port") ||
+        explicitlySet("hostname") ||
+        explicitlySet("mdns") ||
+        explicitlySet("mdns-domain") ||
+        explicitlySet("cors") ||
+        globalConfig?.server !== undefined ||
         networkOpts.mdns ||
-        networkOpts.port !== 0 ||
         networkOpts.hostname !== "127.0.0.1"
+      Log.Default.info("TUI startup stage", {
+        stage: shouldStartServer ? "server-start-selected" : "direct-rpc-selected",
+        serverConfigured: globalConfig?.server !== undefined,
+        networkOpts,
+      })
 
       let url: string
       let customFetch: typeof fetch | undefined
