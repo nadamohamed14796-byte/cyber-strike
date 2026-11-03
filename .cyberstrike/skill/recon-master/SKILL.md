@@ -24,6 +24,10 @@ chains_with:
   - attack-information-disclosure
   - attack-phpinfo-exposure
   - cicd-attacks
+  - attack-bfla
+  - attack-idor-automation
+  - attack-auth-bypass
+  - attack-session
 ---
 # Recon Master — Evidence-driven Recon Router
 
@@ -83,6 +87,7 @@ Load a specialist only after its trigger is observed; chains_with is discoverabi
 | GitLab CI configuration or build/deploy trust boundary is observed | cicd-attacks |
 | A source/build artifact or source map exposes application source/configuration | attack-source-leak |
 | A log/debug/exception artifact discloses internal or sensitive information | attack-information-disclosure; use attack-phpinfo-exposure only for an actual PHP configuration artifact |
+| Visual evidence points to an admin-only function, tenant/object boundary, or authentication/session flow and normal HTTP evidence corroborates it | attack-bfla, attack-idor-automation, attack-auth-bypass, or attack-session according to the observed boundary |
 
 For every handoff, pass the observed signal, canonical asset/endpoint ID, evidence references, timestamp, attribution and scope decisions, prerequisites, negative control needed, active-test permission state, exact uncertainty, and next action. The recipient must independently validate its own preconditions and impact.
 
