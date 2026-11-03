@@ -52,14 +52,41 @@ jobs:
       - name: Run unit tests
         run: bun turbo test
 
+  app-e2e:
+    name: app e2e (linux)
+    runs-on: ubuntu-24.04
+    needs:
+      - unit
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install Chromium for Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run app browser E2E without external model credentials
+        working-directory: packages/app
+        run: |
+          bun run test:e2e:local -- --grep-invert "(can send a prompt and receive a reply|prompt succeeds when sync message endpoint is unreachable)"
+
   required:
     name: test (linux)
     runs-on: ubuntu-24.04
     needs:
       - unit
+      - app-e2e
     if: always()
     steps:
       - name: Verify upstream test jobs passed
         run: |
           echo "unit=${{ needs.unit.result }}"
+          echo "app-e2e=${{ needs.app-e2e.result }}"
           test "${{ needs.unit.result }}" = "success"
+          test "${{ needs.app-e2e.result }}" = "success"
