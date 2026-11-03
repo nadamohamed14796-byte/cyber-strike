@@ -21,7 +21,7 @@ export { reconRunID, unresolvedReconPrerequisites } from "../target/recon-gate"
 export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/recon-gate"
 
 function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable" || status === "deferred"
+  return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
 /** Load the effective authorization chain for a selected workspace, rejecting broken or cross-root ancestry. */
