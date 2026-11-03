@@ -861,7 +861,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
 const RAW_DESC = `Send an EXACT byte sequence over a raw TCP/TLS socket — no normalization. This is the byte-exact backend for request smuggling / desync, intentionally-malformed messages, duplicate/odd-case headers, and Host-header overrides that http_replay (fetch) would normalize away.
 
-Provide request_id (PRIMARY) to derive host/port/TLS from a captured request; by default it sends that request's raw bytes, or pass raw to send bytes you crafted. For an endpoint the crawl never captured, pass target_url (FALLBACK) together with raw instead. Give exactly one of request_id / target_url. This byte-exact active test requires an explicitly running `vulnerability_testing` checkpoint after endpoint inventory is complete. Returns the parsed response (status/headers/body) with timing. Host must be one the crawl already captured.`
+Provide request_id (PRIMARY) to derive host/port/TLS from a captured request; by default it sends that request's raw bytes, or pass raw to send bytes you crafted. For an endpoint the crawl never captured, pass target_url (FALLBACK) together with raw instead. Give exactly one of request_id / target_url. This byte-exact active test requires an explicitly running `parameter_fuzzing` or `vulnerability_testing` checkpoint after endpoint inventory is complete. Returns the parsed response (status/headers/body) with timing. Host must be one the crawl already captured.`
 
 export const HttpReplayRawTool = Tool.define("http_replay_raw", {
   description: RAW_DESC,
