@@ -41,8 +41,8 @@ test("reads HTML attributes by exact name and ignores data-* lookalikes", () => 
     '<link data-rel="preload" data-as="script" data-href="/decoy-preload.js" rel="modulepreload" href="/real-module.js">',
   ].join("\n")
   expect(extractHTMLScriptURLs(html, pageURL).sort()).toEqual([
-    "https://app.example.test/real.js",
     "https://app.example.test/real-module.js",
+    "https://app.example.test/real.js",
   ])
 })
 
