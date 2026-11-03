@@ -149,7 +149,6 @@ Preserve the contributing source references when several sources identify the sa
 Continue with independent, relevant sources while they can add meaningful coverage. Do not repeat an unchanged source/query after a deterministic failure or a completed zero-result response; choose a materially different source or record the unresolved coverage gap. There is no fixed candidate-count ceiling, but scope, rate, and safety controls remain authoritative.
 
 
-
 #### References
 
 - https://github.com/projectdiscovery/subfinder
@@ -159,6 +158,8 @@ Continue with independent, relevant sources while they can add meaningful covera
 - https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://www.rfc-editor.org/rfc/rfc1034
+
+---
 
 ## 03. ASN and infrastructure mapping
 
@@ -268,7 +269,6 @@ These are asset-attribution outcomes, not vulnerability verdicts. Vulnerability 
 
 Stop on scope ambiguity, unexpected user data, service degradation, secret exposure, or prohibited behavior. Return the exact relationship, source/time, attribution class, confidence, explicit scope decision, exclusions, and the next evidence needed. Start a chained skill only when its trigger has been independently observed.
 
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/asn-infrastructure-mapping/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/asn-infrastructure-mapping/SKILL.md)
@@ -280,7 +280,9 @@ Stop on scope ambiguity, unexpected user data, service degradation, secret expos
 - https://stat.ripe.net/docs/
 - https://owasp.org/www-project-web-security-testing-guide/
 
-IP exposure assessment
+---
+
+## 04. Origin IP exposure assessment
 
 
 ### Chapter profile
@@ -362,7 +364,6 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 
 
 
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/origin-ip-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/origin-ip-discovery/SKILL.md)
@@ -373,6 +374,23 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 - https://docs.censys.com/
 - https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/
 - https://owasp.org/www-project-web-security-testing-guide/
+
+---
+
+## 05. Port and service discovery
+
+
+### Chapter profile
+
+**Purpose:** Classify services on confirmed target infrastructure and prioritize web, API, management, and unusual-port exposures using bounded probes.
+
+**Prerequisites:** An attributable host or IP explicitly authorized for service discovery
+
+**Technology:** `TCP`, `UDP`, `HTTP`, `TLS`, `DNS`, `Linux`
+
+**Coverage tags:** `recon`, `ports`, `services`, `network`, `HTTP`, `TLS`
+
+**Legacy source:** `recon-port-service-discovery` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -442,7 +460,6 @@ For a suspected issue, preserve one benign handshake or read-only response and r
 - Do not infer that all addresses within a hosting provider's ASN belong to the target.
 
 
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/port-service-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/port-service-discovery/SKILL.md)
@@ -454,6 +471,25 @@ For a suspected issue, preserve one benign handshake or read-only response and r
 - https://nmap.org/download.html
 - https://nmap.org/book/man.html
 - https://owasp.org/www-project-web-security-testing-guide/
+
+---
+
+## 06. Virtual-host enumeration
+
+
+### Chapter profile
+
+**Purpose:** Identify virtual hosts and tenant-specific applications on confirmed infrastructure using DNS, TLS, HTTP Host behavior, and response clustering.
+
+**Prerequisites:** A confirmed target domain or attributable server IP
+
+**Technology:** `HTTP`, `TLS`, `DNS`, `reverse-proxy`
+
+**Coverage tags:** `recon`, `virtual-host`, `HTTP`, `TLS`, `DNS`
+
+**Related security workflows:** `attack-host-header`
+
+**Legacy source:** `recon-vhost-enumeration` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -517,7 +553,6 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 
 
 
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/vhost-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/vhost-enumeration/SKILL.md)
@@ -527,6 +562,25 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - https://github.com/ffuf/ffuf
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://portswigger.net/web-security/host-header
+
+---
+
+## 07. CMS and component fingerprinting
+
+
+### Chapter profile
+
+**Purpose:** Fingerprint CMS platforms, versions, themes, plugins, and exposed administrative surfaces using corroborated passive and low-impact signals.
+
+**Prerequisites:** A confirmed in-scope asset and authorization for the specific procedure.
+
+**Technology:** `HTTP`, `HTML`, `JavaScript`, `DNS`
+
+**Coverage tags:** `recon`, `CMS`, `WordPress`, `Drupal`, `Joomla`, `fingerprinting`
+
+**Related security workflows:** `attack-wordpress`, `attack-source-leak`, `attack-information-disclosure`
+
+**Legacy source:** `recon-cms-detection` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -607,7 +661,6 @@ Maintain separate confidence for CMS identity, component identity/version, deplo
 
 
 
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/cms-detection/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/cms-detection/SKILL.md)
@@ -618,6 +671,23 @@ Maintain separate confidence for CMS identity, component identity/version, deplo
 - https://github.com/RetireJS/retire.js
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/vavkamil/awesome-bugbounty-tools
+
+---
+
+## 08. Visual reconnaissance and application clustering
+
+
+### Chapter profile
+
+**Purpose:** Use screenshots, page titles, visual clustering, and browser-observed behavior to prioritize web assets and identify distinct applications.
+
+**Prerequisites:** A confirmed in-scope asset and authorization for the specific procedure.
+
+**Technology:** `HTTP`, `browser`, `TLS`
+
+**Coverage tags:** `recon`, `screenshots`, `visual-triage`, `web-enumeration`
+
+**Legacy source:** `recon-visual-recon` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -696,26 +766,36 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 - Organizations can reduce the value of this technique by consolidating default/placeholder pages, disabling framework and admin-panel banners on production hosts, and keeping staging/legacy interfaces off public DNS or behind authentication.
 - Consistent, informative error pages (rather than framework-default error pages) reduce fingerprinting value from screenshots and titles alone.
 
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/visual-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/visual-recon/SKILL.md)
 - [Playwright documentation](https://playwright.dev/docs/intro)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
-
-
-#### Additional validation refinements
-
-##### Visual clusters as testable hypotheses
-Capture consistent screenshots at the same viewport and auth context, then cluster only as a navigation aid—not as proof that two apps share code or ownership. Retain URL, screenshot hash/path, title, favicon/theme fingerprint, response status, and comparison rationale. Convert each visual anomaly into one question (different tenant, admin console, old version, hidden workflow, unexpected login state) and verify with normal HTTP evidence. Avoid screenshotting personal information and redact account names/IDs. Route admin-specific paths to BFLA, tenant/object references to IDOR, and visually different auth flows to the authentication specialist only after the request behavior corroborates the visual clue.
-
-
-
-
-#### References
-
 - https://github.com/sensepost/gowitness
 - https://github.com/michenriksen/aquatone
 - https://github.com/vavkamil/awesome-bugbounty-tools
+
+---
+
+## 09. Public GitLab project reconnaissance
+
+
+### Chapter profile
+
+**Purpose:** Inventory public GitLab projects, groups, package artifacts, CI configuration, and exposed metadata with ownership verification.
+
+**Prerequisites:** A confirmed organization namespace or public GitLab instance
+
+**Technology:** `GitLab`, `Git`, `HTTP`, `CI/CD`
+
+**Coverage tags:** `recon`, `GitLab`, `source-code`, `CI/CD`, `information-disclosure`
+
+**Related security workflows:** `attack-source-leak`, `cicd-attacks`
+
+**Specialist validation threshold:** a public artifact appears to expose a sensitive private asset or secret-like material. This chapter records redacted evidence only; the source-leak/information-disclosure specialist independently validates impact without using the secret.
+
+**Legacy source:** `recon-gitlab-public-recon` v"1.0.0"; credited to cyberstrike-official.
 
 #### Objective
 
@@ -785,43 +865,117 @@ Persist a read-only inventory of attributable GitLab groups/projects, project id
 - Do not trigger CI pipelines, change settings, or attempt deployment as proof.
 
 
+
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/gitlab-public-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/gitlab-public-recon/SKILL.md)
 - [GitLab CI/CD Security](https://docs.gitlab.com/ci/security/)
 - [GitLab REST API](https://docs.gitlab.com/api/)
 - [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
+- https://github.com/gitleaks/gitleaks
+- https://docs.gitlab.com/cli/
+- https://git-scm.com/docs
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+---
+
+## 10. Email domain security assessment
 
 
-#### Additional validation refinements
+### Chapter profile
 
-##### Repository attribution and secret-safe handling
-Confirm namespace/organization attribution and public visibility before pivoting through group projects, forks, issue attachments, packages, snippets, build artifacts, and commit history. Preserve repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Secret-like matches must be recorded as type plus redacted fingerprint; do not test or reuse credentials or access projects beyond what is public and authorized. Distinguish public code disclosure from an exploitable credential or CI trust boundary. Route workflow/runner problems to CI/CD review, first-party JavaScript to JS analysis, and secret candidates to evidence-safe triage without invoking them.
+**Purpose:** Assess SPF, DKIM, DMARC, MX, MTA-STS, TLS-RPT, and mail transport configuration for domain spoofing and delivery risks.
 
+**Prerequisites:** A confirmed organization-owned domain
+
+**Technology:** `DNS`, `SMTP`, `TLS`
+
+**Coverage tags:** `email-security`, `SPF`, `DKIM`, `DMARC`, `DNS`, `SMTP`
+
+**Related security workflows:** `attack-exchange-owa`, `attack-oauth`
+
+**Specialist validation threshold:** recipient-side evidence from a separately authorized, controlled, non-deceptive test may establish impersonation impact. This Recon chapter performs no mail sending and records posture plus the required specialist validation.
+
+**Legacy source:** `recon-email-security` v"1.0.0"; credited to cyberstrike-official.
+
+#### Objective
+
+Evaluate whether DNS policy and mail authentication allow sender impersonation or expose weaknesses in mail transport. DNS posture alone does not prove that a spoofed message will reach an inbox; receiver policy, alignment, and actual message authentication results matter.
+
+#### Methodology
+
+##### 1. Inventory mail identity and routing
+
+Collect MX records, SPF TXT records, the _dmarc policy, DKIM selectors known from legitimate messages or provider documentation, and MTA-STS/TLS-RPT records. Record DNS TTLs and delegated subdomains; distinguish no record, resolver failure, stale cache, and a confirmed misconfiguration. Keep third-party SaaS sending sources separate from organization-owned mail domains.
+
+##### 2. Evaluate SPF correctly
+
+Check for one valid SPF record, syntax errors, excessive DNS lookups, unintended broad mechanisms, and the terminal qualifier. The qualifiers -all, ~all, ?all, and +all have materially different semantics. SPF authorizes sending hosts for the SMTP envelope domain; it does not alone authenticate the visible From header and must be interpreted with DMARC alignment.
+
+##### 3. Evaluate DKIM coverage
+
+Review DKIM signatures from legitimate organization mail and verify selector DNS records, key strength, and signing-domain alignment. A missing guessed selector is not proof DKIM is absent; selectors are sender-specific. A published key proves configuration, not that every mail stream is signed.
+
+##### 4. Evaluate DMARC policy and alignment
+
+Parse p, sp, pct, adkim, aspf, rua, and ruf. Determine whether the visible From domain aligns with SPF and/or DKIM. Assess root-domain and subdomain policy. p=none requests monitoring rather than enforcement, but does not automatically prove successful impersonation or total lack of receiver-side protection.
+
+##### 5. Evaluate transport controls
+
+Inspect MTA-STS policy and TLS-RPT reporting configuration where published. Check MX host TLS behavior with a normal protocol-aware client, certificate validity, and support for modern TLS. Separate transport encryption posture from sender identity authentication.
+
+##### 6. Prepare a safe validation handoff
+
+Prefer passive DNS and analysis of legitimate, owner-provided test messages. Do not send spoofed or test mail from this Recon procedure. If recipient-side testing is separately authorized, record the required controlled mailbox, sender/domain, and evidence to be collected, then hand off that test plan without sending the message.
+
+#### Security significance and handoff triggers
+
+- SPF/DKIM/DMARC or transport-policy observations may indicate impersonation or downgrade risk; record domain/subdomain scope and the exact technical basis.
+- A weak DNS record alone is not proof that an email will be spoofed or delivered.
+- MX presence, a missing guessed DKIM selector, or p=none without recipient-side evidence is not proof of compromise.
+- This chapter reports posture and validation requirements; it does not send mail or confirm successful impersonation.
+
+#### Output contract
+Record the organization-owned mail domain and each observed MX, SPF, DKIM selector/result, DMARC policy/alignment, MTA-STS, TLS-RPT, and relevant TLS posture observation with DNS provenance, TTL/freshness, and validation limits. Separate missing/misconfigured policy from demonstrated exploitability. Do not send unsolicited mail or create a separate mail inventory when the canonical asset record can hold the observations.
+
+#### Evidence Requirements
+
+- Sanitized DNS outputs with timestamps and TTLs.
+- Parsed SPF/DMARC values and lookup-count analysis.
+- If a separate mail test is approved and performed by the authorized owner/specialist, its sanitized Authentication-Results, From, Return-Path, DKIM d=, and DMARC alignment result. This chapter does not send that test message.
+- Never include recipient personal data, session material, or deceptive-message content in reusable artifacts.
+
+#### Email Control Matrix
+
+| Control | Strong posture | Weak signal | Interpretation caveat |
+|---|---|---|---|
+| SPF | One valid record, narrow senders, deliberate terminal policy | Permissive +all, invalid record, excessive lookups | SPF authenticates envelope sender, not visible From alone |
+| DKIM | Relevant streams signed with aligned domain and adequate key | Unsigned stream or misaligned signature | Unknown selector does not mean no DKIM |
+| DMARC | p=reject after monitoring, correct alignment and subdomain policy | p=none, partial rollout, weak alignment | Receiver handling can differ; policy is not delivery proof |
+| MX | Expected mail providers only | Stale/unexpected MX | MX is routing metadata, not spoofing proof |
+| MTA-STS | Valid policy with enforce mode where appropriate | Missing/expired policy or testing mode | Applies to SMTP transport, not sender identity |
+| TLS-RPT | Reports configured and reviewed | No reporting visibility | Reporting absence is usually hardening, not direct exploit |
+| Subdomains | Explicit sending and DMARC strategy | Unmanaged subdomain mail | Parent policy and sp behavior must be checked |
+
+#### Verification and False Positives
+
+- Re-query DNS from independent resolvers and account for TTL/propagation.
+- Check for duplicate SPF records and parse nested includes rather than judging one TXT string.
+- Evaluate SPF and DKIM alignment with the exact visible From domain.
+- Distinguish transport TLS findings from spoofing findings.
+- Do not infer that any third-party service allowed by SPF can freely send as the domain; provider-side account/domain verification controls matter.
+- Avoid claims of complete spoofing without a controlled recipient-side result or strong technical proof.
 
 
 
 #### References
 
-- https://github.com/gitleaks/gitleaks
-- https://docs.gitlab.com/cli/
-- https://git-scm.com/docs
-- https://github.com/vavkamil/awesome-bugbounty-tools
 - Source merged: [uphiago/recon-skills — recon/email-security/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/email-security/SKILL.md)
 - [RFC 7208 — SPF](https://www.rfc-editor.org/rfc/rfc7208)
 - [RFC 6376 — DKIM](https://www.rfc-editor.org/rfc/rfc6376)
 - [RFC 7489 — DMARC](https://www.rfc-editor.org/rfc/rfc7489)
 - [RFC 8461 — MTA-STS](https://www.rfc-editor.org/rfc/rfc8461)
 - [RFC 8460 — TLS Reporting](https://www.rfc-editor.org/rfc/rfc8460)
-
-#### Additional validation refinements
-
-##### Mail-domain evidence and impact boundary
-For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact. If recipient-side validation is required, hand the test plan to the authorized mail specialist for a separately approved synthetic recipient/domain; this Recon chapter sends no test mail. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.
-
-
-#### Additional references
-
 - https://github.com/drwetter/testssl.sh
 - https://github.com/projectdiscovery/tlsx
 - https://www.rfc-editor.org/
@@ -922,15 +1076,14 @@ For each candidate, record the in-scope URL/resource, response/access context, t
 - If evidence contains secrets, stop collection, redact immediately, and follow the engagement's sensitive-data handling process.
 
 
+#### Additional references
 
-
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- https://github.com/vavkamil/awesome-bugbounty-tools
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/error-log-mining/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/error-log-mining/SKILL.md)
 - [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
 - [CWE-200: Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
 - [CWE-532: Insertion of Sensitive Information into Log File](https://cwe.mitre.org/data/definitions/532.html)
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
