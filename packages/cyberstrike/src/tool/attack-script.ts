@@ -82,7 +82,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
     target_url: z.string().url().optional().describe("Canonical in-scope target workspace context; required for ssrf_listener and github_dorker"),
     timeout_seconds: z.number().optional().default(120).describe("Maximum execution time in seconds (default: 120)"),
   }),
-  async execute(params, ctx) {
+  async execute(params) {
     const { directory: scriptsDir, searched: scriptDirectoriesSearched } = await resolveScriptsDir()
     const scriptPath = path.join(scriptsDir, `${params.script}.py`)
     const file = Bun.file(scriptPath)
@@ -99,7 +99,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
     const denied = (reason: string, metadata: Record<string, unknown> = {}) => ({
       title: `attack_script: ${params.script} — refused`,
       output: "No script was executed. " + reason,
-      metadata: { script: params.script, exitCode: -1, scopeDenied: true, ...metadata },
+      metadata: { script: params.script, exitCode: -1, blocked: true, ...metadata },
     })
     const normalizeTarget = (value: string): string | undefined => {
       try {
@@ -115,7 +115,11 @@ export const AttackScriptTool = Tool.define("attack_script", {
     const scriptTargets: string[] = []
     const args = params.args
     const first = args[0]
-    if (params.target_url) scriptTargets.push(params.target_url)
+    if (params.target_url) {
+      const target = normalizeTarget(params.target_url)
+      if (!target) return denied("target_url must be an HTTP(S) URL.")
+      scriptTargets.push(target)
+    }
 
     if (params.script === "race_tester" || params.script === "file_upload_tester") {
       const target = first ? normalizeTarget(first) : undefined
@@ -137,6 +141,9 @@ export const AttackScriptTool = Tool.define("attack_script", {
       }
     } else if (params.script === "cloud_storage_enum") {
       if (!first) return denied("Provide a target domain or explicitly named bucket set.")
+      const baseTarget = normalizeTarget(first)
+      if (!baseTarget) return denied("Cloud storage target must be a valid in-scope domain or URL.")
+      scriptTargets.push(baseTarget)
       const namesIndex = args.indexOf("--names")
       const names = namesIndex >= 0
         ? args.slice(namesIndex + 1).filter((item) => !item.startsWith("--"))
@@ -184,6 +191,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       const authorization = await TargetMemory.checkURLScope(target)
       if (!authorization.allowed || !authorization.workspace) {
         return denied("Target is outside persisted scope or has no canonical workspace: " + target, {
+          scopeDenied: true,
           reason: authorization.reason ?? "target_out_of_scope",
           target,
         })
