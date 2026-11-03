@@ -114,8 +114,9 @@ const shutdown = (code: number, reason: string) => {
 }
 
 const reportInternalError = (reason: string, error: unknown) => {
-  console.warn(`e2e-local ignored server error: ${reason}`)
-  console.warn(error)
+  console.error(`e2e-local fatal runtime error: ${reason}`)
+  console.error(error)
+  shutdown(1, reason)
 }
 
 process.once("SIGINT", () => shutdown(130, "SIGINT"))
