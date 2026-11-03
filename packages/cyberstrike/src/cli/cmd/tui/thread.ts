@@ -127,6 +127,13 @@ export const TuiThreadCommand = cmd({
         if (await Bun.file(distWorker).exists()) return distWorker
         return localWorker
       })
+      Log.Default.info("TUI startup stage", {
+        stage: "worker-path-resolved",
+        workerPath: String(workerPath),
+        stdinTTY: process.stdin.isTTY,
+        stdoutTTY: process.stdout.isTTY,
+        cwd,
+      })
       try {
         process.chdir(cwd)
       } catch (e) {
@@ -139,6 +146,7 @@ export const TuiThreadCommand = cmd({
           Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
         ),
       })
+      Log.Default.info("TUI startup stage", { stage: "worker-created" })
       const client = Rpc.client<typeof rpc>(worker)
       worker.onerror = (e) => {
         const error = e.error instanceof Error ? e.error : new Error(e.message || "CyberStrike worker failed")
@@ -165,14 +173,22 @@ export const TuiThreadCommand = cmd({
         await client.call("reload", undefined)
       })
 
+      Log.Default.info("TUI startup stage", {
+        stage: "prompt-input-start",
+        stdinTTY: process.stdin.isTTY,
+        hasPromptArgument: Boolean(args.prompt),
+      })
       const prompt = await iife(async () => {
         const piped = !process.stdin.isTTY ? await Bun.stdin.text() : undefined
         if (!args.prompt) return piped
         return piped ? piped + "\n" + args.prompt : args.prompt
       })
+      Log.Default.info("TUI startup stage", { stage: "prompt-input-complete", hasPrompt: Boolean(prompt) })
 
       // Check if server should be started (port or hostname explicitly set in CLI or config)
+      Log.Default.info("TUI startup stage", { stage: "network-options-start" })
       const networkOpts = await resolveNetworkOptions(args)
+      Log.Default.info("TUI startup stage", { stage: "network-options-complete", networkOpts })
       const shouldStartServer =
         process.argv.includes("--port") ||
         process.argv.includes("--hostname") ||
@@ -202,6 +218,11 @@ export const TuiThreadCommand = cmd({
         events = createEventSource(client)
       }
 
+      Log.Default.info("TUI startup stage", {
+        stage: "tui-call",
+        url,
+        directRPC: !shouldStartServer,
+      })
       const tuiPromise = tui({
         url,
         fetch: customFetch,
@@ -223,7 +244,9 @@ export const TuiThreadCommand = cmd({
         client.call("checkUpgrade", { directory: cwd }).catch(() => {})
       }, 1000)
 
+      Log.Default.info("TUI startup stage", { stage: "tui-promise-await" })
       await tuiPromise
+      Log.Default.info("TUI startup stage", { stage: "tui-exited" })
     } finally {
       unguard?.()
     }
