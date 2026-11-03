@@ -4,6 +4,8 @@ import path from "path"
 import { tmpdir } from "../fixture/fixture"
 import { Ripgrep } from "../../src/file/ripgrep"
 import { File } from "../../src/file"
+import { Bus } from "../../src/bus"
+import { FileWatcher } from "../../src/file/watcher"
 import { Instance } from "../../src/project/instance"
 
 describe("file.ripgrep", () => {
@@ -101,6 +103,45 @@ test("file search waits for the initial inventory scan and reuses its completed 
         await Instance.dispose()
       },
     }).catch(() => undefined)
+    Ripgrep.files = originalFiles
+  }
+})
+
+test("file search rebuilds its index after edited and watched file events", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(path.join(dir, "before.js"), "before")
+    },
+  })
+  const originalFiles = Ripgrep.files
+  let scanCount = 0
+  Ripgrep.files = (async function* (input) {
+    scanCount++
+    yield* originalFiles(input)
+  }) as typeof Ripgrep.files
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        File.init()
+        expect(await File.search({ query: "before.js", dirs: false, limit: 10 })).toContain("before.js")
+        expect(scanCount).toBe(1)
+        const editedPath = path.join(tmp.path, "edited.js")
+        await Bun.write(editedPath, "edited")
+        await Bus.publish(File.Event.Edited, { file: editedPath })
+        expect(await File.search({ query: "edited.js", dirs: false, limit: 10 })).toContain("edited.js")
+        expect(scanCount).toBe(2)
+        const watchedPath = path.join(tmp.path, "watched.js")
+        await Bun.write(watchedPath, "watched")
+        await Bus.publish(FileWatcher.Event.Updated, { file: watchedPath, event: "add" })
+        expect(await File.search({ query: "watched.js", dirs: false, limit: 10 })).toContain("watched.js")
+        expect(scanCount).toBe(3)
+        await Instance.dispose()
+      },
+    })
+  } finally {
+    await Instance.provide({ directory: tmp.path, fn: () => Instance.dispose() }).catch(() => undefined)
     Ripgrep.files = originalFiles
   }
 })

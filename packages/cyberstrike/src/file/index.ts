@@ -9,7 +9,9 @@ import ignore from "ignore"
 import { Log } from "../util/log"
 import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
+import { Bus } from "../bus"
 import { Ripgrep } from "./ripgrep"
+import { FileWatcher } from "./watcher"
 import fuzzysort from "fuzzysort"
 import { Global } from "../global"
 
@@ -267,14 +269,25 @@ export namespace File {
       let cache: Entry = { files: [], dirs: [] }
       let fetching = false
       let inventoryReady = false
+      let inventoryVersion = 0
+      let completedVersion = -1
+      let failedVersion = -1
       let disposed = false
       const abort = new AbortController()
       let activeScan: Promise<void> | undefined
 
       const isGlobalHome = directory === Global.Path.home && Instance.project.id === "global"
 
-      const fn = async (result: Entry) => {
-        if (disposed || directory === path.parse(directory).root) return
+      const fn = async (result: Entry, version: number) => {
+        if (disposed) return
+        if (directory === path.parse(directory).root) {
+          if (version === inventoryVersion) {
+            cache = result
+            inventoryReady = true
+            completedVersion = version
+          }
+          return
+        }
         fetching = true
         try {
           if (isGlobalHome) {
@@ -310,10 +323,11 @@ export namespace File {
               }
             }
 
-            if (!disposed && !abort.signal.aborted) {
+            if (!disposed && !abort.signal.aborted && version === inventoryVersion) {
               result.dirs = Array.from(dirs).toSorted()
               cache = result
               inventoryReady = true
+              completedVersion = version
             }
             return
           }
@@ -333,43 +347,80 @@ export namespace File {
               result.dirs.push(dir + "/")
             }
           }
-          if (!disposed && !abort.signal.aborted) {
+          if (!disposed && !abort.signal.aborted && version === inventoryVersion) {
             cache = result
             inventoryReady = true
+            completedVersion = version
           }
         } finally {
           fetching = false
         }
       }
 
-      const startScan = (result: Entry) => {
-        if (disposed || fetching) return
-        const scan = fn(result)
-        activeScan = scan
-        void scan.catch((error) => {
-          // Disposal intentionally aborts the inventory scan. Keep genuine scan
-          // failures visible, but never let a background scan become an
-          // unhandled rejection during project close or instance teardown.
-          if (disposed || abort.signal.aborted) return
-          log.error("project file inventory scan failed", { directory, error })
-        })
+      const logScanError = (error: unknown) => {
+        // Disposal intentionally aborts the inventory scan. Keep genuine scan
+        // failures visible, but never let a background scan become an
+        // unhandled rejection during project close or instance teardown.
+        if (disposed || abort.signal.aborted) return
+        log.error("project file inventory scan failed", { directory, error })
       }
 
-      startScan(cache)
+      const startScan = () => {
+        if (disposed || fetching || activeScan || completedVersion === inventoryVersion) return activeScan
+        const version = inventoryVersion
+        const scan = fn({ files: [], dirs: [] }, version)
+        activeScan = scan
+        void scan.then(
+          () => {
+            if (activeScan === scan) activeScan = undefined
+            if (!disposed && completedVersion !== inventoryVersion) startScan()
+          },
+          (error) => {
+            failedVersion = version
+            if (activeScan === scan) activeScan = undefined
+            logScanError(error)
+            if (!disposed && inventoryVersion !== version) startScan()
+          },
+        )
+        return scan
+      }
+
+      const invalidate = (filepath: string) => {
+        if (disposed || !filepath) return
+        const absolute = path.isAbsolute(filepath) ? path.resolve(filepath) : path.resolve(directory, filepath)
+        const relative = path.relative(directory, absolute)
+        if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) return
+        if (relative.split(/[\\/]/).includes(".git")) return
+        inventoryVersion++
+        inventoryReady = false
+        failedVersion = -1
+        if (!fetching && !activeScan) void startScan()
+      }
+
+      const unsubscribeEdited = Bus.subscribe(Event.Edited, (event) => invalidate(event.properties.file))
+      const unsubscribeWatcher = Bus.subscribe(FileWatcher.Event.Updated, (event) => invalidate(event.properties.file))
+
+      void startScan()
 
       return {
         async files() {
-          if (!inventoryReady && !fetching && !disposed) {
-            startScan({ files: [], dirs: [] })
+          if (failedVersion === inventoryVersion) failedVersion = -1
+          if (!inventoryReady && !fetching && !activeScan && !disposed) void startScan()
+          while (!disposed && completedVersion !== inventoryVersion && failedVersion !== inventoryVersion) {
+            const pending = activeScan
+            if (!pending) {
+              if (!fetching) void startScan()
+              if (!activeScan) break
+              continue
+            }
+            await pending.catch(() => undefined)
           }
-          // Search must observe a complete inventory. Returning the current cache
-          // while the initial scan is still running creates false empty results
-          // for early @mentions and other file-name searches.
-          await activeScan?.catch(() => undefined)
           return cache
         },
         async dispose() {
           disposed = true
+          unsubscribeEdited()
+          unsubscribeWatcher()
           abort.abort()
           await activeScan?.catch(() => undefined)
         },
