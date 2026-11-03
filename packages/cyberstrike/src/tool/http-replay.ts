@@ -28,6 +28,7 @@ import { Mutate } from "../replay/mutate"
 import { Batch } from "../replay/batch"
 import { Network } from "../network/network"
 import { TargetMemory } from "../target"
+import { reconPhaseGate } from "../target/recon-gate"
 
 // Encode codecs mirrored as a zod enum for the tool schema (kept in sync with
 // Encode.Codec in ../replay/encode.ts).
@@ -658,7 +659,27 @@ export const HttpReplayTool = Tool.define("http_replay", {
       }
     }
 
-    const originalWorkspaceID = targetAuthorization.workspace?.id
+    if (!targetAuthorization.workspace) {
+      return {
+        title: "http_replay — refused (workspace)",
+        output: "No request was sent because the persisted scope check did not resolve a canonical target workspace.",
+        metadata: { scopeDenied: true, reason: "target_workspace_unresolved" },
+      }
+    }
+    const testingGate = await reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        title: "http_replay — refused (testing checkpoint)",
+        output: [
+          "No replay request was sent.",
+          "Reason: " + testingGate.reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before replaying requests.",
+        ].join("\n"),
+        metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
+      }
+    }
+
+    const originalWorkspaceID = targetAuthorization.workspace.id
     const sendOpts = {
       insecure_tls: params.insecure_tls,
       total_timeout_ms: params.total_timeout_ms,
@@ -912,6 +933,22 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
           "A configured target workspace and persisted authorization scope are required for active replay.",
         ].join("\n"),
         metadata: { scopeDenied: true, reason: targetAuthorization.reason },
+      }
+    }
+
+    if (!targetAuthorization.workspace) {
+      return err("No raw request was sent because the persisted scope check did not resolve a canonical target workspace.")
+    }
+    const testingGate = await reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        title: "http_replay_raw — refused (testing checkpoint)",
+        output: [
+          "No byte-exact request was sent.",
+          "Reason: " + testingGate.reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before raw replay.",
+        ].join("\n"),
+        metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
       }
     }
 
