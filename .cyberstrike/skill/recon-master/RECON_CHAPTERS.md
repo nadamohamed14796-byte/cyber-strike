@@ -1076,14 +1076,12 @@ For each candidate, record the in-scope URL/resource, response/access context, t
 - If evidence contains secrets, stop collection, redact immediately, and follow the engagement's sensitive-data handling process.
 
 
-#### Additional references
-
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-- https://github.com/vavkamil/awesome-bugbounty-tools
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/error-log-mining/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/error-log-mining/SKILL.md)
 - [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
+- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
+- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
 - [CWE-200: Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
 - [CWE-532: Insertion of Sensitive Information into Log File](https://cwe.mitre.org/data/definitions/532.html)
+- https://github.com/vavkamil/awesome-bugbounty-tools
