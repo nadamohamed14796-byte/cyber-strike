@@ -36,7 +36,7 @@ test("structured and raw HTTP replay refuse before network access without an exp
             sessionID: session.id,
             method: "GET",
             normalizedPath: "/replay?baseline=1",
-            rawRequest: "GET /replay?baseline=1 HTTP/1.1\\r\\nHost: 127.0.0.1:" + server.port + "\\r\\nConnection: close\\r\\n\\r\\n",
+            rawRequest: "GET /replay?baseline=1 HTTP/1.1\r\nHost: 127.0.0.1:" + server.port + "\r\nConnection: close\r\n\r\n",
             scheme: "http",
             host: "127.0.0.1",
             port: server.port,
