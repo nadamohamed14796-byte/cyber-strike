@@ -127,7 +127,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       if (!first) return denied("Provide a domain or an in-scope subdomain file.")
       const inputFile = Bun.file(first)
       const domains = await inputFile.exists()
-        ? (await inputFile.text()).split(/\\r?\\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
+        ? (await inputFile.text()).split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
         : [first]
       if (!domains.length) return denied("The supplied subdomain file contains no candidate hosts.")
       for (const domain of domains) {
@@ -141,7 +141,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       const names = namesIndex >= 0
         ? args.slice(namesIndex + 1).filter((item) => !item.startsWith("--"))
         : (() => {
-            const base = first.replace(/\\./g, "-").replace(/\\s/g, "-").toLowerCase()
+            const base = first.replace(/\./g, "-").replace(/\s/g, "-").toLowerCase()
             return [
               base, `${base}-dev`, `${base}-staging`, `${base}-prod`, `${base}-backup`,
               `${base}-assets`, `${base}-static`, `${base}-media`, `${base}-uploads`,
