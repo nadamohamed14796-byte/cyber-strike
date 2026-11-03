@@ -433,9 +433,9 @@ Prioritize exposed admin consoles, databases, caches, message brokers, CI/CD sys
 
 Map port → protocol → certificate/hostname → application → owner. Compare alternate ports against the canonical web app and inspect public JavaScript/configuration for backend references. Use the dedicated API, cloud, CMS, and origin skills for service-specific validation.
 
-##### 6. Validate one meaningful exposure
+##### 6. Prepare a specialist handoff
 
-For a suspected issue, capture a single benign handshake or read-only response and verify access control with a controlled identity if required. Do not enumerate data, alter configuration, or run exploit checks against sensitive services unless the testing class is explicitly permitted.
+For a suspected issue, preserve one benign handshake or read-only response and record the exact access-control question, expected policy, and owner-provided test identity required for separate validation. Do not verify privilege boundaries, enumerate data, alter configuration, or run exploit checks from this Recon procedure.
 
 #### Output contract
 
@@ -449,7 +449,7 @@ For a suspected issue, capture a single benign handshake or read-only response a
 - Confirmed host attribution and scan boundary.
 - Port/protocol/state, timestamp, and minimal sanitized service response.
 - Service identity evidence and reason the exposure is unexpected.
-- For a vulnerability, the access-control gap or sensitive impact, not just a banner.
+- For a candidate requiring security validation, record the exact access-control question and minimum additional evidence required; a banner or open port is not proof.
 
 #### Service Discovery Matrix
 
@@ -551,7 +551,7 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - Candidate source and resolution timestamp.
 - Baseline versus candidate fingerprints, including the random-host control.
 - Evidence tying the host to the organization.
-- For any vulnerability, a separate minimal proof of security impact beyond host discovery.
+- Any security impact must be validated by the relevant specialist under its own authorization; this chapter records host-routing evidence and the validation question only.
 
 #### Virtual-Host Signal Matrix
 
@@ -842,7 +842,7 @@ Capture consistent screenshots at the same viewport and auth context, then clust
 
 **Related security workflows:** `attack-source-leak`, `cicd-attacks`
 
-**Impact qualification:** high: A public artifact exposes a sensitive private asset or a verified active secret, confirmed without using the secret.
+**Specialist validation threshold:** a public artifact appears to expose a sensitive private asset or secret-like material. This chapter records redacted evidence only; the source-leak/information-disclosure specialist independently validates impact without using the secret.
 
 **Legacy source:** `recon-gitlab-public-recon` v"1.0.0"; credited to cyberstrike-official.
 
@@ -952,7 +952,7 @@ Confirm namespace/organization attribution and public visibility before pivoting
 
 **Related security workflows:** `attack-information-disclosure`
 
-**Impact qualification:** high: A controlled, non-deceptive validation proves that an unauthorized message can pass recipient-side authentication and materially impersonate the organization.
+**Specialist validation threshold:** recipient-side evidence from a separately authorized, controlled, non-deceptive test may establish impersonation impact. This Recon chapter performs no mail sending and records posture plus the required specialist validation.
 
 **Legacy source:** `recon-email-security` v"1.0.0"; credited to cyberstrike-official.
 
@@ -1067,7 +1067,7 @@ For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/ali
 
 **Relevant weakness classes:** `CWE-200`, `CWE-532`
 
-**Impact qualification:** high: An exposed log contains a demonstrably active secret or sensitive user data with material impact, verified without using the secret.
+**Specialist validation threshold:** an exposed log may contain secret-like material or sensitive user data with material impact. This chapter records only bounded, redacted evidence; a specialist independently assesses impact without using the secret.
 
 **Legacy source:** `recon-error-log-mining` v"1.0.0"; credited to cyberstrike-official.
 
@@ -1154,7 +1154,7 @@ For each candidate, record the in-scope URL/resource, response/access context, t
 #### Additional validation refinements
 
 ##### Log validation without collecting secrets
-First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to triage with a specific demonstrated impact statement.
+First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to information-disclosure triage with the observed data category and unresolved impact question.
 
 
 #### Additional references
