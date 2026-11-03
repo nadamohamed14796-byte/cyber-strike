@@ -5,7 +5,7 @@ import { Phase } from "../../src/methodology/phase"
 import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
 import { Skill } from "../../src/skill"
 import { Instance } from "../../src/project/instance"
-import type { SkillIndex } from "../../src/skill/index-engine"
+import { SkillIndex } from "../../src/skill/index-engine"
 import { RECON_SPECIALIZED_ASSET_PROMPT } from "../../src/methodology/recon"
 
 describe("Recon prompt specialization", () => {
@@ -89,52 +89,58 @@ describe("Phase-critical skill pinning", () => {
     })
   })
 
-  test("recon master is loadable and preserves every dedicated recon source procedure", async () => {
+  test("recon master routes to an on-demand chapter reference with complete output contracts", async () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
       fn: async () => {
         const skill = await Skill.get("recon-master")
         expect(skill, "recon-master must be registered and loadable").toBeDefined()
-        for (const heading of [
-          "## 01. Cross-asset attribution and delta analysis",
-          "## 02. Subdomain enumeration and validation",
-          "## 03. ASN and infrastructure mapping",
-          "## 04. Origin IP exposure assessment",
-          "## 05. Port and service discovery",
-          "## 06. Virtual-host enumeration",
-          "## 07. CMS and component fingerprinting",
-          "## 08. Visual reconnaissance and application clustering",
-          "## 09. Public GitLab project reconnaissance",
-          "## 10. Email domain security assessment",
-          "## 11. Exposed error-log analysis",
-        ]) expect(skill!.content).toContain(heading)
+        expect(skill!.content.length, "the loaded router must stay within a practical context size").toBeLessThan(18_000)
+        expect(skill!.content).toContain("RECON_CHAPTERS.md")
+        expect(skill!.content).toContain("Do not load all eleven chapters")
+        expect(skill!.content).toContain("active-test permission state")
+
+        const chapterPath = path.join(path.dirname(skill!.location), "RECON_CHAPTERS.md")
+        const chapters = await Bun.file(chapterPath).text()
+        const headings = chapters.match(/^## [0-9]{2}[.] .+$/gm) ?? []
+        expect(headings, "all eleven technique procedures must be preserved").toHaveLength(11)
+        expect(chapters).not.toContain("Signal Confidence, Attempt Budget, and Handoff")
+        expect(chapters).not.toContain("Targeted quality-loop enrichment (2026-10-19)")
+        for (let index = 0; index < headings.length; index++) {
+          const start = chapters.indexOf(headings[index]!)
+          const end = headings[index + 1] ? chapters.indexOf(headings[index + 1]!, start + headings[index]!.length) : chapters.length
+          const chapter = chapters.slice(start, end)
+          expect(chapter, headings[index]!).toContain("#### Output contract")
+          expect(chapter, headings[index]!).toContain("#### Evidence Requirements")
+          expect(chapter, headings[index]!).toMatch(/^#### Verification and False Positives$/m)
+        }
+
         for (const retired of [
           "recon-methodology", "recon-asn-infrastructure", "recon-cms-detection",
           "recon-email-security", "recon-error-log-mining", "recon-gitlab-public-recon",
           "recon-origin-ip-discovery", "recon-port-service-discovery",
           "recon-subdomain-enumeration", "recon-vhost-enumeration", "recon-visual-recon", "attack-web-recon",
         ]) expect(await Skill.get(retired), retired + " must not remain a separately loadable skill").toBeUndefined()
-        expect(skill!.content).toContain("Purpose and ownership")
-        expect(skill!.content).toContain("attack-javascript-analysis")
+
         const jsSkill = await Skill.get("attack-javascript-analysis")
         expect(jsSkill?.content).toContain("HackBrowser")
         expect(jsSkill?.content).toContain("browser extensions")
         expect(jsSkill?.content).toContain("url_sources")
-        expect(skill!.content).toContain("first_seen")
-        expect(skill!.content).toContain("removed-from-current-observation")
-        expect(skill!.content).toContain("Source coverage and count semantics")
-        expect(skill!.content).toContain("zero-results")
-        expect(skill!.content).not.toContain("## Mandatory startup contract")
-        expect(skill!.content).not.toContain("## Engagement workflow")
-        expect(skill!.content).not.toContain("## Tool selection and runtime discipline")
-        expect(skill!.content).not.toContain("### Candidate handoff record")
-        expect(skill!.content).toContain("runtime scope gate")
-        expect(skill!.content).toContain("Source coverage and count semantics")
 
         const correlation = await Skill.get("attack-finding-correlation")
         expect(correlation?.content).toContain("negative_control_needed")
         expect(correlation?.content).toContain("candidate_skill")
         expect(correlation?.content).toContain("first_seen")
+
+        await SkillIndex.ensureBuilt()
+        expect(SkillIndex.validateReferences().filter(problem => problem.skill === "recon-master")).toEqual([])
+        for (const target of [
+          "community-tool-selection", "target-workspace-workflow", "attack-javascript-analysis",
+          "attack-finding-correlation", "attack-shadow-api", "attack-subdomain-takeover",
+          "attack-api-contract-testing", "attack-host-header", "attack-cache-poison",
+          "attack-minio-s3", "attack-wordpress", "attack-source-leak",
+          "attack-information-disclosure", "attack-phpinfo-exposure", "cicd-attacks",
+        ]) expect(SkillIndex.chainsFrom("recon-master").map(link => link.target)).toContain(target)
       },
     })
   })
@@ -161,11 +167,12 @@ describe("Phase-critical skill pinning", () => {
 
   test("curated registry publishes canonical workflow skills and excludes retired duplicates", async () => {
     const registryPath = path.resolve(import.meta.dir, "../../../../.cyberstrike/skill/index.json")
-    const registry = JSON.parse(await Bun.file(registryPath).text()) as { skills: Array<{ name: string }> }
+    const registry = JSON.parse(await Bun.file(registryPath).text()) as { skills: Array<{ name: string; files?: string[] }> }
     const names = registry.skills.map((entry) => entry.name)
     expect(names).toContain("attack-bb-methodology")
     expect(names).not.toContain("bug-bounty-evidence-workflow")
     expect(names).toContain("recon-master")
+    expect(registry.skills.find((entry) => entry.name === "recon-master")?.files).toContain("RECON_CHAPTERS.md")
     expect(names).not.toContain("attack-web-recon")
   })
 
