@@ -21,13 +21,17 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     // Bound request setup so a stalled local API/server cannot leave startup
     // and the initial TUI synchronization in a permanent loading state.
     // Streaming responses are reconnected by the event loop below.
-    const fetchWithTimeout: typeof fetch = (input, init) => {
-      const signals = [init?.signal, AbortSignal.timeout(15_000)].filter(Boolean) as AbortSignal[]
-      return baseFetch(input, {
-        ...init,
-        signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals),
-      })
-    }
+    const fetchWithTimeout = Object.assign(
+      (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const signals = [init?.signal, AbortSignal.timeout(15_000)].filter(Boolean) as AbortSignal[]
+        return baseFetch(input, {
+          ...init,
+          signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals),
+        })
+      },
+      // Preserve Bun's fetch.preconnect helper while wrapping the callable fetch.
+      { preconnect: baseFetch.preconnect },
+    )
     const sdk = createCyberstrikeClient({
       baseUrl: props.url,
       signal: abort.signal,
