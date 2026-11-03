@@ -321,6 +321,7 @@ export namespace Worktree {
 
   function queueStartScripts(directory: string, input: { projectID: string; extra?: string }) {
     setTimeout(() => {
+      let readyEmitted = false
       const start = async () => {
         await runStartScripts(directory, input)
       }
@@ -393,6 +394,7 @@ export namespace Worktree {
             return false
           })
         if (!booted) return
+        readyEmitted = true
 
         emitSafe({
           directory: info.directory,
@@ -409,7 +411,18 @@ export namespace Worktree {
       }
 
       void start().catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
         log.error("worktree start task failed", { directory: info.directory, error })
+        // Do not leave the sidebar workspace permanently busy on an unexpected startup failure.
+        if (!readyEmitted) {
+          emitSafe({
+            directory: info.directory,
+            payload: {
+              type: Event.Failed.type,
+              properties: { message },
+            },
+          })
+        }
       })
     }, 0)
 
