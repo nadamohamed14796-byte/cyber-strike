@@ -138,9 +138,13 @@ export namespace BunProc {
       version,
     })
 
-    await BunProc.run(args, {
-      cwd: Global.Path.cache,
-    }).catch((e) => {
+    await BunProc.run(
+      args,
+      {
+        cwd: Global.Path.cache,
+      },
+      120_000,
+    ).catch((e) => {
       throw new InstallFailedError(
         { pkg, version },
         {
