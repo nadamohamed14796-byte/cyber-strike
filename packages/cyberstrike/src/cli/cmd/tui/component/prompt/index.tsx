@@ -1,6 +1,5 @@
 import { BoxRenderable, TextareaRenderable, MouseEvent, PasteEvent, t, dim, fg } from "@opentui/core"
-import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
-import "opentui-spinner/solid"
+import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, on, Show, Switch, Match, For } from "solid-js"
 import { useLocal } from "@tui/context/local"
 import { useTheme } from "@tui/context/theme"
 import { EmptyBorder } from "@tui/component/border"
@@ -989,6 +988,15 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  const [spinnerFrame, setSpinnerFrame] = createSignal(0)
+  onMount(() => {
+    const timer = setInterval(() => {
+      const count = spinnerDef().frames.length
+      if (count > 0) setSpinnerFrame((current) => (current + 1) % count)
+    }, 40)
+    onCleanup(() => clearInterval(timer))
+  })
+
   return (
     <>
       <Autocomplete
@@ -1266,7 +1274,22 @@ export function Prompt(props: PromptProps) {
               <box flexShrink={0} flexDirection="row" gap={1}>
                 <box marginLeft={1}>
                   <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
-                    <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
+                    <box flexDirection="row">
+                      <For each={spinnerDef().frames[spinnerFrame()]?.split("") ?? []}>
+                        {(char, charIndex) => (
+                          <text
+                            fg={spinnerDef().color(
+                              spinnerFrame(),
+                              charIndex(),
+                              spinnerDef().frames.length,
+                              spinnerDef().frames[spinnerFrame()]?.length ?? 0,
+                            )}
+                          >
+                            {char}
+                          </text>
+                        )}
+                      </For>
+                    </box>
                   </Show>
                 </box>
                 <box flexDirection="row" gap={1} flexShrink={0}>
