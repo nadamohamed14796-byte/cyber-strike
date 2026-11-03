@@ -635,11 +635,13 @@ test("does not try to install dependencies in read-only CYBERSTRIKE_CONFIG_DIR",
   }
 })
 
-test("installs dependencies in writable CYBERSTRIKE_CONFIG_DIR", async () => {
+test("installs dependencies for local extensions in writable CYBERSTRIKE_CONFIG_DIR", async () => {
   await using tmp = await tmpdir<string>({
     init: async (dir) => {
       const cfg = path.join(dir, "configdir")
-      await fs.mkdir(cfg, { recursive: true })
+      const tools = path.join(cfg, "tools")
+      await fs.mkdir(tools, { recursive: true })
+      await Bun.write(path.join(tools, "fixture.ts"), "export const fixture = true\\n")
       return cfg
     },
   })
