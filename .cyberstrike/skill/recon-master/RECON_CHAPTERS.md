@@ -60,7 +60,6 @@ A shared IP, CDN, certificate SAN, CNAME, redirect, matching brand string, or hi
 
 ## 02. Subdomain enumeration and validation
 
-### Subdomain Enumeration and Validation
 
 ### Chapter profile
 
@@ -163,7 +162,6 @@ Continue with independent, relevant sources while they can add meaningful covera
 
 ## 03. ASN and infrastructure mapping
 
-### ASN and Infrastructure Mapping
 
 ### Chapter profile
 
@@ -292,7 +290,6 @@ For every IP/prefix/ASN pivot, retain the organization attribution source, relat
 
 ## 04. Origin IP exposure assessment
 
-### Origin IP Exposure Assessment
 
 ### Chapter profile
 
@@ -372,10 +369,6 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 - Treat exposed origin IPs as informational unless direct access changes security posture.
 
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/origin-ip-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/origin-ip-discovery/SKILL.md)
@@ -401,7 +394,6 @@ Build candidate origins from historical DNS, certificate/deployment metadata, fi
 
 ## 05. Port and service discovery
 
-### Port and Service Discovery
 
 ### Chapter profile
 
@@ -482,10 +474,6 @@ For a suspected issue, capture a single benign handshake or read-only response a
 - Avoid high-rate full-range scans unless explicitly allowed; broad scanning is not a substitute for targeted validation.
 - Do not infer that all addresses within a hosting provider's ASN belong to the target.
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/port-service-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/port-service-discovery/SKILL.md)
@@ -510,7 +498,6 @@ For each host/port, record the exact resolver result, scope basis, service-detec
 
 ## 06. Virtual-host enumeration
 
-### Virtual-Host Enumeration
 
 ### Chapter profile
 
@@ -587,10 +574,6 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - Keep host discovery separate from vulnerability claims.
 
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/vhost-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/vhost-enumeration/SKILL.md)
@@ -615,7 +598,6 @@ Establish stable fingerprints for a known host, a known-invalid host header, and
 
 ## 07. CMS and component fingerprinting
 
-### CMS and Component Fingerprinting
 
 ### Chapter profile
 
@@ -709,10 +691,6 @@ Map a corroborated component/version to a credible advisory and record the affec
 - Keeping CMS core, themes, and plugins current, and restricting admin/login routes by network or MFA, reduces both the fingerprinting surface and the exploitability of anything found.
 
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/cms-detection/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/cms-detection/SKILL.md)
@@ -738,7 +716,6 @@ Maintain independent confidence for CMS identity, component identity/version, de
 
 ## 08. Visual reconnaissance and application clustering
 
-### Visual Reconnaissance and Application Clustering
 
 ### Chapter profile
 
@@ -829,14 +806,6 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 - Organizations can reduce the value of this technique by consolidating default/placeholder pages, disabling framework and admin-panel banners on production hosts, and keeping staging/legacy interfaces off public DNS or behind authentication.
 - Consistent, informative error pages (rather than framework-default error pages) reduce fingerprinting value from screenshots and titles alone.
 
-
-#### Chapter-specific execution notes
-
-##### Visual signal follow-through
-
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/visual-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/visual-recon/SKILL.md)
@@ -860,7 +829,6 @@ Capture consistent screenshots at the same viewport and auth context, then clust
 
 ## 09. Public GitLab project reconnaissance
 
-### GitLab Public Project Reconnaissance
 
 ### Chapter profile
 
@@ -946,10 +914,6 @@ Persist a read-only inventory of attributable GitLab groups/projects, project id
 - Do not trigger CI pipelines, change settings, or attempt deployment as proof.
 
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/gitlab-public-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/gitlab-public-recon/SKILL.md)
@@ -975,7 +939,6 @@ Confirm namespace/organization attribution and public visibility before pivoting
 
 ## 10. Email domain security assessment
 
-### Email Domain Security Assessment
 
 ### Chapter profile
 
@@ -1062,10 +1025,6 @@ Record the organization-owned mail domain and each observed MX, SPF, DKIM select
 - Avoid claims of complete spoofing without a controlled recipient-side result or strong technical proof.
 
 
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
-
 #### References
 
 - Source merged: [uphiago/recon-skills — recon/email-security/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/email-security/SKILL.md)
@@ -1093,7 +1052,6 @@ For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/ali
 
 ## 11. Exposed error-log analysis
 
-### Exposed Error-Log Analysis
 
 ### Chapter profile
 
@@ -1184,10 +1142,6 @@ For each candidate, record the in-scope URL/resource, response/access context, t
 - Do not download whole multi-gigabyte logs or validate credentials by attempting login.
 - If evidence contains secrets, stop collection, redact immediately, and follow the engagement's sensitive-data handling process.
 
-
-#### Chapter-specific execution notes
-
-##### Skill-specific next steps
 
 #### References
 
