@@ -107,6 +107,19 @@ const CLI_OPTIONS_WITH_NON_TARGET_VALUES = new Set([
   "--api-key", "--token", "--api-token", "--username", "--password", "--config",
   "--template", "-template", "--format", "-of", "--severity", "--exclude",
 ])
+/** CyberStrike's bundled network scripts must use attack_script, which applies
+ * per-target scope checks and the active-testing checkpoint before spawning them.
+ */
+export function bundledAttackScriptBlockReason(scannerInput: string, args: string[]): string | undefined {
+  const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
+  if (!/^python(?:3(?:\.\d+)?)?$/.test(scanner)) return undefined
+  const script = args.map(stripOuterShellQuotes).find((value) =>
+    /(?:^|[/\\])data[/\\]scripts[/\\][a-z0-9_-]+\.py$/i.test(value),
+  )
+  if (!script) return undefined
+  return "Bundled CyberStrike scripts must be executed through the attack_script tool, which enforces per-target persisted scope and active-testing gates."
+}
+
 /** Resolve the minimum checkpoint required by the behavior of a target-aware CLI invocation. */
 export function scannerRequiredReconPhase(scannerInput: string, args: string[]): ReconPhase | undefined {
   const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
@@ -1093,6 +1106,10 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   }
   const scanner = path.basename(command[scannerIndex]!).toLowerCase()
   const args = command.slice(scannerIndex + 1)
+  const bundledScriptBlock = bundledAttackScriptBlockReason(scanner, args)
+  if (bundledScriptBlock) {
+    throw new Error("Cannot run " + scanner + ": " + bundledScriptBlock + " No command was started.")
+  }
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
   // Do not blanket-disable a scanner because of its name. Every explicit input
