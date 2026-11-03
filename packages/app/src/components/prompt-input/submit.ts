@@ -1,4 +1,5 @@
 import { Accessor } from "solid-js"
+import { produce } from "solid-js/store"
 import { useNavigate, useParams } from "@solidjs/router"
 import type { Message } from "@cyberstrike-io/sdk/v2/client"
 import { showToast } from "@cyberstrike-io/ui/toast"
@@ -163,6 +164,17 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           return
         }
         WorktreeState.pending(createdWorktree.directory)
+        globalSync.set(
+          "project",
+          produce((draft) => {
+            const project = draft.find((item) => item.worktree === projectDirectory)
+            if (!project) return
+            project.sandboxes ??= []
+            if (!project.sandboxes.includes(createdWorktree.directory)) {
+              project.sandboxes.push(createdWorktree.directory)
+            }
+          }),
+        )
         sessionDirectory = createdWorktree.directory
       }
 
