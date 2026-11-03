@@ -19,7 +19,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 import { TargetMemory, type TargetScope, type Workspace } from "../target"
-import type { ReconPhase } from "../target/recon-gate"
+import { reconPhaseGate, type ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
 
@@ -107,6 +107,72 @@ const CLI_OPTIONS_WITH_NON_TARGET_VALUES = new Set([
   "--api-key", "--token", "--api-token", "--username", "--password", "--config",
   "--template", "-template", "--format", "-of", "--severity", "--exclude",
 ])
+/** Resolve the minimum checkpoint required by the behavior of a target-aware CLI invocation. */
+export function scannerRequiredReconPhase(scannerInput: string, args: string[]): ReconPhase | undefined {
+  const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
+  const values = args.map(stripOuterShellQuotes)
+
+  // These CLIs are purpose-built vulnerability/weaponization testers even when
+  // their default request method is GET. Their actual execution remains dynamic;
+  // this is a behavior boundary, not an executable allowlist for ordinary recon.
+  const vulnerabilityScanners = new Set([
+    "nuclei", "sqlmap", "dalfox", "commix", "wpscan", "nikto", "wapiti",
+    "skipfish", "xsstrike", "ghauri", "tplmap", "ssrfmap", "nosqlmap",
+    "crlfuzz", "corsy", "jwt_tool", "jwt-tool",
+  ])
+  if (vulnerabilityScanners.has(scanner)) return "vulnerability_testing"
+
+  // Nmap's broad discovery modes remain available; only explicit vulnerability,
+  // exploit, brute-force, or auth scripts are active vulnerability testing.
+  if (scanner === "nmap") {
+    for (let index = 0; index < values.length; index++) {
+      const value = values[index]!
+      const scripts = value === "--script" ? values[index + 1] ?? "" : value.startsWith("--script=") ? value.slice("--script=".length) : ""
+      if (scripts && /(?:^|[,\s])(?:vuln|vulners|exploit|brute|auth)(?:$|[,\s])/i.test(scripts)) {
+        return "vulnerability_testing"
+      }
+    }
+  }
+
+  // A wordlist substituted into a query parameter is parameter fuzzing, distinct
+  // from path/directory discovery (which remains under its own recon checkpoint).
+  const hasWordlist = values.some((value) =>
+    value === "-w" || value === "--wordlist" || value === "--word-list" || value.startsWith("--wordlist="),
+  )
+  const queryFuzz = values.some((value) => {
+    const queryIndex = value.indexOf("?")
+    return queryIndex >= 0 && /(?:^|[?&])[^=&#]*FUZZ[^=&#]*(?:=|&|$)/i.test(value.slice(queryIndex))
+  })
+  if (hasWordlist && queryFuzz) return "parameter_fuzzing"
+
+  // Explicit non-safe HTTP methods or request bodies are active validation, even
+  // when the caller uses a generic HTTP client rather than a named security CLI.
+  const methodFlags = new Set(["-X", "--request", "--method", "-method"])
+  for (let index = 0; index < values.length; index++) {
+    const value = values[index]!
+    let method: string | undefined
+    if (methodFlags.has(value)) method = values[index + 1]
+    else if (/^-X(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)$/i.test(value)) method = value.slice(2)
+    else if (/^(?:--request|--method|-method)=/i.test(value)) method = value.slice(value.indexOf("=") + 1)
+    if (method && !["GET", "HEAD"].includes(method.toUpperCase())) return "vulnerability_testing"
+  }
+
+  const bodyFlags = new Set([
+    "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json",
+    "--form", "--form-string", "--post-data", "--post-file", "--body",
+  ])
+  if (values.some((value) => bodyFlags.has(value.toLowerCase()) || [...bodyFlags].some((flag) => value.toLowerCase().startsWith(flag + "=")))) {
+    return "vulnerability_testing"
+  }
+  if (["curl", "httpie", "http"].includes(scanner) && values.some((value) => value === "-d" || value === "-F" || /^-[^-]*[dF]/.test(value))) {
+    return "vulnerability_testing"
+  }
+  if (values.some((value) => value === "--exploit" || value === "--unsafe" || value === "--inject")) {
+    return "vulnerability_testing"
+  }
+  return undefined
+}
+
 const LOCAL_TEXT_PROCESSORS = new Set([
   "echo", "printf", "cat", "head", "tail", "sed", "awk", "grep", "egrep", "fgrep",
   "rg", "sort", "uniq", "tr", "cut", "paste", "wc", "tee", "jq", "yq",
@@ -1139,6 +1205,15 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       const decision = await TargetMemory.checkURLScope(scopedURL)
       if (!decision.allowed || !decision.workspace) {
         throw new Error("Cannot run " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No command was started.")
+      }
+      const requiredPhase = scannerRequiredReconPhase(scanner, args)
+      if (requiredPhase) {
+        const testing = await reconPhaseGate(decision.workspace, requiredPhase)
+        if (!testing.allowed) {
+          throw new Error(
+            "Cannot run " + scanner + " for " + scopedURL + ": the " + requiredPhase + " checkpoint is not authorized (" + testing.reason + "). No command was started.",
+          )
+        }
       }
       if (scanner === "katana") {
         let scopes: TargetScope[]
