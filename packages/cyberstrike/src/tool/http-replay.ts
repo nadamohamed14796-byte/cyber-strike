@@ -666,16 +666,26 @@ export const HttpReplayTool = Tool.define("http_replay", {
         metadata: { scopeDenied: true, reason: "target_workspace_unresolved" },
       }
     }
-    const testingGate = await reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing")
-    if (!testingGate.allowed) {
+    // Structured replay supports both explicitly requested parameter fuzzing
+    // and vulnerability validation. It is never available during passive recon.
+    const [parameterGate, vulnerabilityGate] = await Promise.all([
+      reconPhaseGate(targetAuthorization.workspace, "parameter_fuzzing"),
+      reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing"),
+    ])
+    const testingGate = parameterGate.allowed ? parameterGate : vulnerabilityGate
+    if (!parameterGate.allowed && !vulnerabilityGate.allowed) {
+      const reason = [
+        "parameter_fuzzing: " + parameterGate.reason,
+        "vulnerability_testing: " + vulnerabilityGate.reason,
+      ].join("; ")
       return {
         title: "http_replay — refused (testing checkpoint)",
         output: [
           "No replay request was sent.",
-          "Reason: " + testingGate.reason,
-          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before replaying requests.",
+          "Reason: " + reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin parameter_fuzzing or vulnerability_testing before replaying requests.",
         ].join("\n"),
-        metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
+        metadata: { testingDenied: true, reason, manifest: testingGate.manifestPath },
       }
     }
 
