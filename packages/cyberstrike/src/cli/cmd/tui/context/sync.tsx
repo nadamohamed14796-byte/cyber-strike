@@ -34,6 +34,12 @@ import type { Path } from "@cyberstrike-io/sdk"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
+  fallback: (
+    <box flexDirection="column" gap={1} padding={2}>
+      <text fg="#fab283">CyberStrike</text>
+      <text fg="#808080">Connecting to the local engine and loading workspace data…</text>
+    </box>
+  ),
   init: () => {
     const [store, setStore] = createStore<{
       status: "loading" | "partial" | "complete"
@@ -721,17 +727,56 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     const exit = useExit()
     const args = useArgs()
 
+    function trackStartupRequest<T>(name: string, request: Promise<T>): Promise<T> {
+      const startedAt = Date.now()
+      Log.Default.debug("tui startup request", { name, status: "started" })
+      return request.then(
+        (value) => {
+          Log.Default.debug("tui startup request", {
+            name,
+            status: "completed",
+            duration: Date.now() - startedAt,
+          })
+          return value
+        },
+        (error) => {
+          Log.Default.error("tui startup request", {
+            name,
+            status: "failed",
+            duration: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          throw error
+        },
+      )
+    }
+
     const bootstrap = singleflight(async function () {
       const start = Date.now() - 30 * 24 * 60 * 60 * 1000
-      const sessionListPromise = sdk.client.session
-        .list({ start: start, roots: true })
-        .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
+      const sessionListPromise = trackStartupRequest(
+        "session.list",
+        sdk.client.session
+          .list({ start: start, roots: true })
+          .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id))),
+      )
 
       // blocking - include session.list when continuing a session
-      const providersPromise = sdk.client.config.providers({}, { throwOnError: true })
-      const providerListPromise = sdk.client.provider.list({}, { throwOnError: true })
-      const agentsPromise = sdk.client.app.agents({}, { throwOnError: true })
-      const configPromise = sdk.client.config.get({}, { throwOnError: true })
+      const providersPromise = trackStartupRequest(
+        "config.providers",
+        sdk.client.config.providers({}, { throwOnError: true }),
+      )
+      const providerListPromise = trackStartupRequest(
+        "provider.list",
+        sdk.client.provider.list({}, { throwOnError: true }),
+      )
+      const agentsPromise = trackStartupRequest(
+        "app.agents",
+        sdk.client.app.agents({}, { throwOnError: true }),
+      )
+      const configPromise = trackStartupRequest(
+        "config.get",
+        sdk.client.config.get({}, { throwOnError: true }),
+      )
       const blockingRequests: Promise<unknown>[] = [
         providersPromise,
         providerListPromise,
