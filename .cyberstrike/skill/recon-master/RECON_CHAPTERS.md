@@ -91,7 +91,7 @@ Combine certificate transparency, passive DNS, search indexes, public DNS datase
 
 ##### 3. Add bounded active discovery when permitted
 
-Use a restrained wordlist derived from known naming conventions and the application's architecture. Keep request rate and concurrency conservative. Expand the wordlist based on evidence rather than running an unbounded dictionary against every candidate domain.
+Use a restrained wordlist derived from observed naming conventions and the application's architecture. Generate optional permutations only from labels and patterns already observed on an in-scope root (for example, a confirmed `api` label suggesting `api-staging`); scope-check each generated hostname before any request. Keep request rate and concurrency conservative, and expand based on evidence rather than running an unbounded dictionary. Alternate-TLD expansion is not part of default Recon: each different registrable domain needs its own explicit scope basis.
 
 ##### 4. Resolve DNS and identify wildcard behavior
 
@@ -319,7 +319,7 @@ Resolve A/AAAA/CNAME records, record certificate and HTTP behavior, and identify
 
 ##### 2. Collect passive origin candidates
 
-Correlate historical DNS, certificate transparency, organization-owned DNS records, public service metadata, passive scan results, and attributable ASN/IP information. Treat old DNS records, mail servers, and unrelated addresses in a shared prefix as candidates until corroborated.
+Correlate historical DNS, certificate transparency, organization-owned DNS records, public service metadata, passive scan results, favicon fingerprints, and attributable ASN/IP information. Analytics identifiers may be used only as weak search pivots when already observed in first-party content; shared IDs and favicon matches are not ownership proof. Treat old DNS records, mail servers, and unrelated addresses in a shared prefix as candidates until independently corroborated.
 
 ##### 3. Confirm candidate identity without bypass assumptions
 
@@ -356,7 +356,7 @@ Return each origin candidate with its source, freshness, ownership confidence, s
 | Historical DNS A record | Candidate historical host | Same app marker or certificate identity |
 | Certificate SAN | Hostnames share certificate | Verify current application response |
 | Direct IP returns app | Possible origin or shared host | Preserve SNI/Host and compare content |
-| WAF differs at origin | Potential edge-only enforcement | Confirm the same request is denied at edge and materially succeeds at origin |
+| Edge/origin response differs | Possible control or routing differential | Preserve the paired benign response; a specialist independently validates any control-boundary claim under separate authorization |
 | Different server banner | Infrastructure clue | No impact unless a security boundary is bypassed |
 | Origin responds on extra port | Additional service candidate | Confirm ownership and service sensitivity |
 
