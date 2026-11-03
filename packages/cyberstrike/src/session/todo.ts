@@ -27,7 +27,7 @@ export namespace Todo {
   const MAX_COMPLETED = 5
 
   function isReconChecklistItem(todo: Info) {
-    return /^\\[recon:[a-z_]+\\]/.test(todo.content.trim())
+    return /^\[recon:[a-z_]+\]/.test(todo.content.trim())
   }
 
   export function trimTodoHistory(todos: Info[]): Info[] {
