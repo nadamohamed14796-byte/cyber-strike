@@ -30,6 +30,8 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Build monorepo
+        env:
+          CYBERSTRIKE_BUILD_OS: linux
         run: bun turbo build
 
       - name: Typecheck monorepo
