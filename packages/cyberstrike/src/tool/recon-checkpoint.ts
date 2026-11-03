@@ -276,9 +276,6 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         workspace = parent
       }
 
-      // Serialize manifest read/modify/write cycles per canonical target root.
-      // Different targets remain independent.
-      using _ = await Lock.write("recon-checkpoint:" + workspace.id)
       const sessionID = Session.root(ctx.sessionID)
       // A checkpoint update is a read-modify-write of both the run manifest and
       // its index. Serialize by canonical target so concurrent tool calls cannot
