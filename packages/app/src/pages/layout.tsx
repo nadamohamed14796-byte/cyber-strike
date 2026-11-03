@@ -1629,6 +1629,19 @@ export default function Layout(props: ParentProps) {
 
     if (!created?.directory) return
 
+    // Register the returned worktree in the root project immediately. The
+    // project bootstrap/event stream can lag behind the create response, and
+    // currentProject() resolves workspace routes through project.sandboxes.
+    globalSync.set(
+      "project",
+      produce((draft) => {
+        const root = draft.find((item) => item.worktree === project.worktree)
+        if (!root) return
+        root.sandboxes ??= []
+        if (!root.sandboxes.includes(created.directory)) root.sandboxes.push(created.directory)
+      }),
+    )
+
     setWorkspaceName(created.directory, created.branch, project.id, created.branch)
 
     const local = project.worktree
