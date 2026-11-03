@@ -141,6 +141,7 @@ describe("Phase-critical skill pinning", () => {
           "attack-minio-s3", "attack-wordpress", "attack-source-leak",
           "attack-information-disclosure", "attack-phpinfo-exposure", "cicd-attacks",
           "attack-bfla", "attack-idor-automation", "attack-auth-bypass", "attack-session",
+          "attack-exchange-owa", "attack-oauth",
         ]) expect(SkillIndex.chainsFrom("recon-master").map(link => link.target)).toContain(target)
       },
     })
