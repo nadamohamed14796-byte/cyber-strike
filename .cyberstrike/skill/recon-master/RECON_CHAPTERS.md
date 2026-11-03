@@ -1042,6 +1042,7 @@ Check production debug settings, web-server deny rules, deployment packaging, lo
 - Describe the exact data category and sensitivity; do not infer impact from the file name, byte size, or pattern match alone.
 - A secret must never be copied into notes/reports or tested; retain only the secret type, location, and minimal redacted fingerprint.
 - A generic error page, empty log, public sample, or stale benign stack trace is not a confirmed finding. Route a meaningful exposure candidate to the information-disclosure specialist for independent triage.
+- Route an actual metrics/monitoring endpoint or telemetry exposure to `attack-metrics-exposure`; do not infer this from ordinary log lines or stack traces.
 
 #### Output contract
 For each candidate, record the in-scope URL/resource, response/access context, timestamp, content classification, minimal redacted proof reference, random-path or equivalent control, exposure status, sensitivity category, and safe next action. Preserve only the minimum sanitized evidence needed to establish the access boundary; do not retain full logs, credentials, tokens, session IDs, or customer data.
