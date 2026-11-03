@@ -71,6 +71,15 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 })
 
 async function seedStorage(page: Page, input: { directory: string; extra?: string[] }) {
+  // Update availability is environment-dependent and the persistent update toast can
+  // cover controls under test. Keep E2E runs deterministic without disabling real UI behavior.
+  await page.route("**/global/version-check", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ updateAvailable: false }),
+    }),
+  )
   await seedProjects(page, input)
   await page.addInitScript(() => {
     localStorage.setItem(
