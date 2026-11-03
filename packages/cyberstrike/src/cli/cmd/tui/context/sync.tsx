@@ -760,6 +760,13 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id))),
       )
 
+      // When not continuing, this is a background request. Its consumer is
+      // attached after the blocking bootstrap requests complete, so attach a
+      // rejection observer now to prevent early failures becoming unhandled.
+      // Keep the original promise rejected so Promise.allSettled / --continue
+      // still observe its real outcome later.
+      if (!args.continue) void sessionListPromise.catch(() => {})
+
       // blocking - include session.list when continuing a session
       const providersPromise = trackStartupRequest(
         "config.providers",
