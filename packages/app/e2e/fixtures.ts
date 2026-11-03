@@ -77,7 +77,10 @@ async function seedStorage(page: Page, input: { directory: string; extra?: strin
       "cyberstrike.global.dat:model",
       JSON.stringify({
         recent: [{ providerID: "cyberstrike", modelID: "big-pickle" }],
-        user: [],
+        user: [
+          { providerID: "cyberstrike", modelID: "big-pickle", visibility: "show" },
+          { providerID: "cyberstrike", modelID: "gpt-5-nano", visibility: "show" },
+        ],
         variant: {},
       }),
     )

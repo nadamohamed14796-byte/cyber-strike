@@ -75,6 +75,7 @@ const serverEnv = {
   XDG_CACHE_HOME: path.join(sandbox, "cache"),
   XDG_CONFIG_HOME: path.join(sandbox, "config"),
   XDG_STATE_HOME: path.join(sandbox, "state"),
+  CYBERSTRIKE_MODELS_PATH: path.join(cyberstrikeDir, "test", "tool", "fixtures", "models-api.json"),
   CYBERSTRIKE_E2E_PROJECT_DIR: repoDir,
   CYBERSTRIKE_E2E_SESSION_TITLE: "E2E Session",
   CYBERSTRIKE_E2E_MESSAGE: "Seeded for UI e2e",
