@@ -7,6 +7,7 @@ import { HttpMessage } from "../replay/message"
 import { Mutate } from "../replay/mutate"
 import { BackendFetch } from "../replay/backend-fetch"
 import { TargetMemory } from "../target"
+import { reconPhaseGate } from "../target/recon-gate"
 
 function originFromRequest(req: Request.Info): string | undefined {
   if (req.origin) return req.origin.replace(/\/+$/, "")
@@ -38,7 +39,7 @@ const CsrfExtractParameters = z.object({
 })
 
 export const CsrfExtractTool = Tool.define<typeof CsrfExtractParameters, Tool.Metadata>("csrf_extract", {
-  description: `Fetch a page and extract a CSRF token from the response. Replays a captured GET request, then extracts the token using one of: regex pattern matching on the body, a response header name, or a Set-Cookie name.
+  description: `Fetch a page and extract a CSRF token from the response. Replays a captured GET request, then extracts the token using one of: regex pattern matching on the body, a response header name, or a Set-Cookie name. This supports active CSRF validation and requires an explicitly running vulnerability_testing checkpoint after endpoint inventory is complete.
 
 Use this to:
 - Get a fresh CSRF token before sending a state-changing request
@@ -113,6 +114,18 @@ Use this to:
           "No request was sent. A configured target workspace and persisted authorization scope are required.",
         ].join("\\n"),
         metadata: { extracted: false, scopeDenied: true, reason: authorization.reason },
+      }
+    }
+    const testingGate = await reconPhaseGate(authorization.workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        title: "csrf_extract: refused (testing checkpoint)",
+        output: [
+          "No CSRF-token fetch was sent.",
+          "Reason: " + testingGate.reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before CSRF validation.",
+        ].join("\n"),
+        metadata: { extracted: false, testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
       }
     }
     const originalWorkspaceID = authorization.workspace.id
