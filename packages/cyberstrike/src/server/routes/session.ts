@@ -434,6 +434,7 @@ async function getOrCreateExtensionTaskSession(input: {
 
 async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Promise<void> {
   const analysisStartedAt = performance.now()
+  const analysisStartedAtEpoch = Date.now()
   const sessionID = input.sessionID
   const req = input.req
   const normalized = {
@@ -727,7 +728,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
       brokerSessionID: childSessionID,
       requestID: req.id,
       status: finalStatus,
-      queueWaitMs: Math.max(0, analysisStartedAt - req.time.created),
+      queueWaitMs: Math.max(0, analysisStartedAtEpoch - req.time.created),
       analysisDurationMs: Math.round(performance.now() - analysisStartedAt),
     })
   }
