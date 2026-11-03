@@ -12,7 +12,14 @@ export interface ToastRegionProps extends ComponentProps<typeof Kobalte.Region> 
 function ToastRegion(props: ToastRegionProps) {
   return (
     <Portal>
-      <Kobalte.Region data-component="toast-region" {...props}>
+      <Kobalte.Region
+        data-component="toast-region"
+        // Kobalte promotes the region into the top layer; force the wrapper
+        // itself to pass pointer input through while individual toast controls
+        // opt back in via their own pointer-events styles.
+        style={{ "pointer-events": "none" }}
+        {...props}
+      >
         <Kobalte.List data-slot="toast-list" />
       </Kobalte.Region>
     </Portal>
