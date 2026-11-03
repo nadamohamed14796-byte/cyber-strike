@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { htmlAttribute } from "./html-attributes"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { and, desc, eq, inArray } from "../storage/db"
@@ -702,8 +703,7 @@ function extractInlineHTMLScripts(html: string): string[] {
   const pattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
   for (const match of html.matchAll(pattern)) {
     const attributes = match[1] ?? ""
-    const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").split(";", 1)[0]!.trim().toLowerCase()
+    const mime = (htmlAttribute(attributes, "type") ?? "").split(";", 1)[0]!.trim().toLowerCase()
     // JSON-LD, import maps, and framework data blobs are not executable JavaScript.
     if (mime && !["module", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript", "application/x-javascript"].includes(mime)) continue
     const body = (match[2] ?? "").trim()

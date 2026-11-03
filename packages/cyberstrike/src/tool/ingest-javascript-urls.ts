@@ -4,6 +4,7 @@ import path from "node:path"
 import z from "zod"
 import { gunzipSync } from "node:zlib"
 import { TargetMemory } from "../target"
+import { htmlAttribute } from "../target/html-attributes"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences, groupCanonicalJavaScriptEndpoints } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
@@ -212,9 +213,9 @@ export function extractJavaScriptImportURLs(body: string, assetURL: string): str
 
 export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   const output = new Set<string>()
-  const baseMatch = /<base\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(body)
+  const baseMatch = /<base\b([^>]*)>/i.exec(body)
   let baseURL = pageURL
-  const baseValue = baseMatch?.[1] ?? baseMatch?.[2] ?? baseMatch?.[3]
+  const baseValue = baseMatch ? htmlAttribute(baseMatch[1] ?? "", "href") : undefined
   if (baseValue) {
     try { baseURL = new URL(baseValue, pageURL).toString() } catch { /* Keep the page URL as the base. */ }
   }
@@ -229,22 +230,18 @@ export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   const scriptPattern = /<script\b([^>]*)>/gi
   for (const match of body.matchAll(scriptPattern)) {
     const attributes = match[1] ?? ""
-    const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    enqueue(srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3])
+    enqueue(htmlAttribute(attributes, "src"))
   }
   // Module/preload links can reference bundles that are not repeated in a script[src].
   const linkPattern = /<link\b([^>]*)>/gi
   for (const match of body.matchAll(linkPattern)) {
     const attributes = match[1] ?? ""
-    const relMatch = /\brel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    const asMatch = /\bas\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    const rel = (relMatch?.[1] ?? relMatch?.[2] ?? relMatch?.[3] ?? "").toLowerCase().split(/\s+/)
-    const as = (asMatch?.[1] ?? asMatch?.[2] ?? asMatch?.[3] ?? "").toLowerCase()
+    const rel = (htmlAttribute(attributes, "rel") ?? "").toLowerCase().split(/\s+/)
+    const as = (htmlAttribute(attributes, "as") ?? "").toLowerCase()
     const isModulePreload = rel.includes("modulepreload")
     const isScriptPreload = rel.includes("preload") && as === "script"
     if (!isModulePreload && !isScriptPreload) continue
-    const hrefMatch = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    enqueue(hrefMatch?.[1] ?? hrefMatch?.[2] ?? hrefMatch?.[3])
+    enqueue(htmlAttribute(attributes, "href"))
   }
   return [...output]
 }

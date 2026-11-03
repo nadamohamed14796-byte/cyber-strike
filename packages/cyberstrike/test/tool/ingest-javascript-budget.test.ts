@@ -31,6 +31,21 @@ test("discovers HTML modulepreload and script preload assets using the resolved 
   ])
 })
 
+test("reads HTML attributes by exact name and ignores data-* lookalikes", () => {
+  const pageURL = "https://app.example.test/pages/start"
+  const html = [
+    '<base data-href="/wrong-base/">',
+    '<script data-src="/fake-data-src.js"></script>',
+    '<script data-src="/decoy.js" src="/real.js"></script>',
+    '<link data-rel="modulepreload" data-href="/fake-data-href.js" data-as="script">',
+    '<link data-rel="preload" data-as="script" data-href="/decoy-preload.js" rel="modulepreload" href="/real-module.js">',
+  ].join("\n")
+  expect(extractHTMLScriptURLs(html, pageURL).sort()).toEqual([
+    "https://app.example.test/pages/real.js",
+    "https://app.example.test/pages/real-module.js",
+  ])
+})
+
 test("discovers static imports, dynamic imports, workers, importScripts, and literal module loaders", () => {
   const assetURL = "https://app.example.test/assets/main.js"
   const source = [

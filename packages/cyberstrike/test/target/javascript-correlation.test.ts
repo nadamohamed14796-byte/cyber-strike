@@ -389,11 +389,13 @@ test("extracts inline JavaScript from captured HTML response bodies", async () =
     responseBody: [
       "<html><head><script type=\"application/ld+json\">{\"name\":\"not-code\"}</script></head>",
       "<body><script>fetch('/api/profile');</script>",
+      "<script data-type=\"application/ld+json\">fetch('/api/data-type-is-not-a-real-type');</script>",
       "<script type=\"module\">axios.post('/api/settings', {theme: 'dark'});</script></body></html>",
     ].join(""),
   }])
-  expect(sources).toHaveLength(2)
+  expect(sources).toHaveLength(3)
   expect(sources.map((source) => source.endpointLiterals).flat()).toContain("/api/profile")
+  expect(sources.map((source) => source.endpointLiterals).flat()).toContain("/api/data-type-is-not-a-real-type")
   expect(sources.map((source) => source.endpointLiterals).flat()).toContain("/api/settings")
   expect(sources.every((source) => source.sourceRequestID === "req-html-inline")).toBe(true)
   expect(JSON.stringify(sources)).not.toContain("application/ld+json")
