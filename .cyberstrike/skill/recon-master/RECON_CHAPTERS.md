@@ -117,6 +117,14 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Ownership confidence and explicit quarantine for ambiguous assets.
 - A prioritized list of distinct applications rather than a raw count of names.
 
+#### Verification and False Positives
+
+- Compare multiple random labels beneath the same parent to identify wildcard DNS; do not treat one random response as conclusive.
+- Re-resolve candidates and preserve TTLs; distinguish NXDOMAIN, NODATA, SERVFAIL, and transient failures.
+- Compare HTTP/TLS behavior with random-host and random-path controls to filter parked domains, CDN defaults, and SPA/soft-404 responses.
+- Treat certificate SANs, historical DNS, shared IPs, provider CNAMEs, and name similarity as leads rather than ownership proof.
+- Keep ambiguous, third-party, and out-of-scope candidates out of active inventories until attribution and scope are independently established.
+
 #### Evidence Requirements
 
 - Source URL/tool and observation timestamp for each candidate.
