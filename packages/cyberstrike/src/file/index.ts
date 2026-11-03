@@ -266,6 +266,7 @@ export namespace File {
       const directory = Instance.directory
       let cache: Entry = { files: [], dirs: [] }
       let fetching = false
+      let inventoryReady = false
       let disposed = false
       const abort = new AbortController()
       let activeScan: Promise<void> | undefined
@@ -312,6 +313,7 @@ export namespace File {
             if (!disposed && !abort.signal.aborted) {
               result.dirs = Array.from(dirs).toSorted()
               cache = result
+              inventoryReady = true
             }
             return
           }
@@ -331,7 +333,10 @@ export namespace File {
               result.dirs.push(dir + "/")
             }
           }
-          if (!disposed && !abort.signal.aborted) cache = result
+          if (!disposed && !abort.signal.aborted) {
+            cache = result
+            inventoryReady = true
+          }
         } finally {
           fetching = false
         }
@@ -354,9 +359,13 @@ export namespace File {
 
       return {
         async files() {
-          if (!fetching && !disposed) {
+          if (!inventoryReady && !fetching && !disposed) {
             startScan({ files: [], dirs: [] })
           }
+          // Search must observe a complete inventory. Returning the current cache
+          // while the initial scan is still running creates false empty results
+          // for early @mentions and other file-name searches.
+          await activeScan?.catch(() => undefined)
           return cache
         },
         async dispose() {

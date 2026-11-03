@@ -45,6 +45,11 @@ async function seedConversation(input: {
     .toBe(true)
 
   if (!userMessageID) throw new Error("Expected a user message id")
+
+  // Seed through the SDK, then reload so the timeline hydrates the persisted
+  // message before exercising revert behavior. This test is not about stream timing.
+  await input.page.reload()
+  await expect(prompt).toBeVisible({ timeout: 30_000 })
   await expect(input.page.locator(`[data-message-id="${userMessageID}"]`).first()).toBeVisible({ timeout: 30_000 })
   return { prompt, userMessageID }
 }

@@ -12,7 +12,7 @@ test("smoke @mention inserts file pill token", async ({ page, gotoSession }) => 
   await page.keyboard.type(`@${file}`)
 
   const suggestion = page.getByRole("button", { name: filePattern }).first()
-  await expect(suggestion).toBeVisible()
+  await expect(suggestion).toBeVisible({ timeout: 30_000 })
   await suggestion.hover()
 
   await page.keyboard.press("Tab")

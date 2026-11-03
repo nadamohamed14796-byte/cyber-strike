@@ -25,6 +25,9 @@ export function SessionPromptDock(props: {
   return (
     <div
       ref={props.setPromptDockRef}
+      data-component="session-prompt-dock"
+      data-prompt-ready={String(props.promptReady)}
+      data-blocked={String(props.blocked)}
       class="absolute inset-x-0 bottom-0 pt-12 pb-4 flex flex-col justify-center items-center z-50 bg-gradient-to-t from-background-stronger via-background-stronger to-transparent pointer-events-none"
     >
       <div

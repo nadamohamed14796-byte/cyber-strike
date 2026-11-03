@@ -41,6 +41,70 @@ describe("file.ripgrep", () => {
 })
 
 
+test("file search waits for the initial inventory scan and reuses its completed index", async () => {
+  await using tmp = await tmpdir()
+  const originalFiles = Ripgrep.files
+  let startedResolve!: () => void
+  const started = new Promise<void>((resolve) => {
+    startedResolve = resolve
+  })
+  let releaseResolve!: () => void
+  const released = new Promise<void>((resolve) => {
+    releaseResolve = resolve
+  })
+  let scanCount = 0
+
+  Ripgrep.files = (async function* () {
+    scanCount++
+    startedResolve()
+    await released
+    yield path.join("packages", "app", "package.json")
+  }) as typeof Ripgrep.files
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        File.init()
+        await started
+
+        let completed = false
+        const searching = File.search({
+          query: "packages/app/package.json",
+          dirs: false,
+          limit: 10,
+        }).then((results) => {
+          completed = true
+          return results
+        })
+
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        expect(completed).toBe(false)
+
+        releaseResolve()
+        expect(await searching).toContain(path.join("packages", "app", "package.json"))
+        expect(scanCount).toBe(1)
+        expect(await File.search({
+          query: "packages/app/package.json",
+          dirs: false,
+          limit: 10,
+        })).toContain(path.join("packages", "app", "package.json"))
+        expect(scanCount).toBe(1)
+        await Instance.dispose()
+      },
+    })
+  } finally {
+    releaseResolve()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Instance.dispose()
+      },
+    }).catch(() => undefined)
+    Ripgrep.files = originalFiles
+  }
+})
+
 test("file inventory aborts and settles before instance disposal completes", async () => {
   await using tmp = await tmpdir()
   const originalFiles = Ripgrep.files

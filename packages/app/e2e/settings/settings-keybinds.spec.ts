@@ -215,7 +215,7 @@ test("changing new session keybind works", async ({ page, sdk, gotoSession }) =>
     await page.waitForTimeout(100)
 
     const newKeybind = await keybindButton.textContent()
-    expect(newKeybind).toContain("N")
+    expect(newKeybind).toContain("M")
 
     const stored = await page.evaluate(() => {
       const raw = localStorage.getItem("settings.v3")

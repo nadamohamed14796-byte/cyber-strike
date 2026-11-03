@@ -5,6 +5,14 @@ import { createSdk, dirSlug, getWorktree, sessionPath } from "./utils"
 
 export const settingsKey = "settings.v3"
 
+async function waitForSessionPrompt(page: Page) {
+  const dock = page.locator('[data-component="session-prompt-dock"]')
+  await expect(dock).toBeVisible({ timeout: 30_000 })
+  await expect(dock).toHaveAttribute("data-prompt-ready", "true", { timeout: 30_000 })
+  await expect(dock).toHaveAttribute("data-blocked", "false", { timeout: 30_000 })
+  await expect(page.locator(promptSelector)).toBeVisible({ timeout: 10_000 })
+}
+
 type TestFixtures = {
   sdk: ReturnType<typeof createSdk>
   gotoSession: (sessionID?: string) => Promise<void>
@@ -45,7 +53,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     const gotoSession = async (sessionID?: string) => {
       await page.goto(sessionPath(directory, sessionID))
-      await expect(page.locator(promptSelector)).toBeVisible()
+      await waitForSessionPrompt(page)
     }
     await use(gotoSession)
   },
@@ -57,7 +65,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
       const gotoSession = async (sessionID?: string) => {
         await page.goto(sessionPath(directory, sessionID))
-        await expect(page.locator(promptSelector)).toBeVisible()
+        await waitForSessionPrompt(page)
       }
 
       try {
