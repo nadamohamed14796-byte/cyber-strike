@@ -1,26 +1,23 @@
 import { expect, test } from "bun:test"
 import { executionPhaseForWebRecon } from "../../src/tool/web-recon/phase"
 
-test("read-only discovery programs are not gated by checkpoint status", () => {
+test("passive inventory programs remain available during ordinary reconnaissance", () => {
   for (const program of [
     "sitemap_scan",
     "robots_scan",
     "openapi_scan",
     "header_audit",
-    "method_check",
-    "graphql_probe",
     "tech_detect",
   ]) {
     expect(executionPhaseForWebRecon(program)).toBe("url_collection")
   }
 })
 
-test("sensitive-file collection is ordinary read-only recon", () => {
-  expect(executionPhaseForWebRecon("sensitive_files")).toBe("url_collection")
-})
-
-test("active vulnerability-oriented web-recon programs remain opt-in", () => {
+test("sensitive-file, GraphQL, method, and vulnerability probes require opt-in testing", () => {
   for (const program of [
+    "sensitive_files",
+    "graphql_probe",
+    "method_check",
     "cors_check",
     "open_redirect",
     "full_recon",
