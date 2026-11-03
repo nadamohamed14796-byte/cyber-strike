@@ -12,7 +12,11 @@ import { proxied } from "@/util/proxied"
 export namespace BunProc {
   const log = Log.create({ service: "bun" })
 
-  export async function run(cmd: string[], options?: Bun.SpawnOptions.OptionsObject<any, any, any>) {
+  export async function run(
+    cmd: string[],
+    options?: Bun.SpawnOptions.OptionsObject<any, any, any>,
+    timeoutMs?: number,
+  ) {
     log.info("running", {
       cmd: [which(), ...cmd],
       ...options,
@@ -40,16 +44,35 @@ export namespace BunProc {
         : readableStreamToText(result.stderr)
       : Promise.resolve(undefined)
 
-    const [code, stdout, stderr] = await Promise.all([
-      result.exited,
-      stdoutPromise,
-      stderrPromise,
-    ])
-    log.info("done", {
-      code,
-      stdout,
-      stderr,
-    })
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      const exit = timeoutMs
+        ? Promise.race([
+            result.exited,
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(() => {
+                result.kill()
+                reject(new Error(`Command timed out after ${timeoutMs}ms: ${cmd.join(" ")}`))
+              }, timeoutMs)
+            }),
+          ])
+        : result.exited
+
+      const [code, stdout, stderr] = await Promise.all([exit, stdoutPromise, stderrPromise])
+      log.info("done", {
+        code,
+        stdout,
+        stderr,
+      })
+    } catch (error) {
+      // Ensure a timed-out child cannot keep the CLI alive. Drain both pipes and
+      // wait for process termination before propagating the failure.
+      result.kill("SIGKILL")
+      await Promise.allSettled([result.exited, stdoutPromise, stderrPromise])
+      throw error
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
     if (code !== 0) {
       throw new Error(`Command failed with exit code ${result.exitCode}`)
     }
