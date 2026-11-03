@@ -116,10 +116,11 @@ jobs:
           test -f "$TMP_DIR/share/cyberstrike/skill/SKILL_GUIDE.md"
 
           mkdir -p "$TMP_DIR/zip-archive"
-          python3 - <<'PY'
+          ZIP_EXTRACT_DIR="$TMP_DIR/zip-archive" python3 - <<'PY'
+          import os
           from zipfile import ZipFile
           with ZipFile("cyberstrike-linux-x64.zip") as archive:
-              archive.extractall("$TMP_DIR/zip-archive")
+              archive.extractall(os.environ["ZIP_EXTRACT_DIR"])
           PY
           HOME="$TMP_DIR/zip-home" \
             XDG_DATA_HOME="$TMP_DIR/zip-share" \
