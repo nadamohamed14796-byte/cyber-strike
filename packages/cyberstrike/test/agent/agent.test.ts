@@ -159,7 +159,7 @@ test("direct captured-request analyzer persists candidates through the canonical
       expect(agent).toBeDefined()
       expect(agent?.prompt).toContain("## Impact Hunter Escalation")
       expect(agent?.prompt).toContain("report_vulnerability")
-      expect(agent?.prompt).toContain("reporting automatically starts one background Hunter in `proof_gap` mode")
+      expect(agent?.prompt).toContain("only while the persisted `vulnerability_testing` checkpoint is explicitly running")
       expect(agent?.prompt).toContain("triage_vulnerability(status=\"approved\")")
       expect(agent?.prompt).not.toContain('subagent_type: "impact-hunter"')
       expect(agent?.prompt).not.toContain("start a separate impact-hunter")
