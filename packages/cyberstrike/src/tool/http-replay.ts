@@ -949,16 +949,24 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
     if (!targetAuthorization.workspace) {
       return err("No raw request was sent because the persisted scope check did not resolve a canonical target workspace.")
     }
-    const testingGate = await reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing")
-    if (!testingGate.allowed) {
+    const [parameterGate, vulnerabilityGate] = await Promise.all([
+      reconPhaseGate(targetAuthorization.workspace, "parameter_fuzzing"),
+      reconPhaseGate(targetAuthorization.workspace, "vulnerability_testing"),
+    ])
+    const testingGate = parameterGate.allowed ? parameterGate : vulnerabilityGate
+    if (!parameterGate.allowed && !vulnerabilityGate.allowed) {
+      const reason = [
+        "parameter_fuzzing: " + parameterGate.reason,
+        "vulnerability_testing: " + vulnerabilityGate.reason,
+      ].join("; ")
       return {
         title: "http_replay_raw — refused (testing checkpoint)",
         output: [
           "No byte-exact request was sent.",
-          "Reason: " + testingGate.reason,
-          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before raw replay.",
+          "Reason: " + reason,
+          "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin parameter_fuzzing or vulnerability_testing before raw replay.",
         ].join("\n"),
-        metadata: { testingDenied: true, reason: testingGate.reason, manifest: testingGate.manifestPath },
+        metadata: { testingDenied: true, reason, manifest: testingGate.manifestPath },
       }
     }
 
