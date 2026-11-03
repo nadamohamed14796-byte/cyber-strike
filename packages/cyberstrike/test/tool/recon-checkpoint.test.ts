@@ -4,6 +4,7 @@ import { nextTodo } from "../../src/tool/todo"
 import {
   reconRunID,
   reconBeginDisposition,
+  reconcileReconTodoChecklist,
   RECON_PHASE_ARTIFACT_AREAS,
   missingRequiredReconArtifacts,
   validateCanonicalInventoryContent,
@@ -93,6 +94,16 @@ test("recon phases cannot skip pending prerequisites", () => {
     "scope_validation",
     "workspace_setup",
   ])
+})
+
+test("recon phase start follows the persisted checklist prerequisites", () => {
+  const state = records("complete")
+  state.javascript_analysis = { status: "pending" }
+  const decision = reconPhaseStartDecision("parameter_discovery", state)
+  expect(decision.allowed).toBe(false)
+  expect(decision.unresolved).toEqual(["javascript_analysis"])
+  state.javascript_analysis = { status: "complete" }
+  expect(reconPhaseStartDecision("parameter_discovery", state).allowed).toBe(true)
 })
 
 test("scope must be completed, not unavailable, before discovery or testing", () => {
