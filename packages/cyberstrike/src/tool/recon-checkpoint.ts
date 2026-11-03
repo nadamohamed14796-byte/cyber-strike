@@ -29,6 +29,26 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
+// Serialize manifest read/modify/write cycles per canonical target root. Different
+// targets remain independent; duplicate/concurrent phase updates cannot overwrite
+// each other's persisted state or run-index changes.
+const reconCheckpointLocks = new Map<string, Promise<void>>()
+
+async function acquireReconCheckpointLock(targetID: string): Promise<() => void> {
+  const previous = reconCheckpointLocks.get(targetID) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const queued = previous.then(() => current)
+  reconCheckpointLocks.set(targetID, queued)
+  await previous
+  return () => {
+    release()
+    if (reconCheckpointLocks.get(targetID) === queued) reconCheckpointLocks.delete(targetID)
+  }
+}
+
 /** Turn a saved, supported scope entry into one concrete URL candidate for initial checkpoint setup. */
 function scopeEntryURL(entry: string): string | undefined {
   let value = entry.trim().replace(/^(?:url|domain|wildcard|api|ip address|cidr)\s*:\s*/i, "")
@@ -276,6 +296,8 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         workspace = parent
       }
 
+      const releaseCheckpointLock = await acquireReconCheckpointLock(workspace.id)
+      try {
       const sessionID = Session.root(ctx.sessionID)
       // A checkpoint update is a read-modify-write of both the run manifest and
       // its index. Serialize by canonical target so concurrent tool calls cannot
@@ -815,6 +837,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       await TargetMemory.writeWorkspaceFile(workspace, "runs/index.json", JSON.stringify(index, null, 2) + "\n")
 
       return { title: "Recon checkpoint saved", output: ["Target: " + workspace.targetURL, "Phase: " + phase, "Status: " + run.phases[phase].status, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...(run.phases[phase].artifacts?.length ? ["Artifacts: " + run.phases[phase].artifacts.join(", ")] : []), ...(run.phases[phase].reason ? ["Reason: " + run.phases[phase].reason] : [])].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, phase, status: run.phases[phase].status, manifest: absolutePath, current_phase: run.currentPhase } }
+      } finally {
+        releaseCheckpointLock()
+      }
     } catch (error) {
       return { title: "Recon checkpoint failed", output: error instanceof Error ? error.message : String(error), metadata: { saved: false, error: true } }
     }
