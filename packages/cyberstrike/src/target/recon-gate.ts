@@ -286,7 +286,8 @@ export function reconPhaseExecutionDecision(
         unresolved.map((item) => item + "=" + phases[item].status).join(", "),
     }
   }
-  return { allowed: true, reason: "explicit " + requiredPhase + " checkpoint and prerequisites passed" }
+  const phaseName = requiredPhase === "vulnerability_testing" ? "vulnerability-testing" : requiredPhase
+  return { allowed: true, reason: "explicit " + phaseName + " checkpoint and prerequisites passed" }
 }
 
 /** Checkpoint gate for explicit active-testing tools.

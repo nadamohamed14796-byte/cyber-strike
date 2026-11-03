@@ -20,7 +20,7 @@ export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) 
   const preserved = previous.filter(
     (todo) =>
       ((todo.status === "pending" || todo.status === "in_progress") ||
-        /^\\[recon:[a-z_]+\\]/.test(todo.content.trim())) &&
+        /^\[recon:[a-z_]+\]/.test(todo.content.trim())) &&
       !hasTodo(todo.content),
   )
   return { todos: [...next, ...preserved], preserved }
@@ -61,8 +61,8 @@ export const TodoWriteTool = Tool.define("todowrite", {
     })
 
     const previous = await Todo.get(ctx.sessionID)
-    // An update is a full snapshot. Preserve unfinished work unless the agent
-    // explicitly keeps it or marks it cancelled; omission must not erase work.
+    // An update is a full snapshot. Preserve unfinished work and completed
+    // recon checklist history unless the agent explicitly replaces/cancels it.
     const { todos: nextTodos, preserved } = mergeTodoSnapshot(previous, params.todos)
 
     const activeCount = nextTodos.filter((x) => x.status === "pending" || x.status === "in_progress").length
@@ -85,7 +85,7 @@ export const TodoWriteTool = Tool.define("todowrite", {
       title: `${nextTodos.filter((x) => x.status === "pending" || x.status === "in_progress").length} active todos`,
       output:
         JSON.stringify(nextTodos, null, 2) +
-        (preserved.length ? "\n\nPreserved unfinished items omitted from this update: " + preserved.map((todo) => todo.content).join(" | ") : "") +
+        (preserved.length ? "\n\nPreserved previously tracked items omitted from this update: " + preserved.map((todo) => todo.content).join(" | ") : "") +
         "\n\n" +
         nextTodoHint(nextTodos),
       metadata: {

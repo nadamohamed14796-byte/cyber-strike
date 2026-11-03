@@ -492,6 +492,8 @@ export namespace LazyToolRegistry {
 
   function normalizeSearchTokens(value: string): string[] {
     return value
+      // Preserve the canonical language name before splitting generic camelCase tokens.
+      .replace(/javascript/gi, "javascript")
       .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
