@@ -137,20 +137,6 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         if (!finding) {
           throw new Error("Impact Hunter dispatch is blocked: finding " + findingID + " was not found in the current session.")
         }
-        const workspace = finding.target_id
-          ? TargetMemory.list().find((item) => item.id === finding.target_id)
-          : undefined
-        if (!workspace) {
-          throw new Error("Impact Hunter dispatch is blocked: finding is not linked to an existing target workspace.")
-        }
-        const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
-        if (!testingGate.allowed) {
-          throw new Error(
-            "Impact Hunter dispatch is blocked because the explicit vulnerability_testing checkpoint is not active: " +
-            testingGate.reason,
-          )
-        }
-
         const requestIDsInPrompt = (promptField("supporting_request_ids") ?? "")
           .split(",")
           .map((item) => item.trim())
@@ -174,6 +160,22 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           if (!baselineValidationID || baselineValidationID !== gate.baselineValidationID) {
             throw new Error("Impact Hunter dispatch is blocked: the prompt baseline_validation_id does not match the latest confirmed ten-check validation.")
           }
+        }
+
+        // Evidence validation comes first; only a legitimate finding may request
+        // the active-testing handoff. Recon-only collection cannot launch a Hunter.
+        const workspace = finding.target_id
+          ? TargetMemory.list().find((item) => item.id === finding.target_id)
+          : undefined
+        if (!workspace) {
+          throw new Error("Impact Hunter dispatch is blocked: finding is not linked to an existing target workspace.")
+        }
+        const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
+        if (!testingGate.allowed) {
+          throw new Error(
+            "Impact Hunter dispatch is blocked because the explicit vulnerability_testing checkpoint is not active: " +
+            testingGate.reason,
+          )
         }
       }
 
