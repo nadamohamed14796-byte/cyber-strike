@@ -2,11 +2,13 @@
   "$schema": "https://turborepo.com/schema.json",
   "globalEnv": [
     "CI",
-    "CYBERSTRIKE_DISABLE_SHARE"
+    "CYBERSTRIKE_DISABLE_SHARE",
+    "CYBERSTRIKE_BUILD_OS"
   ],
   "globalPassThroughEnv": [
     "CI",
-    "CYBERSTRIKE_DISABLE_SHARE"
+    "CYBERSTRIKE_DISABLE_SHARE",
+    "CYBERSTRIKE_BUILD_OS"
   ],
   "tasks": {
     "typecheck": {},
