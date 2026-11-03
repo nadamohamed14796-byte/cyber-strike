@@ -47,6 +47,44 @@ export namespace Skill {
   /** Lightweight catalog entry. Full Markdown bodies are read only by Skill.get(). */
   export type Metadata = Omit<Info, "content">
 
+  function descriptionFromBody(content: string): string | undefined {
+    const lines = content.split(/\r?\n/)
+    const heading = lines.findIndex((line) => /^#{1,6}\s+description\s*#*\s*$/i.test(line.trim()))
+    const start = heading >= 0 ? heading + 1 : Math.max(0, lines.findIndex((line) => /^#\s+/.test(line.trim())) + 1)
+    const section: string[] = []
+
+    for (let index = start; index < lines.length; index++) {
+      const line = lines[index]
+      if (/^#{1,6}\s+/.test(line.trim())) {
+        if (heading >= 0 || section.length > 0) break
+        continue
+      }
+      section.push(line)
+    }
+
+    const paragraphs = section.join("\n").split(/\n\s*\n/)
+    for (const paragraph of paragraphs) {
+      const description = paragraph
+        .replace(/^\s*(?:[-*+]\s+|>\s*)/gm, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/[*_~]{1,3}/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+      if (description) return description.slice(0, 512)
+    }
+  }
+
+  function parseMetadata(data: unknown, content: string) {
+    const raw = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
+    const description =
+      typeof raw.description === "string" && raw.description.trim()
+        ? raw.description.trim()
+        : descriptionFromBody(content)
+    return Info.pick({ name: true, description: true }).safeParse({ ...raw, description })
+  }
+
   export const InvalidError = NamedError.create(
     "SkillInvalidError",
     z.object({
@@ -137,7 +175,7 @@ export namespace Skill {
 
       if (!md) return
 
-      const parsed = Info.pick({ name: true, description: true }).safeParse(md.data)
+      const parsed = parseMetadata(md.data, md.content)
       if (!parsed.success) {
         log.warn("skill metadata is invalid; skipping", {
           path: match,
@@ -396,7 +434,7 @@ export namespace Skill {
     try {
       const fileContent = await Bun.file(metadata.location).text()
       const md = await ConfigMarkdown.parseContent(fileContent, metadata.location)
-      const parsed = Info.pick({ name: true, description: true }).safeParse(md.data)
+      const parsed = parseMetadata(md.data, md.content)
       if (!parsed.success || parsed.data.name !== metadata.name || parsed.data.description !== metadata.description) {
         log.warn("skill metadata changed since catalog discovery; refresh the catalog", {
           name: metadata.name,
