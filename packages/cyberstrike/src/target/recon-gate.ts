@@ -68,6 +68,34 @@ export function reconScopeFingerprint(input: ScopeFingerprintInput | readonly Sc
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
+
+/** Resolve the complete persisted authorization chain for an asset under one canonical program root. */
+export async function reconScopeFingerprintForWorkspace(start: Workspace, expectedRootID: string): Promise<string> {
+  const byID = new Map(TargetMemory.list().map((item) => [item.id, item]))
+  const visited = new Set<string>()
+  const scopes: TargetScope[] = []
+  let current: Workspace | undefined = start
+  let foundExpectedRoot = false
+  while (current) {
+    if (visited.has(current.id)) throw new Error("target workspace ancestry contains a cycle; scope validation cannot be trusted")
+    visited.add(current.id)
+    if (current.id === expectedRootID) foundExpectedRoot = true
+    const scope = await TargetMemory.getScope(current.targetURL)
+    if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
+      throw new Error("workspace " + current.targetURL + " has no configured persisted scope")
+    }
+    scopes.push(scope)
+    if (!current.parentTargetID) break
+    const parent = byID.get(current.parentTargetID)
+    if (!parent) throw new Error("parent target workspace is missing; refusing to weaken inherited scope")
+    current = parent
+  }
+  if (!foundExpectedRoot || current?.id !== expectedRootID) {
+    throw new Error("the starting asset resolves to a different canonical program workspace; re-check it under the current root")
+  }
+  return reconScopeFingerprint(scopes)
+}
+
 export function reconRunID(targetID: string): string {
   return createHash("sha256").update(targetID).digest("hex").slice(0, 20)
 }
@@ -312,6 +340,48 @@ export async function reconPhaseGate(
     return {
       allowed: false,
       reason: requiredPhase + " is opt-in. The recon handoff leaves active-testing phases deferred; explicitly begin " + requiredPhase + " only after the user requests active testing.",
+      manifestPath,
+    }
+  }
+
+  // A previously completed scope checkpoint is not a permanent authorization
+  // grant. Revalidate the exact starting asset and the complete inherited policy
+  // chain immediately before active testing, even when that asset still matches
+  // the edited policy. Otherwise stale endpoint inventories could outlive a scope
+  // change that did not happen to exclude the original seed.
+  const scopeValidation = run.phases.scope_validation
+  if (!scopeValidation.scopeValidationTarget || !scopeValidation.scopeFingerprint) {
+    return {
+      allowed: false,
+      reason: "The scope checkpoint has no persisted starting-asset fingerprint. Run recon_checkpoint status to migrate/revalidate it, then rebuild any invalidated downstream inventory before active testing.",
+      manifestPath,
+    }
+  }
+  try {
+    const validationTarget = new URL(scopeValidation.scopeValidationTarget)
+    if ((validationTarget.protocol !== "http:" && validationTarget.protocol !== "https:") || validationTarget.username || validationTarget.password) {
+      throw new Error("saved scope-validation target is not a credential-free HTTP(S) URL")
+    }
+    const scopeDecision = await TargetMemory.checkURLScope(validationTarget.href)
+    if (!scopeDecision.allowed || !scopeDecision.workspace) {
+      return {
+        allowed: false,
+        reason: "The saved scope-validation starting asset is no longer authorized: " + scopeDecision.reason + ". Revalidate scope and rebuild downstream inventory before active testing.",
+        manifestPath,
+      }
+    }
+    const currentFingerprint = await reconScopeFingerprintForWorkspace(scopeDecision.workspace, root.id)
+    if (currentFingerprint !== scopeValidation.scopeFingerprint) {
+      return {
+        allowed: false,
+        reason: "The persisted scope or exclusions changed after recon validation. Re-run recon_checkpoint status, revalidate the scope, and rebuild downstream artifacts including endpoint_inventory before active testing.",
+        manifestPath,
+      }
+    }
+  } catch (error) {
+    return {
+      allowed: false,
+      reason: "The current authorization chain could not be revalidated; active testing is blocked until scope is repaired: " + (error instanceof Error ? error.message : String(error)),
       manifestPath,
     }
   }
