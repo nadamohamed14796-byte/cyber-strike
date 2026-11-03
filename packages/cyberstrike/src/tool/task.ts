@@ -103,13 +103,15 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const config = await Config.get()
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      const agentID = await Agent.resolveID(agent)
+      if (!agentID) throw new Error(`Unable to resolve stable agent ID for ${params.subagent_type}`)
 
       // Impact Hunter is a designated escalation path. A task handoff is
       // permitted only for an existing finding that passes the independent
       // approval/validation/ledger gate below; ordinary task-spawning privileges
       // and scope/request enforcement remain separate.
       const impactHandoff = isInternalImpactHandoff({
-        subagentType: agent.id,
+        subagentType: agentID,
         background: params.background,
         caller: callerID,
         callerMode: caller?.mode,
@@ -117,7 +119,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       // Every Impact Hunter launch is evidence-gated, including explicit
       // @-invocations that bypass ordinary task permissions.
-      if (agent.id === "impact-hunter") {
+      if (agentID === "impact-hunter") {
         const promptLines = params.prompt.split("\n").map((line) => line.trim())
         const promptField = (name: string) => promptLines
           .find((line) => line.startsWith(name + ":"))
@@ -188,7 +190,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         // with a re-dispatch hint instead of spawning a wasted subagent. Domain
         // logic lives in vuln-scope; here we only enforce. Only autonomous dispatch
         // is constrained — explicit user @-invocation is bypassAgentCheck and skips.
-        const violation = dispatchScopeViolation(params.subagent_type, `${params.description}\n${params.prompt}`)
+        const violation = dispatchScopeViolation(agentID, `${params.description}\n${params.prompt}`)
         if (violation) {
           return {
             title: `Dispatch rejected — ${params.subagent_type} out of lane`,
@@ -252,7 +254,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         !requestID &&
         !params.task_id &&
         !ctx.extra?.bypassAgentCheck &&
-        (params.subagent_type === "proxy-analyzer" || params.subagent_type.startsWith("proxy-tester-"))
+        (agentID === "proxy-analyzer" || agentID.startsWith("proxy-tester-"))
       ) {
         return {
           title: "Request-specific dispatch blocked",
@@ -271,7 +273,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         requestID &&
         !params.task_id &&
         !ctx.extra?.bypassAgentCheck &&
-        (params.subagent_type === "proxy-analyzer" || params.subagent_type.startsWith("proxy-tester-"))
+        (agentID === "proxy-analyzer" || agentID.startsWith("proxy-tester-"))
       ) {
         const reservationKey = ctx.sessionID + ":" + requestID
         let reservations = proxyRequestDispatchReservations.get(reservationKey)
@@ -279,7 +281,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           reservations = new Set<string>()
           proxyRequestDispatchReservations.set(reservationKey, reservations)
         }
-        if (reservations.has(params.subagent_type)) {
+        if (reservations.has(agentID)) {
           return {
             title: "Duplicate specialist dispatch skipped",
             output: `This lane is already being dispatched for request ${requestID}. Do not create another task.`,
@@ -291,17 +293,17 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           }
         }
         const alreadyReserved = [...reservations]
-        reservations.add(params.subagent_type)
+        reservations.add(agentID)
         try {
           const children = await Session.children(ctx.sessionID)
           const decision = evaluateProxyRequestDispatch({
             requestID,
-            agentID: params.subagent_type,
+            agentID,
             children,
             reservedAgentIDs: alreadyReserved,
           })
           if (!decision.allowed) {
-            reservations.delete(params.subagent_type)
+            reservations.delete(agentID)
             if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
             const existingTaskID = decision.existingTaskID
             return {
@@ -316,9 +318,9 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
               },
             }
           }
-          proxyDispatchReservation = { key: reservationKey, agentID: params.subagent_type }
+          proxyDispatchReservation = { key: reservationKey, agentID }
         } catch (error) {
-          reservations.delete(params.subagent_type)
+          reservations.delete(agentID)
           if (reservations.size === 0) proxyRequestDispatchReservations.delete(reservationKey)
           throw error
         }
@@ -330,11 +332,11 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         try {
           await ctx.ask({
             permission: "task",
-            patterns: [params.subagent_type],
+            patterns: [agentID],
             always: ["*"],
             metadata: {
               description: params.description,
-              subagent_type: params.subagent_type,
+              subagent_type: agentID,
             },
           })
         } catch (error) {
@@ -352,7 +354,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
 
       const parentSessionID = params.parent_session_id ?? ctx.sessionID
       if (params.parent_session_id) {
-        if (params.subagent_type !== "impact-hunter") {
+        if (agentID !== "impact-hunter") {
           throw new Error("Only the dedicated Impact Hunter may be attached directly to a root session.")
         }
         const parent = await Session.get(params.parent_session_id)
@@ -381,7 +383,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
             .find((line) => line.startsWith("finding_id:"))
             ?.slice("finding_id:".length)
             .trim()
-          const sameRootImpactHunter = params.subagent_type === "impact-hunter" &&
+          const sameRootImpactHunter = agentID === "impact-hunter" &&
             Boolean(found.parentID) &&
             Session.root(found.parentID!) === Session.root(ctx.sessionID) &&
             Boolean(promptFindingID) &&
@@ -464,7 +466,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       let prompt = params.prompt
       // Cross-cutting handoff contract: every subagent receives the same routing
       // rule, regardless of which specialized prompt it was loaded from.
-      if (params.subagent_type !== "impact-hunter") {
+      if (agentID !== "impact-hunter") {
         prompt =
           "## Automatic Impact Hunter dispatch\n" +
           "report_vulnerability records a finding candidate but dispatches no Impact Hunter during recon-only collection. A finding-specific proof_gap Hunter may start only while the persisted vulnerability_testing checkpoint is explicitly running and its scope/workspace/endpoint-inventory prerequisites pass. The finding must also be NEW, have no reproducible class-appropriate PoC (execution-dependent classes also need an observed trigger), and carry an exact target-attributed endpoint plus a matching captured request or source file/line evidence anchor. If the checkpoint is not active, do not spawn the Hunter manually; preserve the candidate and wait for an explicit user request to begin targeted testing. For INFO observations, investigate evidence-backed chains only; never approve or report the INFO item alone. For a candidate with a complete PoC, complete all ten evidence-backed validation checks, record a durable CONFIRMED finding:<id> ledger outcome, compare the full similarity set, and call triage_vulnerability(status=\"approved\"). Approval alone does not bypass the same running vulnerability_testing checkpoint required for approved_impact. Do not manually create duplicate Hunter tasks. The Hunter may call other relevant specialist testers but must never dispatch another Impact Hunter. A started task is not a PoC, confirmation, triage, or impact verdict. Informational findings are chain precursors only: do not approve or report an INFO item by itself; seek evidence-backed complementary findings, test each chain hop only under the active-testing gate, and report only a separately validated combined finding with demonstrated terminal impact. If no chain is proven, preserve the observation as a note/candidate.\n\n" +
@@ -600,7 +602,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
           modelID: model.modelID,
           providerID: model.providerID,
         },
-        agent: params.subagent_type,
+        agent: agentID,
         tools: {
           todowrite: false,
           todoread: false,
@@ -613,7 +615,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       // Each lane may run two sibling specialists. One of four global slots is
       // reserved for Impact Hunter so main/extension fan-out cannot starve it.
       // Background Hunter work never blocks the parent; additional Hunter work queues.
-      const taskLane = `${Session.root(ctx.sessionID)}:${params.subagent_type === "impact-hunter" || callerID === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
+      const taskLane = `${Session.root(ctx.sessionID)}:${agentID === "impact-hunter" || callerID === "impact-hunter" ? "impact" : callerID === "proxy-agent" ? "extension" : "main"}`
 
       if (params.background) {
         // Persist the child prompt immediately, then queue its detached loop through
