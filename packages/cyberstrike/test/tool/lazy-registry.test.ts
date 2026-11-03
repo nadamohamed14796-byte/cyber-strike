@@ -300,6 +300,29 @@ describe("lazy tool registry snapshot reconciliation", () => {
     })
   })
 
+  test("ranks by exact capability coverage and explains why a tool matched", async () => {
+    await withProject(() => {
+      LazyToolRegistry.reconcileServerTools("test.server", [
+        {
+          name: "js_behavior_trace",
+          description: "Analyze JavaScript bundles and source maps. Extract HTTP requests, API endpoints, parameter names, and source locations.",
+        },
+        { name: "generic_capability_helper", description: "Run a general capability workflow and summarize unrelated data." },
+        { name: "account_cleanup", description: "Delete old user accounts and related records." },
+      ])
+
+      const matches = LazyToolRegistry.searchDetailed("JavaScript source maps API endpoints requests parameters analysis", 10)
+      expect(matches[0]?.tool.name).toBe("js_behavior_trace")
+      expect(matches[0]?.coverage).toBe(1)
+      expect(matches[0]?.matchedTerms).toEqual(
+        expect.arrayContaining(["javascript", "source", "map", "api", "endpoint", "request", "parameter", "analyze"]),
+      )
+      expect(matches[0]?.reasons.some((reason) => reason.includes("tool description"))).toBe(true)
+      expect(matches.find((match) => match.tool.name === "generic_capability_helper")).toBeUndefined()
+      expect(matches.find((match) => match.tool.name === "account_cleanup")).toBeUndefined()
+    })
+  })
+
   test("formats search results with real line breaks", async () => {
     await withProject(() => {
       LazyToolRegistry.reconcileServerTools("test.server", [
