@@ -131,8 +131,26 @@ export namespace ModelsDev {
       .catch(() => undefined)
     if (snapshot) return snapshot
     if (Flag.CYBERSTRIKE_DISABLE_MODELS_FETCH) return {}
-    const json = await fetch(`${url()}/api.json`).then((x) => x.text())
-    return JSON.parse(json)
+    // Provider discovery runs during startup. A stalled models.dev request must
+    // never keep the CLI/TUI loading forever; custom providers from config can
+    // still be registered even when the remote catalogue is unavailable.
+    const result = await fetch(`${url()}/api.json`, {
+      signal: AbortSignal.timeout(10 * 1000),
+      headers: {
+        "User-Agent": Installation.USER_AGENT,
+      },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`models.dev returned HTTP ${response.status}`)
+        }
+        return response.json()
+      })
+      .catch((error) => {
+        log.warn("Could not load models.dev catalogue; continuing with configured providers", { error })
+        return {}
+      })
+    return result
   })
 
   export async function get() {
