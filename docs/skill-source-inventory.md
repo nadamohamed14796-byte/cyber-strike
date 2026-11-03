@@ -110,7 +110,9 @@ The following semantic overlaps have been consolidated into canonical responsibi
 
 The following remain separate by design because they perform different work:
 - `/recon`: engagement orchestration, phase/checkpoint lifecycle, canonical inventory index, and closeout.
-- `recon-master`: cross-asset attribution/delta interpretation and conditional reconnaissance technique chapters; it does not duplicate the orchestration workflow.
+- `recon-master/SKILL.md`: compact evidence-driven router and shared scope, attribution, coverage, deduplication, and handoff contracts.
+- `recon-master/RECON_CHAPTERS.md`: eleven conditional technique procedures; read only the chapter selected by the router.
+- `recon-master/RECON_PHASE_TOOL_MATRIX.md`: canonical phase artifacts and completion checks; not a tool allowlist.
 - `attack-javascript-analysis`: evidence-triggered JavaScript/source-map acquisition, local analysis, and source-linked endpoint candidates, using per-URL provenance.
 - `attack-finding-correlation`: normalized evidence aggregation, graph updates, provenance, freshness, and evidence-driven skill handoffs.
 - `attack-triage-validation`: the required finding validation gate, counterevidence, verdict, and severity controls.
