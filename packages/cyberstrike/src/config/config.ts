@@ -221,12 +221,32 @@ export namespace Config {
         }
       }
 
-      deps.push(
-        iife(async () => {
-          const shouldInstall = await needsInstall(dir)
-          if (shouldInstall) await installDependencies(dir)
-        }),
-      )
+      // Dependency installation is only needed for executable local extensions.
+      // Do not bootstrap Bun packages in every config directory: the global config
+      // directory is commonly present even when it contains no custom tools/plugins,
+      // and doing so can stall an otherwise normal CLI startup on registry access.
+      const hasLocalExtensions =
+        new Bun.Glob("{tool,tools}/*.{js,ts}").scanSync({
+          cwd: dir,
+          onlyFiles: true,
+          followSymlinks: true,
+          dot: true,
+        }).next().done === false ||
+        new Bun.Glob("{plugin,plugins}/*.{js,ts}").scanSync({
+          cwd: dir,
+          onlyFiles: true,
+          followSymlinks: true,
+          dot: true,
+        }).next().done === false
+
+      if (hasLocalExtensions) {
+        deps.push(
+          iife(async () => {
+            const shouldInstall = await needsInstall(dir)
+            if (shouldInstall) await installDependencies(dir)
+          }),
+        )
+      }
 
       result.command = mergeDeep(result.command ?? {}, await loadCommand(dir))
       result.agent = mergeDeep(result.agent, await loadAgent(dir))
@@ -328,8 +348,6 @@ export namespace Config {
       "@cyberstrike-io/plugin": targetVersion,
     }
     await Bun.write(pkg, JSON.stringify(json, null, 2))
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-
     const gitignore = path.join(dir, ".gitignore")
     const hasGitIgnore = await Bun.file(gitignore).exists()
     if (!hasGitIgnore) await Bun.write(gitignore, ["node_modules", "package.json", "bun.lock", ".gitignore"].join("\n"))
@@ -343,7 +361,10 @@ export namespace Config {
         ...(proxied() ? ["--no-cache"] : []),
       ],
       { cwd: dir },
-    ).catch(() => {})
+      120_000,
+    ).catch((error) => {
+      log.warn("local extension dependency installation failed", { dir, error })
+    })
   }
 
   async function isWritable(dir: string) {
