@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { Session } from "../session"
+import { Todo } from "../session/todo"
 import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE, type TargetScope, type Workspace } from "../target"
 import {
   RECON_PHASES as PHASES,
@@ -11,7 +12,9 @@ import {
   parseReconRun as parseRun,
   reconRunID,
   reconScopeFingerprint,
+  reconPhaseStartDecision,
   type ReconPhase,
+  type ReconPhaseRecord,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
 } from "../target/recon-gate"
@@ -122,6 +125,75 @@ export function missingRequiredReconArtifacts(phase: ReconPhase, reportedPaths: 
   return [...(RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? [])].filter((required) => !normalized.has(required))
 }
 
+const RECON_TODO_CHECKLIST: Array<{ phase: ReconPhase; content: string; priority: string; optional?: boolean }> = [
+  { phase: "scope_validation", content: "[recon:scope_validation] Verify saved scope and exclusions", priority: "high" },
+  { phase: "workspace_setup", content: "[recon:workspace_setup] Reuse and verify the canonical workspace", priority: "high" },
+  { phase: "asset_discovery", content: "[recon:asset_discovery] Collect and merge in-scope assets", priority: "high" },
+  { phase: "live_hosts_ports", content: "[recon:live_hosts_ports] Validate live hosts and permitted services", priority: "high" },
+  { phase: "url_collection", content: "[recon:url_collection] Collect and merge URLs", priority: "high" },
+  { phase: "javascript_analysis", content: "[recon:javascript_analysis] Collect and analyze all JavaScript and source maps", priority: "high" },
+  { phase: "parameter_discovery", content: "[recon:parameter_discovery] Merge parameter evidence", priority: "high" },
+  { phase: "directory_fuzzing", content: "[recon:directory_fuzzing] Discover permitted paths and merge new URLs", priority: "high" },
+  { phase: "endpoint_inventory", content: "[recon:endpoint_inventory] Verify one merged endpoint inventory", priority: "high" },
+  { phase: "parameter_fuzzing", content: "[recon:parameter_fuzzing] Run explicitly requested parameter tests", priority: "high", optional: true },
+  { phase: "vulnerability_testing", content: "[recon:vulnerability_testing] Validate requested vulnerability hypotheses", priority: "high", optional: true },
+  { phase: "reporting", content: "[recon:reporting] Verify the final report and remaining gaps", priority: "high" },
+]
+
+/** Derive the UI checklist from persisted checkpoint state, not model memory. */
+export function reconcileReconTodoChecklist(
+  previous: Todo.Info[],
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+  currentPhase: ReconPhase | null,
+  includeOptional: readonly ReconPhase[] = [],
+): Todo.Info[] {
+  const known = new Set(RECON_TODO_CHECKLIST.map((item) => item.phase))
+  const previousByPhase = new Map<ReconPhase, Todo.Info>()
+  for (const todo of previous) {
+    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    if (!match || !known.has(match[1] as ReconPhase)) continue
+    const phase = match[1] as ReconPhase
+    if (!previousByPhase.has(phase)) previousByPhase.set(phase, todo)
+  }
+  const other = previous.filter((todo) => {
+    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    return !match || !known.has(match[1] as ReconPhase)
+  })
+  const visibleOptional = new Set<ReconPhase>([...includeOptional, ...previousByPhase.keys()])
+  const checklist = RECON_TODO_CHECKLIST
+    .filter((item) => !item.optional || visibleOptional.has(item.phase))
+    .map((item, index) => {
+      const phaseStatus = phases[item.phase].status
+      const handedOff = phaseStatus === "partial"
+      const status = phaseStatus === "complete"
+        ? "completed"
+        : phaseStatus === "deferred" || phaseStatus === "unavailable" || handedOff
+          ? "cancelled"
+          : phaseStatus === "running" || phaseStatus === "blocked" || phaseStatus === "failed"
+            ? "in_progress"
+            : "pending"
+      const numbered = item.content.replace(/^(\\[recon:[a-z_]+\\])\\s*/, "$1 " + (index + 1) + ". ")
+      return {
+        content: handedOff ? numbered + " — partial handoff; revisit when useful" : numbered,
+        status: item.phase === currentPhase && phaseStatus === "running" ? "in_progress" : status,
+        priority: item.priority,
+      }
+    })
+  return [...checklist, ...other]
+}
+
+function syncReconTodoChecklist(
+  sessionID: string,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+  currentPhase: ReconPhase | null,
+  includeOptional: readonly ReconPhase[] = [],
+): void {
+  Todo.update({
+    sessionID,
+    todos: reconcileReconTodoChecklist(Todo.get(sessionID), phases, currentPhase, includeOptional),
+  })
+}
+
 const CANONICAL_INVENTORY_PHASES = new Set<ReconPhase>([
   "asset_discovery",
   "live_hosts_ports",
@@ -196,7 +268,7 @@ export function reconBeginDisposition(status: ReconPhaseStatus, _phase: ReconPha
 }
 
 const Parameters = z.object({
-  action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable", "defer"]),
+  action: z.enum(["status", "begin", "complete", "handoff", "block", "fail", "unavailable", "defer"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
   scope_validation_target: z.string().min(1).optional().describe("Optional absolute HTTP(S) starting asset. If omitted, use the root URL when authorized, otherwise select a concrete authorized URL from the persisted scope. Saved scope is reused on resume; active requests still enforce scope independently."),
   phase: z.enum(PHASES).optional(),
@@ -208,10 +280,10 @@ const Parameters = z.object({
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
   description: [
-    "Tracks the canonical recon run, phase status, prerequisites, and artifact checks; it is not a tool allowlist. Useful ordinary recon tools may still run when evidence justifies them, independent of stale phase labels. For checkpoint transitions only, every phase after scope_validation/workspace_setup requires both foundational checkpoints to be complete; if a prior completion is rejected, repair that checkpoint before advancing the ledger. If a phase is already running and foundational checkpoints are valid, resume it.",
-    "Use status to recover progress and begin/complete/block/fail/unavailable/defer to record outcomes. Follow prerequisites for checkpoint transitions, but do not use phase state to restrict ordinary tool selection. For directory/parameter work, save useful wordlists, settings, and results. Record JavaScript correlation artifacts and verify the exact reports/recon-final.md path before reporting completion.",
-    "A normal recon run completes verified endpoint inventory and reporting, while vulnerability_testing stays deferred unless the user explicitly requests testing. Testing requires completed endpoint_inventory; refresh the report after testing. Never launch scanners/session_scan automatically.",
-    "Scope and workspace setup remain required. Configure and validate new, changed, or unresolved scope once, then persist and reuse that decision on resume. For a program-root policy container, automatically select a concrete authorized URL from the saved manifest when scope_validation_target is omitted; do not prompt the user to re-enter the same scope. Active-request tools independently enforce every concrete URL and redirect.",
+    "Tracks one resumable recon run and syncs its ordered todo checklist from saved checkpoint state. The sequence is scope/workspace → assets → live hosts → URLs → JavaScript/source maps → parameters → permitted path discovery → endpoint inventory → optional active testing → report. This tool is not a tool allowlist.",
+    "Actions: status, begin, complete, handoff, block, fail, unavailable, defer. Mark complete only after the phase's canonical artifacts are verified. Use handoff with a concrete reason and evidence-backed summary when a materially different attempt fails or useful progress stalls; it records partial work without falsely marking it complete.",
+    "Earlier required phases must be complete or explicitly handed off as partial/unavailable; pending, running, blocked, or failed phases cannot be silently skipped. Ordinary recon tools remain usable to resolve unfinished work. Scope validation and workspace setup are hard gates; parameter fuzzing and vulnerability testing are opt-in and additionally require a completed endpoint inventory.",
+    "For new or changed scope, validate the exact starting asset once and save its decision/fingerprint. Reuse it while persisted authorization is unchanged; each request-level tool must still enforce scope. Never launch active scanners or session_scan automatically.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
@@ -309,6 +381,21 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         }
       }
 
+      const includeOptional = params.phase && params.action !== "defer" &&
+        (params.phase === "parameter_fuzzing" || params.phase === "vulnerability_testing")
+        ? [params.phase]
+        : []
+      let todoSyncError: string | undefined
+      const syncTodo = () => {
+        try {
+          syncReconTodoChecklist(sessionID, run.phases, run.currentPhase, includeOptional)
+          todoSyncError = undefined
+        } catch (error) {
+          todoSyncError = error instanceof Error ? error.message : String(error)
+        }
+      }
+      syncTodo()
+
       if (params.action === "status") {
         const lines = PHASES.map((phase) => {
           const record = run.phases[phase]
@@ -317,14 +404,17 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             (record.reason ? " (reason: " + record.reason + ")" : "") +
             (record.artifacts?.length ? " [artifacts: " + record.artifacts.join(", ") + "]" : "")
         })
-        return { title: "Recon run status", output: ["Target: " + run.targetURL, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...lines].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, manifest: absolutePath, current_phase: run.currentPhase, phases: run.phases } }
+        return { title: todoSyncError ? "Recon run status — checklist sync failed" : "Recon run status", output: ["Target: " + run.targetURL, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...lines].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, manifest: absolutePath, current_phase: run.currentPhase, phases: run.phases, todo_synced: !todoSyncError, todo_sync_error: todoSyncError } }
       }
 
       if (!params.phase) return { title: "Recon checkpoint rejected", output: "phase is required for this action.", metadata: { saved: false, reason: "phase_required" } }
       const phase = params.phase
       const record = run.phases[phase]
-      if (params.action === "defer" && phase !== "vulnerability_testing") {
-        return { title: "Recon checkpoint rejected", output: "Only the optional vulnerability_testing phase may be deferred. Scope validation, workspace setup, discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
+      if (params.action === "handoff" && (phase === "scope_validation" || phase === "workspace_setup")) {
+        return { title: "Recon handoff rejected", output: "Scope validation and workspace setup are safety prerequisites and cannot be handed off as partial. Resolve them before starting recon.", metadata: { saved: false, reason: "hard_prerequisite_cannot_handoff", phase } }
+      }
+      if (params.action === "defer" && phase !== "vulnerability_testing" && phase !== "parameter_fuzzing") {
+        return { title: "Recon checkpoint rejected", output: "Only optional active-testing phases parameter_fuzzing and vulnerability_testing may be deferred. Scope validation, workspace setup, passive discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
       }
 
       if (params.action === "begin") {
@@ -368,9 +458,18 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical program workspace has no configured, non-empty authorization scope. Configure and review the official scope before continuing.", metadata: { saved: false, reason: "persisted_scope_unconfigured" } }
           }
         }
-        // Ordinary recon phases are progress markers, not hard gates. The agent may
-        // use any suitable recon capability when useful evidence becomes available.
-        // Active testing (parameter fuzzing and vulnerability testing) is opt-in
+        const startDecision = reconPhaseStartDecision(phase, run.phases)
+        if (!startDecision.allowed) {
+          return {
+            title: "Recon checklist waiting for an earlier phase",
+            output: "Cannot start " + phase + " yet. Finish the first unresolved checklist item(s): " +
+              startDecision.unresolved.map((item) => item + "=" + run.phases[item].status).join(", ") +
+              ". Resume those phases and verify their artifacts first. This gate controls phase transitions only; ordinary recon tools remain usable.",
+            metadata: { saved: false, reason: "phase_prerequisites_unresolved", phase, unresolved: startDecision.unresolved },
+          }
+        }
+        // Ordinary recon tools remain independent of checkpoint labels; only the
+        // phase-transition ledger follows this evidence-first order.
         // and cannot even enter the running state until the canonical endpoint
         // inventory is complete. The request-level execution gate repeats this check.
         if (phase === "parameter_fuzzing" || phase === "vulnerability_testing") {
@@ -393,7 +492,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           }
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
-        if (record.status === "unavailable" || record.status === "deferred") {
+        if (record.status === "unavailable" || record.status === "deferred" || record.status === "partial") {
           invalidateReconDownstreamPhases(
             phase,
             run.phases,
@@ -405,14 +504,14 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if (record.status !== "running") {
           return { title: "Recon checkpoint rejected", output: "Phase " + phase + " is " + record.status + ", not running. Call begin first; the manifest was not changed.", metadata: { saved: false, reason: "phase_not_running", phase, status: record.status } }
         }
-        if ((params.action === "block" || params.action === "fail" || params.action === "unavailable" || params.action === "defer") && !params.reason?.trim()) {
-          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, unavailable, or deferred.", metadata: { saved: false, reason: "reason_required" } }
+        if ((params.action === "block" || params.action === "fail" || params.action === "unavailable" || params.action === "defer" || params.action === "handoff") && !params.reason?.trim()) {
+          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, unavailable, deferred, or handed off as partial.", metadata: { saved: false, reason: "reason_required" } }
         }
-        const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : params.action === "defer" ? "deferred" : "unavailable"
-        if (status === "complete" && !params.summary?.trim()) {
-          return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
+        const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "handoff" ? "partial" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : params.action === "defer" ? "deferred" : "unavailable"
+        if ((status === "complete" || status === "partial") && !params.summary?.trim()) {
+          return { title: "Recon checkpoint rejected", output: "An evidence-backed summary is required before a phase can be marked complete or handed off as partial.", metadata: { saved: false, reason: "summary_required" } }
         }
-        if (status === "complete") {
+        if (status === "complete" || status === "partial") {
           const unresolved = unresolvedReconPrerequisites(phase, run.phases)
           if (unresolved.length > 0) {
             return {
@@ -502,6 +601,30 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         }
         if (status === "complete" && !["scope_validation", "workspace_setup"].includes(phase) && !params.artifacts?.length) {
           return { title: "Recon checkpoint rejected", output: "This phase requires at least one verified artifact path before it can be marked complete. If the source/tool is genuinely unavailable or there were no applicable assets, use unavailable with a reason.", metadata: { saved: false, reason: "artifact_required" } }
+        }
+        if (status === "partial" && params.artifacts?.length) {
+          const realWorkspace = await fs.realpath(workspace.workspacePath)
+          for (const artifact of params.artifacts) {
+            if (artifact.includes("\\\\") || artifact.split("/").some((part) => part === "..")) {
+              return { title: "Recon handoff rejected", output: "Artifact path must remain inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "unsafe_artifact_path" } }
+            }
+            const candidate = path.isAbsolute(artifact) ? path.resolve(artifact) : path.resolve(realWorkspace, artifact)
+            const relative = path.relative(realWorkspace, candidate)
+            if (!relative || relative === "." || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+              return { title: "Recon handoff rejected", output: "Partial artifact path must point to a file inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_outside_workspace" } }
+            }
+            try {
+              const info = await fs.lstat(candidate)
+              if (!info.isFile() || info.isSymbolicLink()) throw new Error("not a regular file")
+              const realArtifact = await fs.realpath(candidate)
+              const realRelative = path.relative(realWorkspace, realArtifact)
+              if (realRelative === ".." || realRelative.startsWith(".." + path.sep) || path.isAbsolute(realRelative)) {
+                throw new Error("artifact resolves outside the canonical target workspace")
+              }
+            } catch (error) {
+              return { title: "Recon handoff rejected", output: "Partial artifact is missing or unsafe: " + artifact + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "partial_artifact_not_verified" } }
+            }
+          }
         }
         if (status === "complete" && params.artifacts?.length) {
           const realWorkspace = await fs.realpath(workspace.workspacePath)
@@ -695,6 +818,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
 
       run.updatedAt = new Date().toISOString()
       await TargetMemory.writeWorkspaceFile(workspace, relativePath, JSON.stringify(run, null, 2) + "\n")
+      syncTodo()
       const indexPath = path.join(workspace.workspacePath, "runs", "index.json")
       let index: { schemaVersion: number; targetURL: string; runs: Array<Record<string, unknown>> }
       try {
