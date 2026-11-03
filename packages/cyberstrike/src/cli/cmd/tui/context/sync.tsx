@@ -722,7 +722,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     const args = useArgs()
 
     const bootstrap = singleflight(async function () {
-      console.log("bootstrapping")
       const start = Date.now() - 30 * 24 * 60 * 60 * 1000
       const sessionListPromise = sdk.client.session
         .list({ start: start, roots: true })
@@ -775,7 +774,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         .then(() => {
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
-          Promise.all([
+          Promise.allSettled([
             ...(args.continue ? [] : [sessionListPromise.then((sessions) => setStore("session", reconcile(sessions)))]),
             sdk.client.command.list().then((x) => setStore("command", reconcile(x.data ?? []))),
             sdk.client.lsp.status().then((x) => setStore("lsp", reconcile(x.data!))),
