@@ -242,32 +242,8 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 - Remove duplicate addresses and normalize hostnames before counting coverage.
 - Treat WHOIS organization strings, PTR names, and brand-name matches as weak signals unless corroborated.
 - Prefer targeted service checks over high-rate scans of broad ranges.
-
-#### Attribution and scope gate
-
-Use this chapter to establish whether infrastructure is related to the organization, not to validate vulnerabilities. Continue materially distinct passive attribution checks while they can change the ownership conclusion; deduplicate repeated sources and equivalent observations. Stop when attribution is resolved, relevant sources are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. ASN membership alone never authorizes active scanning.
-
-##### Evidence-driven attribution order
-
-1. Anchor discovery to verified organization names, registered entities, known domains, and current RIR/ASN evidence; a matching company string or IP hostname is not sufficient ownership proof.
-2. Collect passive ASN, prefix, BGP, reverse-DNS, certificate, and provider metadata first; preserve source URLs and observation timestamps for each candidate.
-3. Normalize prefixes and hostnames, deduplicate shared CDN/cloud edges, and separate directly registered infrastructure from reseller, SaaS, shared hosting, and third-party service providers.
-4. Keep candidate prefixes passive unless the written scope explicitly includes the exact network range and the requested network-discovery method. Do not sweep every IP in an ASN or infer permission from routing/WHOIS ownership.
-5. Return candidate prefixes with attribution confidence, evidence provenance, explicit exclusions, and narrow next steps. Send confirmed organization-owned web assets to the relevant recon chapter; do not claim a vulnerability.
-
-##### Attribution outcomes
-
-- **Corroborated first-party:** current first-party ownership evidence plus an independent technical or corporate relationship.
-- **Strong candidate:** multiple independent indicators exist, but current ownership or scope is not yet established.
-- **Shared provider / third party:** evidence indicates a CDN, cloud, reseller, SaaS, or multi-tenant service; keep it separate from first-party assets.
-- **Historical / unresolved:** stale, indirect, or conflicting evidence; retain as a passive lead only.
-- **Unrelated / refuted:** reliable evidence identifies a different organization or service owner.
-
-These are asset-attribution outcomes, not vulnerability verdicts. Vulnerability validation belongs to the authorized specialist lifecycle.
-
-##### Stop and handoff
-
-Stop on scope ambiguity, unexpected user data, service degradation, secret exposure, or prohibited behavior. Return the exact relationship, source/time, attribution class, confidence, explicit scope decision, exclusions, and the next evidence needed. Start a chained skill only when its trigger has been independently observed.
+- Classify each candidate as corroborated first-party, strong candidate, shared provider/third party, historical/unresolved, or unrelated/refuted; these are attribution outcomes, not vulnerability verdicts.
+- Keep candidate prefixes passive unless the exact network range and requested method are explicitly in scope. Stop when attribution is resolved or sources are exhausted, and stop earlier on scope ambiguity, unexpected sensitive data, or service degradation.
 
 #### References
 
