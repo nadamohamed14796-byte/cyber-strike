@@ -1,6 +1,6 @@
 import { createEffect, createMemo, Show, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useNavigate, useParams } from "@solidjs/router"
+import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { SDKProvider, useSDK } from "@/context/sdk"
 import { SyncProvider, useSync } from "@/context/sync"
 import { LocalProvider } from "@/context/local"
@@ -50,10 +50,19 @@ function DirectoryDataProvider(props: ParentProps<{ directory: string }>) {
 export default function Layout(props: ParentProps) {
   const params = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const language = useLanguage()
   const [store, setStore] = createStore({ invalid: "" })
   const directory = createMemo(() => {
     return decode64(params.dir) ?? ""
+  })
+
+  createEffect(() => {
+    const slug = params.dir
+    if (!slug || !directory()) return
+    const pathname = location.pathname.replace(/\/+$/, "")
+    if (pathname !== `/${slug}`) return
+    navigate(`/${slug}/session`, { replace: true })
   })
 
   createEffect(() => {
