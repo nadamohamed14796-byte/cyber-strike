@@ -20,6 +20,8 @@ await Log.init({
   })(),
 })
 
+Log.Default.info("TUI worker startup stage", { stage: "worker-module-started" })
+
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
     e: e instanceof Error ? e.message : e,
@@ -150,6 +152,7 @@ export const rpc = {
 }
 
 Rpc.listen(rpc)
+Log.Default.info("TUI worker startup stage", { stage: "worker-rpc-ready" })
 
 function getAuthorizationHeader(): string | undefined {
   const password = Flag.CYBERSTRIKE_SERVER_PASSWORD
