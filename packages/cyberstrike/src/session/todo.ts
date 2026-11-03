@@ -26,11 +26,22 @@ export namespace Todo {
 
   const MAX_COMPLETED = 5
 
+  function isReconChecklistItem(todo: Info) {
+    return /^\\[recon:[a-z_]+\\]/.test(todo.content.trim())
+  }
+
+  export function trimTodoHistory(todos: Info[]): Info[] {
+    // Keep the compact recon ledger visible in full so its completed sequence
+    // remains auditable. General completed todos keep their bounded history.
+    const active = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
+    const done = todos.filter((t) => t.status === "completed" || t.status === "cancelled")
+    const reconDone = done.filter(isReconChecklistItem)
+    const otherDone = done.filter((t) => !isReconChecklistItem(t))
+    return [...active, ...reconDone, ...otherDone.slice(-MAX_COMPLETED)]
+  }
+
   export function update(input: { sessionID: string; todos: Info[] }) {
-    // Auto-cleanup: keep only the last MAX_COMPLETED completed/cancelled items
-    const active = input.todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
-    const done = input.todos.filter((t) => t.status === "completed" || t.status === "cancelled")
-    const trimmed = [...active, ...done.slice(-MAX_COMPLETED)]
+    const trimmed = trimTodoHistory(input.todos)
 
     Database.transaction((db) => {
       db.delete(TodoTable).where(eq(TodoTable.session_id, input.sessionID)).run()
