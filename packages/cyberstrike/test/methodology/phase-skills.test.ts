@@ -98,6 +98,7 @@ describe("Phase-critical skill pinning", () => {
         expect(skill!.content.length, "the loaded router must stay within a practical context size").toBeLessThan(18_000)
         expect(skill!.content).toContain("RECON_CHAPTERS.md")
         expect(skill!.content).toContain("Do not load all eleven chapters")
+        expect(skill!.content).not.toContain("## 01. Cross-asset attribution and delta analysis")
         expect(skill!.content).toContain("active-test permission state")
 
         const chapterPath = path.join(path.dirname(skill!.location), "RECON_CHAPTERS.md")
