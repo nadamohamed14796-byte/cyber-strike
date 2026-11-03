@@ -150,7 +150,7 @@ export namespace ModelsDev {
         log.warn("Could not load models.dev catalogue; continuing with configured providers", { error })
         return {}
       })
-    return result
+    return remoteData
   })
 
   export async function get() {
