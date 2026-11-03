@@ -55,13 +55,13 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
       const stats = LazyToolRegistry.stats()
 
       return {
-        title: \`Found \${results.length} tools\`,
+        title: `Found ${results.length} tools`,
         output: [
           output,
           "",
           "---",
-          \`Tool Stats: \${stats.loaded}/\${stats.available} loaded | ~\${stats.estimatedTokens} tokens used | \${stats.budgetRemaining} budget remaining\`,
-        ].join("\\n"),
+          `Tool Stats: ${stats.loaded}/${stats.available} loaded | ~${stats.estimatedTokens} tokens used | ${stats.budgetRemaining} budget remaining`,
+        ].join("\n"),
         metadata: {
           query,
           resultCount: results.length,
