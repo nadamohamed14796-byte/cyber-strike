@@ -262,7 +262,12 @@
         "evidence",
         "tool-selection",
         "asset-attribution",
-        "application-clustering"
+        "application-clustering",
+        "wildcard-dns",
+        "service-discovery",
+        "visual-clustering",
+        "authorization",
+        "access-control"
       ],
       "tech_stack": [
         "dns",
