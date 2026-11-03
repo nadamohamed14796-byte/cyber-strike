@@ -154,7 +154,12 @@ export const TuiThreadCommand = cmd({
         Log.Default.error(e)
       })
       process.on("unhandledRejection", (e) => {
-        Log.Default.error(e)
+        Log.Default.error("rejection", {
+          e: e instanceof Error ? e.message : e,
+          name: e instanceof Error ? e.name : undefined,
+          stack: e instanceof Error ? e.stack : undefined,
+          cause: e instanceof Error ? e.cause : undefined,
+        })
       })
       process.on("SIGUSR2", async () => {
         await client.call("reload", undefined)
