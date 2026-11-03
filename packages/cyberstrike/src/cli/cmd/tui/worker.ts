@@ -112,13 +112,42 @@ export const rpc = {
     if (auth && !headers["authorization"] && !headers["Authorization"]) {
       headers["Authorization"] = auth
     }
+    const startedAt = Date.now()
     const request = new Request(input.url, {
       method: input.method,
       headers,
       body: input.body,
     })
-    const response = await Server.App().fetch(request)
+    const path = new URL(request.url).pathname
+    Log.Default.debug("TUI worker fetch", {
+      stage: "request-start",
+      method: request.method,
+      path,
+    })
+    const app = Server.App()
+    Log.Default.debug("TUI worker fetch", {
+      stage: "server-app-ready",
+      method: request.method,
+      path,
+      duration: Date.now() - startedAt,
+    })
+    const response = await app.fetch(request)
+    Log.Default.debug("TUI worker fetch", {
+      stage: "response-headers",
+      method: request.method,
+      path,
+      status: response.status,
+      duration: Date.now() - startedAt,
+    })
     const body = await response.text()
+    Log.Default.debug("TUI worker fetch", {
+      stage: "response-complete",
+      method: request.method,
+      path,
+      status: response.status,
+      bytes: body.length,
+      duration: Date.now() - startedAt,
+    })
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
