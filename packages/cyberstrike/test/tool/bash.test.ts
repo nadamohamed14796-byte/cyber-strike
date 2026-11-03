@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, scannerExecutableIndex, parseScopedPortSpec, readTargetListInputs } from "../../src/tool/bash"
+import { BashTool, bundledAttackScriptBlockReason, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, scannerExecutableIndex, parseScopedPortSpec, readTargetListInputs } from "../../src/tool/bash"
 import { TargetMemory, type TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -69,6 +69,32 @@ describe("tool.bash", () => {
     })
   })
 
+
+  test("routes bundled network scripts through the scoped attack_script runner", async () => {
+    const script = path.join(projectRoot, "data", "scripts", "race_tester.py")
+    expect(bundledAttackScriptBlockReason("python3", [script, "https://example.test/api"])).toContain("attack_script")
+    expect(bundledAttackScriptBlockReason("python3", ["-u", script])).toContain("persisted scope")
+    expect(bundledAttackScriptBlockReason("python3", ["-c", "print('hello')"])).toBeUndefined()
+
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const bash = await BashTool.init()
+        let message = ""
+        try {
+          await bash.execute({
+            command: "python3 " + script + " https://example.test/api",
+            description: "Ensure bundled attack scripts use the scoped runner",
+          }, ctx)
+        } catch (error) {
+          message = error instanceof Error ? error.message : String(error)
+        }
+        expect(message).toContain("Bundled CyberStrike scripts must be executed through the attack_script tool")
+        expect(message).toContain("No command was started.")
+      },
+    })
+  })
 
   test("basic", async () => {
     await Instance.provide({
