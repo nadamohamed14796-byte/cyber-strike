@@ -498,7 +498,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           if (unresolved.length > 0) {
             return {
               title: "Recon checkpoint rejected",
-              output: "Cannot complete " + phase + " while required earlier phases remain unresolved: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", ") + ". Finish each phase or record it as unavailable/deferred with a concrete reason; ordinary recon tools remain usable while progress is repaired.",
+              output: "Cannot complete " + phase + " while required earlier phases remain unresolved: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", ") + ". Finish each phase, record it as unavailable/deferred with a concrete reason, or use handoff with a reason and evidence-backed summary when useful partial work is preserved; ordinary recon tools remain usable while progress is repaired.",
               metadata: { saved: false, reason: "phase_prerequisites_unresolved", phase, unresolved },
             }
           }
