@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck monorepo
         run: bun turbo typecheck
 
+      - name: Install Chromium for browser integration tests
+        run: bunx playwright install --with-deps chromium
+
       - name: Test monorepo
         run: bun turbo test
 
