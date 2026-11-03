@@ -650,11 +650,11 @@ export const WebReconTool = Tool.define("web_recon", {
             "No network probes were sent.",
             ...[...sessionGateDenials].map((reason) => "- " + reason),
             "Complete scope_validation and workspace_setup, verify endpoint_inventory, then begin vulnerability_testing before retrying.",
-          ].join("\\n"))
+          ].join("\n"))
         }
         if (sessionGateDenials.size > 0) {
-          result.output += "\\n\\n[!] Active checks skipped for workspace(s) whose vulnerability-testing checkpoint or saved scope fingerprint was not valid:\\n" +
-            [...sessionGateDenials].map((reason) => "- " + reason).join("\\n")
+          result.output += "\n\n[!] Active checks skipped for workspace(s) whose vulnerability-testing checkpoint or saved scope fingerprint was not valid:\n" +
+            [...sessionGateDenials].map((reason) => "- " + reason).join("\n")
         }
       } catch (e) {
         return fail(`[-] session_scan failed: ${e instanceof Error ? e.message : String(e)}`)
@@ -688,7 +688,7 @@ export const WebReconTool = Tool.define("web_recon", {
           "Reason: " + testingGate.reason,
           "No network probes were sent.",
           "Complete scope_validation and workspace_setup, verify endpoint_inventory, and explicitly begin vulnerability_testing before retrying active checks.",
-        ].join("\\n"))
+        ].join("\n"))
       }
 
       // The phase gate authorizes only the current opt-in workflow state. Each
