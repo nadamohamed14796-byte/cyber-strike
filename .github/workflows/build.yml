@@ -46,6 +46,25 @@ jobs:
           install -m 0755 packages/cyberstrike/script/install-linux-artifact.sh "$BIN_DIR/install.sh"
           tar -czf cyberstrike-linux-x64.tar.gz -C "$BIN_DIR" cyberstrike hackbrowser-worker.js data/scripts data/ebpf skill install.sh
 
+      - name: Create portable Linux x64 ZIP
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+
+          root = Path("packages/cyberstrike/dist/cyberstrike-linux-x64/bin")
+          with ZipFile("cyberstrike-linux-x64.zip", "w", compression=ZIP_DEFLATED) as archive:
+              for source in sorted(root.rglob("*")):
+                  relative = source.relative_to(root).as_posix()
+                  info = ZipInfo(relative + ("/" if source.is_dir() else ""))
+                  info.create_system = 3
+                  info.external_attr = (source.stat().st_mode & 0xFFFF) << 16
+                  if source.is_dir():
+                      archive.writestr(info, b"")
+                  else:
+                      archive.writestr(info, source.read_bytes())
+          PY
+
       - name: Verify Linux x64 archive contents
         run: |
           tar -tzf cyberstrike-linux-x64.tar.gz
@@ -54,6 +73,29 @@ jobs:
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'data/ebpf/dep_scan.py'
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'skill/SKILL_GUIDE.md'
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'install.sh'
+          python3 - <<'PY'
+          import stat
+          from zipfile import ZipFile
+
+          with ZipFile("cyberstrike-linux-x64.zip") as archive:
+              names = set(archive.namelist())
+              required = {
+                  "cyberstrike",
+                  "hackbrowser-worker.js",
+                  "data/scripts/wayback_endpoints.py",
+                  "data/ebpf/cleanup.py",
+                  "data/ebpf/dep_scan.py",
+                  "skill/SKILL_GUIDE.md",
+                  "install.sh",
+              }
+              missing = required - names
+              if missing:
+                  raise SystemExit("ZIP is missing required entries: " + ", ".join(sorted(missing)))
+              for name in ("cyberstrike", "install.sh"):
+                  mode = (archive.getinfo(name).external_attr >> 16) & 0xFFFF
+                  if not mode & stat.S_IXUSR:
+                      raise SystemExit(f"ZIP entry is not executable for its owner: {name}")
+          PY
 
       - name: Smoke-test artifact installer
         run: |
@@ -73,10 +115,26 @@ jobs:
           test -f "$TMP_DIR/share/cyberstrike/data/ebpf/dep_scan.py"
           test -f "$TMP_DIR/share/cyberstrike/skill/SKILL_GUIDE.md"
 
+          mkdir -p "$TMP_DIR/zip-archive"
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile("cyberstrike-linux-x64.zip") as archive:
+              archive.extractall("$TMP_DIR/zip-archive")
+          PY
+          HOME="$TMP_DIR/zip-home" \
+            XDG_DATA_HOME="$TMP_DIR/zip-share" \
+            CYBERSTRIKE_INSTALL_BIN_DIR="$TMP_DIR/zip-bin" \
+            bash "$TMP_DIR/zip-archive/install.sh"
+          test -x "$TMP_DIR/zip-bin/cyberstrike"
+          test -f "$TMP_DIR/zip-share/cyberstrike/bin/hackbrowser-worker.js"
+          test -f "$TMP_DIR/zip-share/cyberstrike/skill/SKILL_GUIDE.md"
+
       - name: Upload runnable Linux x64 build
         uses: actions/upload-artifact@v6
         with:
           name: cyberstrike-linux-x64
-          path: cyberstrike-linux-x64.tar.gz
+          path: |
+            cyberstrike-linux-x64.tar.gz
+            cyberstrike-linux-x64.zip
           if-no-files-found: error
           retention-days: 14
