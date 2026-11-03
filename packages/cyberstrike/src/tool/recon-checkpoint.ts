@@ -20,6 +20,7 @@ import {
   type ReconRunManifest as ReconRun,
 } from "../target/recon-gate"
 import { Tool } from "./tool"
+import { Lock } from "../util/lock"
 
 export { reconRunID, unresolvedReconPrerequisites } from "../target/recon-gate"
 export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/recon-gate"
@@ -276,6 +277,10 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       }
 
       const sessionID = Session.root(ctx.sessionID)
+      // A checkpoint update is a read-modify-write of both the run manifest and
+      // its index. Serialize by canonical target so concurrent tool calls cannot
+      // silently overwrite another phase transition or lose its artifact links.
+      using _checkpointLock = await Lock.write("recon-checkpoint:" + workspace.id)
       // One resumable run per canonical target workspace, including across new root sessions.
       const runID = reconRunID(workspace.id)
       const filename = "recon-" + runID + ".json"
