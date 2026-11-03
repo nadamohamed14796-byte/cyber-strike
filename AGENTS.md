@@ -123,7 +123,7 @@ Use one source of truth for each responsibility. Keep shared behavior here rathe
 
 3. **Message and event delivery:** `docs/agent-message-flow.md` documents the end-to-end contract. Event schemas live in `packages/cyberstrike/src/session/message-v2.ts`; persistence lives in `session/index.ts`; stream processing lives in `session/processor.ts`; bus dispatch lives in `src/bus`; client state updates live in `packages/app/src/context/global-sync/event-reducer.ts`. Keep generated SDK event types synchronized with the schemas; regenerate the JavaScript SDK with `./packages/sdk/js/script/build.ts`.
 
-4. **Skills and chaining:** each specialist `SKILL.md` owns its technique-specific procedure. Load the next skill only when evidence creates a concrete need. Pass verified observations, evidence/artifact IDs, prerequisites, constraints, and unresolved questions between agents. Do not copy global tool lists into individual skills or create parallel chain/inventory ledgers.
+4. **Skills and chaining:** each attack/domain specialist `SKILL.md` owns its technique-specific validation procedure. Recon techniques are the deliberate exception: `recon-master/SKILL.md` routes to the selected on-demand chapter in `RECON_CHAPTERS.md`; do not recreate them as separately loadable skills. Load the next specialist only when evidence creates a concrete need. Pass verified observations, evidence/artifact IDs, prerequisites, constraints, and unresolved questions between agents. Do not copy global tool lists into individual skills or create parallel chain/inventory ledgers.
 
 5. **Research ingestion:** `.cyberstrike/commands/update.md` and `packages/cyberstrike/src/research/sources.ts` own the global public-research ingestion workflow.
 
