@@ -28,7 +28,7 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
-/** Turn a saved, supported scope entryto one concrete URL candidate for initial checkpoint setup. */
+/** Turn a saved, supported scope entry into one concrete URL candidate for initial checkpoint setup. */
 function scopeEntryURL(entry: string): string | undefined {
   let value = entry.trim().replace(/^(?:url|domain|wildcard|api|ip address|cidr)\s*:\s*/i, "")
   if (!value || /^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
