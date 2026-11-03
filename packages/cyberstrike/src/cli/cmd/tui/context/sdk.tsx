@@ -69,24 +69,33 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
         return
       }
 
-      // Fall back to SSE
-      while (true) {
-        if (abort.signal.aborted) break
-        const events = await sdk.event.subscribe(
-          {},
-          {
-            signal: abort.signal,
-          },
-        )
+      // Fall back to SSE. A dropped connection must not kill event delivery
+      // or leave the TUI permanently stale; retry with bounded backoff.
+      let retryDelay = 250
+      while (!abort.signal.aborted) {
+        try {
+          const events = await sdk.event.subscribe(
+            {},
+            {
+              signal: abort.signal,
+            },
+          )
 
-        for await (const event of events.stream) {
-          handleEvent(event)
-        }
+          retryDelay = 250
+          for await (const event of events.stream) {
+            if (abort.signal.aborted) break
+            handleEvent(event)
+          }
 
-        // Flush any remaining events
-        if (timer) clearTimeout(timer)
-        if (queue.length > 0) {
-          flush()
+          // Flush any remaining events before reconnecting.
+          if (timer) clearTimeout(timer)
+          if (queue.length > 0) flush()
+          if (!abort.signal.aborted) await new Promise((resolve) => setTimeout(resolve, retryDelay))
+        } catch (error) {
+          if (abort.signal.aborted) break
+          console.error("CyberStrike event stream disconnected; retrying", error)
+          await new Promise((resolve) => setTimeout(resolve, retryDelay))
+          retryDelay = Math.min(retryDelay * 2, 5000)
         }
       }
     })
