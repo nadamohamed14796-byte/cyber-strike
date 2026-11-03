@@ -37,7 +37,7 @@ test("structured and raw replay send nothing before explicit vulnerability-testi
           sessionID: session.id,
           method: "GET",
           normalizedPath: "/probe",
-          rawRequest: "GET /probe HTTP/1.1\\r\\nHost: 127.0.0.1:" + port + "\\r\\n\\r\\n",
+          rawRequest: "GET /probe HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\n\r\n",
           scheme: "http",
           host: "127.0.0.1",
           port,
