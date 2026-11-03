@@ -194,8 +194,11 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       return promise
     }
 
+    // File mentions need a wider result window than the server's generic
+    // default. Deep project paths often rank below the first ten fuzzy matches,
+    // which made exact @path mentions disappear from the suggestion list.
     const search = (query: string, dirs: "true" | "false") =>
-      sdk.client.find.files({ query, dirs }).then(
+      sdk.client.find.files({ query, dirs, limit: 100 }).then(
         (x) => (x.data ?? []).map(path.normalize),
         () => [],
       )
