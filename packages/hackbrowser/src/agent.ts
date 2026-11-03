@@ -1,7 +1,7 @@
 import { chromium, type Page, type BrowserContext } from "playwright"
 import * as Stealth from "./stealth.ts"
 import { Log } from "./log.ts"
-import { closeBrowserOnSetupFailure } from "./browser-lifecycle.ts"
+import { closeBrowserOnSetupFailure, waitForBrowserClose } from "./browser-lifecycle.ts"
 import { drainCaptureQueue, permanentlyRejectedCaptureCount, permanentlyRejectedCaptureDetails } from "./capture-queue.ts"
 import type {
   AgentConfig,
@@ -214,29 +214,7 @@ function isBrowserDead(health: BrowserHealth): boolean {
   return health.dead
 }
 
-const BROWSER_WAIT_TIMEOUT = 30 * 60 * 1000
 
-function waitForBrowserClose(browser: import("playwright").Browser, signal?: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve) => {
-    let resolved = false
-    const done = () => {
-      if (resolved) return
-      resolved = true
-      clearTimeout(timer)
-      resolve()
-    }
-    const timer = setTimeout(done, BROWSER_WAIT_TIMEOUT)
-    browser.on("disconnected", done)
-    if (signal) {
-      if (signal.aborted) {
-        done()
-        return
-      }
-      signal.addEventListener("abort", done, { once: true })
-    }
-    if (!browser.isConnected()) done()
-  })
-}
 
 // ============================================================
 // Post-Login Re-Discovery

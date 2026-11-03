@@ -14,3 +14,58 @@ export async function closeBrowserOnSetupFailure<T>(
     throw error
   }
 }
+
+
+/** Browser event surface required by waitForBrowserClose. */
+export interface BrowserCloseSource {
+  on(event: "disconnected", listener: () => void): unknown
+  removeListener(event: "disconnected", listener: () => void): unknown
+  isConnected(): boolean
+}
+
+export const BROWSER_WAIT_TIMEOUT = 30 * 60 * 1000
+
+/**
+ * Resolve when the browser disconnects, the caller aborts, or the wait times out.
+ * Every completion path removes both event listeners and clears the timer.
+ */
+export function waitForBrowserClose(
+  browser: BrowserCloseSource,
+  signal?: AbortSignal,
+  timeoutMs = BROWSER_WAIT_TIMEOUT,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer)
+      browser.removeListener("disconnected", done)
+      signal?.removeEventListener("abort", done)
+    }
+
+    const done = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve()
+    }
+
+    // Avoid registering listeners for sources that have already completed.
+    if (signal?.aborted || !browser.isConnected()) {
+      done()
+      return
+    }
+
+    browser.on("disconnected", done)
+    signal?.addEventListener("abort", done, { once: true })
+
+    // Recheck after registration to close the check/register race.
+    if (signal?.aborted || !browser.isConnected()) {
+      done()
+      return
+    }
+
+    timer = setTimeout(done, timeoutMs)
+  })
+}
