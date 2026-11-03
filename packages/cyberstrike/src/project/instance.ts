@@ -24,18 +24,42 @@ export const Instance = {
     if (!existing) {
       Log.Default.info("creating instance", { directory: input.directory })
       existing = iife(async () => {
+        const startedAt = Date.now()
+        Log.Default.info("instance initialization stage", {
+          stage: "project-resolution-start",
+          directory: input.directory,
+        })
         const { project, sandbox } = await Project.fromDirectory(input.directory)
+        Log.Default.info("instance initialization stage", {
+          stage: "project-resolution-complete",
+          directory: input.directory,
+          projectID: project.id,
+          duration: Date.now() - startedAt,
+        })
         const ctx = {
           directory: input.directory,
           worktree: sandbox,
           project,
         }
         await context.provide(ctx, async () => {
-          await input.init?.()
+          if (!input.init) return
+          const bootstrapStartedAt = Date.now()
+          Log.Default.info("instance initialization stage", {
+            stage: "bootstrap-start",
+            directory: input.directory,
+          })
+          await input.init()
+          Log.Default.info("instance initialization stage", {
+            stage: "bootstrap-complete",
+            directory: input.directory,
+            duration: Date.now() - bootstrapStartedAt,
+          })
         })
         return ctx
       })
       cache.set(input.directory, existing)
+    } else {
+      Log.Default.debug("instance cache hit", { directory: input.directory })
     }
     const ctx = await existing
     return context.provide(ctx, async () => {
