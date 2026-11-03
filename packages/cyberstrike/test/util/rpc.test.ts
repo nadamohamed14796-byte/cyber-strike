@@ -9,6 +9,18 @@ const scope = globalThis as typeof globalThis & {
 const originalOnMessage = Object.getOwnPropertyDescriptor(scope, "onmessage")
 const originalPostMessage = Object.getOwnPropertyDescriptor(scope, "postMessage")
 
+type RpcMessageTarget = {
+  onmessage: ((this: Worker, event: MessageEvent<any>) => unknown) | null
+}
+
+async function dispatch(target: RpcMessageTarget, payload: unknown) {
+  const handler = target.onmessage
+  if (!handler) throw new Error("RPC message handler is not registered")
+  await Reflect.apply(handler, target, [
+    new MessageEvent("message", { data: JSON.stringify(payload) }),
+  ])
+}
+
 afterEach(() => {
   if (originalOnMessage) Object.defineProperty(scope, "onmessage", originalOnMessage)
   else Reflect.deleteProperty(scope, "onmessage")
@@ -72,15 +84,11 @@ describe("util.rpc", () => {
       id: 0,
     })
 
-    target.onmessage!(
-      new MessageEvent("message", {
-        data: JSON.stringify({
-          type: "rpc.error",
-          id: 0,
-          error: { name: "TypeError", message: "worker request failed" },
-        }),
-      }),
-    )
+    await dispatch(target, {
+      type: "rpc.error",
+      id: 0,
+      error: { name: "TypeError", message: "worker request failed" },
+    })
 
     await expect(pending).rejects.toMatchObject({
       name: "TypeError",
@@ -99,20 +107,12 @@ describe("util.rpc", () => {
     const client = Rpc.client<{ read: (input: string) => Promise<string> }>(target)
 
     const pending = client.call("read", "value")
-    target.onmessage!(
-      new MessageEvent("message", {
-        data: JSON.stringify({ type: "rpc.result", id: 0, result: "ok" }),
-      }),
-    )
+    await dispatch(target, { type: "rpc.result", id: 0, result: "ok" })
     await expect(pending).resolves.toBe("ok")
 
     const received: unknown[] = []
     client.on("ready", (value) => received.push(value))
-    target.onmessage!(
-      new MessageEvent("message", {
-        data: JSON.stringify({ type: "rpc.event", event: "ready", data: { state: "up" } }),
-      }),
-    )
+    await dispatch(target, { type: "rpc.event", event: "ready", data: { state: "up" } })
     expect(received).toEqual([{ state: "up" }])
   })
 })
