@@ -338,6 +338,7 @@ for (const key of Object.keys(binaries)) {
   for (const requiredSkill of [
     "target-workspace-workflow/SKILL.md",
     "recon-master/SKILL.md",
+    "recon-master/RECON_CHAPTERS.md",
     "recon-master/RECON_PHASE_TOOL_MATRIX.md",
     "community-tool-selection/SKILL.md",
     "attack-javascript-analysis/SKILL.md",
