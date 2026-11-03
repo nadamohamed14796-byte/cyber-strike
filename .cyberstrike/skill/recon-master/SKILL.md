@@ -30,6 +30,7 @@ chains_with:
   - attack-session
   - attack-exchange-owa
   - attack-oauth
+  - attack-metrics-exposure
 ---
 # Recon Master — Evidence-driven Recon Router
 
@@ -89,6 +90,7 @@ Load a specialist only after its trigger is observed; chains_with is discoverabi
 | GitLab CI configuration or build/deploy trust boundary is observed | cicd-attacks |
 | A source/build artifact or source map exposes application source/configuration | attack-source-leak |
 | A log/debug/exception artifact discloses internal or sensitive information | attack-information-disclosure; use attack-phpinfo-exposure only for an actual PHP configuration artifact |
+| A public metrics/monitoring endpoint exposes operational telemetry or sensitive labels/configuration | attack-metrics-exposure |
 | Visual evidence points to an admin-only function, tenant/object boundary, or authentication/session flow and normal HTTP evidence corroborates it | attack-bfla, attack-idor-automation, attack-auth-bypass, or attack-session according to the observed boundary |
 | The owned domain publishes mail/identity endpoints or an actual OAuth flow is observed | attack-exchange-owa for attributable Exchange/OWA surfaces; attack-oauth for an observed OAuth/OIDC flow |
 
