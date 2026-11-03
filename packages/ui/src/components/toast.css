@@ -10,7 +10,8 @@
   max-height: calc(100dvh - 96px);
   width: 100%;
   overflow: hidden;
-  pointer-events: none;
+  /* Kobalte marks this region as a top layer; keep the non-blocking overlay transparent to hit testing. */
+  pointer-events: none !important;
 
   [data-slot="toast-list"] {
     pointer-events: none;
