@@ -4,6 +4,8 @@ import { TaskTool } from "../tool/task"
 import type { Tool } from "../tool/tool"
 import { requestIDFromRecentPromptTexts } from "../tool/task-resume"
 import { Vulnerability } from "../session/vulnerability"
+import { TargetMemory } from "../target"
+import { reconPhaseGate } from "../target/recon-gate"
 import { evaluateImpactHunterGate, type ImpactHunterMode } from "./impact-hunter-gate"
 import { redactTargetNoteSecrets } from "../target/redact"
 import { createModeAwareFlightRegistry } from "./mode-aware-flight"
@@ -66,6 +68,24 @@ async function dispatch(
     }
     const reporter = reporterID ? await Agent.get(reporterID) : undefined
     if (!reporter) return { started: false, mode, reason: "reporting agent is not registered: " + String(ctx.agent) }
+
+    // Impact Hunter may run active validation and must never be auto-dispatched
+    // during recon-only collection. Require the explicit vulnerability-testing
+    // checkpoint for both proof-gap and approved-impact investigations.
+    const workspace = finding.target_id
+      ? TargetMemory.list().find((item) => item.id === finding.target_id)
+      : undefined
+    if (!workspace) {
+      return { started: false, mode, reason: "Impact Hunter requires a finding linked to an existing target workspace." }
+    }
+    const testingGate = await reconPhaseGate(workspace, "vulnerability_testing")
+    if (!testingGate.allowed) {
+      return {
+        started: false,
+        mode,
+        reason: "Impact Hunter was not dispatched because explicit vulnerability_testing is not active: " + testingGate.reason,
+      }
+    }
 
     const preferredRequestID = requestIDFromRecentPromptTexts(
       ctx.messages
