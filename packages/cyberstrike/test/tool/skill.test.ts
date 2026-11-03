@@ -347,7 +347,7 @@ Use this skill.
 `,
         )
         await Bun.write(path.join(skillDir, "scripts", "demo.txt"), "demo")
-        await Bun.write(path.join(skillDir, "RECON_CHAPTERS.md"), "## 01. Example recon procedure\\n")
+        await Bun.write(path.join(skillDir, "RECON_CHAPTERS.md"), "## 01. Example recon procedure\n")
         await fs.mkdir(path.join(skillDir, "reference"), { recursive: true })
         for (let index = 0; index < 15; index++) {
           await Bun.write(path.join(skillDir, "reference", "part-" + index + ".md"), "reference " + index)
