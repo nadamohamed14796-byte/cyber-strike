@@ -109,6 +109,15 @@ export const AttackScriptTool = Tool.define("attack_script", {
         return undefined
       }
     }
+    const normalizeHostTarget = (value: string): string | undefined => {
+      try {
+        const url = new URL(value.includes("://") ? value : "https://" + value)
+        if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
+        return "https://" + url.hostname + "/"
+      } catch {
+        return undefined
+      }
+    }
 
     // The offline JWT transformer never sends a request. Every other script
     // must be anchored to a concrete, persisted in-scope target.
@@ -135,7 +144,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
         : [first]
       if (!domains.length) return denied("The supplied subdomain file contains no candidate hosts.")
       for (const domain of domains) {
-        const target = normalizeTarget(domain)
+        const target = normalizeHostTarget(domain)
         if (!target) return denied("Invalid takeover candidate host: " + domain)
         scriptTargets.push(target)
       }
@@ -148,7 +157,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       const names = namesIndex >= 0
         ? args.slice(namesIndex + 1).filter((item) => !item.startsWith("--"))
         : (() => {
-            const base = first.replace(/\./g, "-").replace(/\s/g, "-").toLowerCase()
+            const base = new URL(baseTarget).hostname.replace(/\./g, "-").replace(/\s/g, "-").toLowerCase()
             return [
               base, `${base}-dev`, `${base}-staging`, `${base}-prod`, `${base}-backup`,
               `${base}-assets`, `${base}-static`, `${base}-media`, `${base}-uploads`,
@@ -177,7 +186,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
       if (args.includes("--probe")) {
         return denied("Wayback --probe is disabled because the script cannot scope-check every archived URL before sending HEAD requests. Use the scoped HTTP request tools for verified in-scope URLs.")
       }
-      const target = first ? normalizeTarget(first) : undefined
+      const target = first ? normalizeHostTarget(first) : undefined
       if (!target) return denied("Provide the exact in-scope domain as the first script argument.")
       scriptTargets.push(target)
     }
