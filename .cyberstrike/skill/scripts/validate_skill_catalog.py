@@ -72,6 +72,28 @@ def scalar(meta: str, key: str) -> str | None:
     return value or None
 
 
+def body_description(text: str) -> str | None:
+    """Read the first prose paragraph in a Markdown Description section."""
+    body = re.sub(r"\\A---\\r?\\n.*?\\r?\\n---\\s*", "", text, count=1, flags=re.DOTALL)
+    match = re.search(
+        r"^#{1,6}\\s+description\\s*#*\\s*\\r?\\n(.*?)(?=^#{1,6}\\s+|\\Z)",
+        body,
+        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        return None
+    section = re.sub(r"```.*?```", " ", match.group(1), flags=re.DOTALL)
+    for paragraph in re.split(r"\\n\\s*\\n", section):
+        description = re.sub(r"^\\s*(?:[-*+]\\s+|>\\s*)", "", paragraph, flags=re.MULTILINE)
+        description = re.sub(r"\\[([^\\]]+)\\]\\([^)]+\\)", r"\\1", description)
+        description = re.sub(r"`([^`]+)`", r"\\1", description)
+        description = re.sub(r"<[^>]+>", " ", description)
+        description = re.sub(r"[*_~]{1,3}", "", description)
+        description = re.sub(r"\\s+", " ", description).strip()
+        if description:
+            return description[:512]
+    return None
+
 def yaml_list(meta: str, key: str) -> list[str]:
     lines = meta.splitlines()
     for index, line in enumerate(lines):
@@ -115,6 +137,20 @@ prerequisites:
     meta = frontmatter(sample)
     assert meta is not None
     assert scalar(meta, "name") == "sample-skill"
+    body_sample = """---
+name: cis-skill
+---
+# Audit control
+
+## Description
+
+The audit log directory must be protected from unauthorized modification.
+
+## Rationale
+
+Forensic evidence must remain available.
+"""
+    assert body_description(body_sample) == "The audit log directory must be protected from unauthorized modification."
     assert yaml_list(meta, "chains_with") == ["first", "second"]
     assert yaml_list(meta, "prerequisites") == ["first", "second"]
     aliases = {
@@ -192,7 +228,7 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
             continue
 
         name = scalar(meta, "name")
-        description = scalar(meta, "description")
+        description = scalar(meta, "description") or body_description(text)
         if not name:
             message = f"{label}: required name field is missing"
             (errors if is_direct_skill else warnings).append(message)
