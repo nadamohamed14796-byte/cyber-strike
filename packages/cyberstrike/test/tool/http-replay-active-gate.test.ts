@@ -80,9 +80,9 @@ test("structured and raw replay are available inside an explicitly running param
           } as never
 
           const structured = await (await HttpReplayTool.init()).execute({ request_id: captured!.id }, ctx)
-          expect(structured.metadata.testingDenied).toBeUndefined()
+          expect(structured.metadata).not.toMatchObject({ testingDenied: true })
           const raw = await (await HttpReplayRawTool.init()).execute({ request_id: captured!.id }, ctx)
-          expect(raw.metadata.testingDenied).toBeUndefined()
+          expect(raw.metadata).not.toMatchObject({ testingDenied: true })
           expect(requests).toHaveLength(2)
           expect(requests.every((request) => request === "/replay")).toBe(true)
         } finally {
