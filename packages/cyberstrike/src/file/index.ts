@@ -657,8 +657,17 @@ export namespace File {
       kind === "file" ? result.files : kind === "directory" ? result.dirs : [...result.files, ...result.dirs]
 
     const searchLimit = kind === "directory" && !preferHidden ? limit * 20 : limit
-    const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((r) => r.target)
-    const output = kind === "directory" ? sortHiddenLast(sorted).slice(0, limit) : sorted
+    // Treat path-like input as a path, not only as a fuzzy string. Exact or
+    // partial relative paths must remain discoverable even in large workspaces
+    // where similarly named files can crowd the fuzzy result window.
+    const normalizedQuery = query.replaceAll("\\", "/").toLowerCase()
+    const pathMatches =
+      query.includes("/") || query.includes("\\")
+        ? items.filter((item) => item.replaceAll("\\", "/").toLowerCase().includes(normalizedQuery))
+        : []
+    const fuzzy = fuzzysort.go(query, items, { limit: searchLimit }).map((r) => r.target)
+    const sorted = [...new Set([...pathMatches, ...fuzzy])]
+    const output = kind === "directory" ? sortHiddenLast(sorted).slice(0, limit) : sorted.slice(0, limit)
 
     log.info("search", { query, kind, results: output.length })
     return output

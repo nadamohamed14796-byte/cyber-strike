@@ -72,7 +72,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         await gotoSession()
         return await callback({ directory, slug, gotoSession })
       } finally {
-        await cleanupTestProject(directory)
+        await cleanupTestProject(directory, page)
       }
     })
   },

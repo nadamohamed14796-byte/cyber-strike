@@ -1648,8 +1648,11 @@ export default function Layout(props: ParentProps) {
       }),
     )
 
-    const pending = WorktreeState.pending(created.directory)
-    setBusy(created.directory, pending)
+    // The create endpoint returns only after checkout and instance bootstrap
+    // finish. Mark ready from the response too, so a missed/reconnecting event
+    // stream can never leave this workspace permanently disabled.
+    WorktreeState.ready(created.directory)
+    setBusy(created.directory, false)
     setStore("workspaceExpanded", key, true)
     if (key !== created.directory) {
       setStore("workspaceExpanded", created.directory, true)

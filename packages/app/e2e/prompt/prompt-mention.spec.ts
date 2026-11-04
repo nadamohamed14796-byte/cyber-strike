@@ -1,12 +1,15 @@
 import { test, expect } from "../fixtures"
 import { promptSelector } from "../selectors"
 
-test("smoke @mention inserts file pill token", async ({ page, gotoSession }) => {
+test("smoke @mention inserts file pill token", async ({ page, gotoSession, sdk }) => {
   await gotoSession()
 
   await page.locator(promptSelector).click()
   const sep = process.platform === "win32" ? "\\" : "/"
   const file = ["packages", "app", "package.json"].join(sep)
+  // Assert the server can return the nested path independently of the editor.
+  const indexed = await sdk.find.files({ query: file, dirs: "true", limit: 100 }).then((x) => x.data ?? [])
+  expect(indexed.some((candidate) => candidate.replaceAll("\\", "/") === file.replaceAll("\\", "/"))).toBe(true)
   const filePattern = /packages[\\/]+app[\\/]+\s*package\.json/
 
   await page.keyboard.type(`@${file}`)

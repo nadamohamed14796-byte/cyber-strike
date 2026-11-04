@@ -124,7 +124,7 @@ test("can create a workspace", async ({ page, withProject }) => {
 
     await expect(page.locator(workspaceItemSelector(workspaceSlug)).first()).toBeVisible()
 
-    await cleanupTestProject(workspaceDir)
+    await cleanupTestProject(workspaceDir, page)
   })
 })
 

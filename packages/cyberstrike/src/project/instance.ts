@@ -23,7 +23,7 @@ export const Instance = {
     let existing = cache.get(input.directory)
     if (!existing) {
       Log.Default.info("creating instance", { directory: input.directory })
-      existing = iife(async () => {
+      const pending = iife(async () => {
         const startedAt = Date.now()
         Log.Default.info("instance initialization stage", {
           stage: "project-resolution-start",
@@ -48,7 +48,14 @@ export const Instance = {
             stage: "bootstrap-start",
             directory: input.directory,
           })
-          await input.init()
+          try {
+            await input.init()
+          } catch (error) {
+            // A failed bootstrap may already have registered watchers, file scans,
+            // or other instance state. Dispose those resources before allowing a retry.
+            await State.dispose(input.directory)
+            throw error
+          }
           Log.Default.info("instance initialization stage", {
             stage: "bootstrap-complete",
             directory: input.directory,
@@ -56,6 +63,12 @@ export const Instance = {
           })
         })
         return ctx
+      })
+      existing = pending.catch((error) => {
+        // Never keep a rejected initialization promise in the cache. A later
+        // request must be able to retry after the original cause is corrected.
+        if (cache.get(input.directory) === existing) cache.delete(input.directory)
+        throw error
       })
       cache.set(input.directory, existing)
     } else {

@@ -205,7 +205,11 @@ export async function createTestProject() {
   return root
 }
 
-export async function cleanupTestProject(directory: string) {
+export async function cleanupTestProject(directory: string, page?: Page) {
+  // Unmount the project UI first so it cannot issue new file/session requests
+  // while its instance is being disposed and its directory is removed.
+  if (page) await page.goto("about:blank").catch(() => undefined)
+
   // Release project-scoped watchers, searches, and services before deleting the
   // temporary worktree. Otherwise an in-flight file scan can observe ENOENT.
   await createSdk(directory).instance.dispose({ directory }).catch(() => undefined)

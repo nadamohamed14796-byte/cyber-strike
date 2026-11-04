@@ -205,3 +205,71 @@ test("file enumeration keeps genuine missing-directory errors visible", async ()
     path: missing,
   })
 })
+
+test("file search prioritizes slash-normalized nested paths before fuzzy matches", async () => {
+  await using tmp = await tmpdir()
+  const originalFiles = Ripgrep.files
+  const target = path.join("packages", "app", "package.json")
+  const query = target.split(path.sep).join("\\")
+
+  Ripgrep.files = (async function* () {
+    for (let index = 0; index < 150; index++) {
+      yield path.join("packages", "app-copy-" + index, "package.json")
+    }
+    yield target
+  }) as typeof Ripgrep.files
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        File.init()
+        const results = await File.search({ query, dirs: true, limit: 5 })
+        expect(results[0]).toBe(target)
+        expect(results).toContain(target)
+        await Instance.dispose()
+      },
+    })
+  } finally {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: () => Instance.dispose(),
+    }).catch(() => undefined)
+    Ripgrep.files = originalFiles
+  }
+})
+
+test("failed instance initialization disposes partial state and can be retried", async () => {
+  await using tmp = await tmpdir()
+  let disposed = false
+
+  await expect(
+    Instance.provide({
+      directory: tmp.path,
+      init: async () => {
+        const state = Instance.state(
+          () => ({ active: true }),
+          async () => {
+            disposed = true
+          },
+        )
+        state()
+        throw new Error("bootstrap failed")
+      },
+      fn: () => undefined,
+    }),
+  ).rejects.toThrow("bootstrap failed")
+
+  expect(disposed).toBe(true)
+
+  const result = await Instance.provide({
+    directory: tmp.path,
+    fn: () => "recovered",
+  })
+  expect(result).toBe("recovered")
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: () => Instance.dispose(),
+  })
+})

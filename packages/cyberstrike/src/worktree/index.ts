@@ -336,13 +336,14 @@ export namespace Worktree {
       throw new NotGitError({ message: "Worktrees are only supported for git projects" })
     }
 
-    const root = path.join(Global.Path.data, "worktree", Instance.project.id)
+    const projectID = Instance.project.id
+    const root = path.join(Global.Path.data, "worktree", projectID)
     await fs.mkdir(root, { recursive: true })
 
     const base = input?.name ? slug(input.name) : ""
     const info = await candidate(root, base || undefined)
 
-    const created = await $`git worktree add --no-checkout -b ${info.branch} ${info.directory}`
+    const created = await `git worktree add --no-checkout -b ${info.branch} ${info.directory}`
       .quiet()
       .nothrow()
       .cwd(Instance.worktree)
@@ -350,81 +351,82 @@ export namespace Worktree {
       throw new CreateFailedError({ message: errorText(created) || "Failed to create git worktree" })
     }
 
-    await Project.addSandbox(Instance.project.id, info.directory).catch(() => undefined)
-
-    const projectID = Instance.project.id
-    const extra = input?.startCommand?.trim()
-    setTimeout(() => {
-      let readyEmitted = false
-      const start = async () => {
-        const populated = await $`git reset --hard`.quiet().nothrow().cwd(info.directory)
-        if (populated.exitCode !== 0) {
-          const message = errorText(populated) || "Failed to populate worktree"
-          log.error("worktree checkout failed", { directory: info.directory, message })
-          emitSafe({
-            directory: info.directory,
-            payload: {
-              type: Event.Failed.type,
-              properties: {
-                message,
-              },
-            },
-          })
-          return
-        }
-
-        const booted = await Instance.provide({
-          directory: info.directory,
-          init: InstanceBootstrap,
-          fn: () => undefined,
-        })
-          .then(() => true)
-          .catch((error) => {
-            const message = error instanceof Error ? error.message : String(error)
-            log.error("worktree bootstrap failed", { directory: info.directory, message })
-            emitSafe({
-              directory: info.directory,
-              payload: {
-                type: Event.Failed.type,
-                properties: {
-                  message,
-                },
-              },
-            })
-            return false
-          })
-        if (!booted) return
-        readyEmitted = true
-
-        emitSafe({
-          directory: info.directory,
-          payload: {
-            type: Event.Ready.type,
-            properties: {
-              name: info.name,
-              branch: info.branch,
-            },
-          },
-        })
-
-        await runStartScripts(info.directory, { projectID, extra })
+    let bootstrapped = false
+    try {
+      const populated = await `git reset --hard`.quiet().nothrow().cwd(info.directory)
+      if (populated.exitCode !== 0) {
+        throw new CreateFailedError({ message: errorText(populated) || "Failed to populate worktree" })
       }
 
-      void start().catch((error) => {
-        const message = error instanceof Error ? error.message : String(error)
-        log.error("worktree start task failed", { directory: info.directory, error })
-        // Do not leave the sidebar workspace permanently busy on an unexpected startup failure.
-        if (!readyEmitted) {
-          emitSafe({
-            directory: info.directory,
-            payload: {
-              type: Event.Failed.type,
-              properties: { message },
-            },
-          })
-        }
+      // Do not report a successful create until this workspace can accept requests.
+      // The UI uses the response as a readiness fallback if the event stream reconnects.
+      await Instance.provide({
+        directory: info.directory,
+        init: InstanceBootstrap,
+        fn: () => undefined,
       })
-    }, 0)
+      bootstrapped = true
+
+      // Persist the root-to-worktree relationship before publishing readiness.
+      // A persistence failure must not leave a usable-looking orphan in the sidebar.
+      await Project.addSandbox(projectID, info.directory)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.error("worktree creation failed", { directory: info.directory, message })
+
+      if (bootstrapped) {
+        await Instance.provide({
+          directory: info.directory,
+          fn: () => Instance.dispose(),
+        }).catch((disposeError) => {
+          log.warn("failed to dispose incomplete worktree instance", {
+            directory: info.directory,
+            error: disposeError,
+          })
+        })
+      }
+
+      await Project.removeSandbox(projectID, info.directory).catch(() => undefined)
+
+      const removed = await `git worktree remove --force ${info.directory}`
+        .quiet()
+        .nothrow()
+        .cwd(Instance.worktree)
+      if (removed.exitCode !== 0) {
+        log.warn("failed to unregister incomplete worktree; pruning git metadata", {
+          directory: info.directory,
+          error: errorText(removed),
+        })
+        await fs.rm(info.directory, { recursive: true, force: true }).catch(() => undefined)
+        await `git worktree prune`.quiet().nothrow().cwd(Instance.worktree)
+      }
+      await fs.rm(info.directory, { recursive: true, force: true }).catch(() => undefined)
+      const deleted = await `git branch -D ${info.branch}`.quiet().nothrow().cwd(Instance.worktree)
+      if (deleted.exitCode !== 0) {
+        log.warn("failed to delete incomplete worktree branch", {
+          branch: info.branch,
+          error: errorText(deleted),
+        })
+      }
+
+      throw new CreateFailedError({ message })
+    }
+
+    emitSafe({
+      directory: info.directory,
+      payload: {
+        type: Event.Ready.type,
+        properties: {
+          name: info.name,
+          branch: info.branch,
+        },
+      },
+    })
+
+    queueStartScripts(info.directory, {
+      projectID,
+      extra: input?.startCommand?.trim(),
+    })
 
     return info
   })

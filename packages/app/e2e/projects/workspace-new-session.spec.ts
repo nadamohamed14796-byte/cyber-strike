@@ -138,6 +138,7 @@ test("new sessions from sidebar workspace actions stay in selected workspace", a
           ),
         ),
       )
+      await page.goto("about:blank").catch(() => undefined)
       await Promise.all(workspaces.map((workspace) => cleanupTestProject(workspace.directory)))
     }
   })
