@@ -104,6 +104,7 @@ export const TuiThreadCommand = cmd({
         describe: "agent to use",
       }),
   handler: async (args) => {
+    let workerToTerminate: Worker | undefined
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
     const unguard = win32InstallCtrlCGuard()
@@ -147,6 +148,7 @@ export const TuiThreadCommand = cmd({
           Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
         ),
       })
+      workerToTerminate = worker
       Log.Default.info("TUI startup stage", { stage: "worker-created" })
       const client = Rpc.client<typeof rpc>(worker)
       worker.onerror = (e) => {
@@ -294,6 +296,7 @@ export const TuiThreadCommand = cmd({
       await tuiPromise
       Log.Default.info("TUI startup stage", { stage: "tui-exited" })
     } finally {
+      workerToTerminate?.terminate()
       unguard?.()
     }
   },
