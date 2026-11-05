@@ -198,6 +198,7 @@ export const TuiThreadCommand = cmd({
         globalConfig?.server?.port !== undefined ||
         globalConfig?.server?.hostname !== undefined ||
         globalConfig?.server?.mdns === true
+      const readyStartedAt = Date.now()
       Log.Default.info("TUI startup stage", { stage: "worker-readiness-start" })
       let readyTimeout: ReturnType<typeof setTimeout> | undefined
       try {
@@ -212,11 +213,12 @@ export const TuiThreadCommand = cmd({
         ])
         Log.Default.info("TUI startup stage", {
           stage: "worker-readiness-complete",
-          duration: readyTimeout ? 90_000 - Math.max(0, 90_000 - 90_000) : undefined,
+          duration: Date.now() - readyStartedAt,
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         Log.Default.error("TUI worker readiness failed", { error: message })
+        client.fail(error)
         worker.terminate()
         UI.error("Failed to initialize the local engine: " + message)
         process.exitCode = 1
