@@ -18,7 +18,7 @@ async function dispatch(target: { onmessage: ((this: Worker, event: MessageEvent
 describe("util.rpc", () => {
   test("returns handler exceptions to the caller instead of leaving requests pending", async () => {
     const responses: string[] = []
-    let receive: ((event: MessageEvent<string>) => void) | undefined
+    let receive: ((event: MessageEvent<string>) => void | Promise<void>) | undefined
     const target: RpcMessageTarget = {
       addEventListener(_type, listener) {
         receive = listener
