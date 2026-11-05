@@ -243,7 +243,7 @@ export const TuiThreadCommand = cmd({
       let readyTimeout: ReturnType<typeof setTimeout> | undefined
       try {
         await Promise.race([
-          client.call("ready", undefined),
+          client.call("ready", { includeSessions: Boolean(args.continue || args.session) }),
           new Promise<never>((_, reject) => {
             readyTimeout = setTimeout(
               () => reject(new Error("Local engine did not become ready within 90 seconds")),
