@@ -780,7 +780,7 @@ export namespace Provider {
     }
   }
 
-  const state = Instance.state(async () => {
+  const initState = async () => {
     using _ = log.time("state")
     const config = await Config.get()
     const modelsDev = await ModelsDev.get()
@@ -1069,7 +1069,9 @@ export namespace Provider {
       sdk,
       modelLoaders,
     }
-  })
+  }
+  const state = Instance.state(initState)
+  ModelsDev.onRefresh(() => Instance.resetState(initState))
 
   export async function list() {
     return state().then((state) => state.providers)
