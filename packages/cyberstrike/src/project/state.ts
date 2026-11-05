@@ -28,6 +28,35 @@ export namespace State {
     }
   }
 
+  export async function reset(init: () => unknown) {
+    const tasks: Promise<void>[] = []
+    for (const [key, entries] of [...recordsByKey.entries()]) {
+      const entry = entries.get(init)
+      if (!entry) continue
+
+      // Remove only this initializer's cached value; unrelated project state stays intact.
+      entries.delete(init)
+      const label = init.name || "anonymous"
+
+      if (entry.dispose) {
+        tasks.push(
+          Promise.resolve(entry.state)
+            .then((value) => entry.dispose!(value))
+            .catch((error) => {
+              log.error("Error while resetting state:", { error, key, init: label })
+            }),
+        )
+      }
+
+      if (entries.size === 0 && recordsByKey.get(key) === entries) {
+        recordsByKey.delete(key)
+      } else {
+        log.debug("state reset", { key, init: label })
+      }
+    }
+    await Promise.all(tasks)
+  }
+
   export async function dispose(key: string) {
     const entries = recordsByKey.get(key)
     if (!entries) return
