@@ -151,16 +151,41 @@ export const TuiThreadCommand = cmd({
       workerToTerminate = worker
       Log.Default.info("TUI startup stage", { stage: "worker-created" })
       const client = Rpc.client<typeof rpc>(worker)
+      let rejectWorkerReady: ((error: Error) => void) | undefined
       worker.onerror = (e) => {
         const error = e.error instanceof Error ? e.error : new Error(e.message || "CyberStrike worker failed")
         Log.Default.error("TUI worker failed", { error })
         client.fail(error)
+        rejectWorkerReady?.(error)
       }
       worker.onmessageerror = () => {
         const error = new Error("CyberStrike worker sent an unreadable message")
         Log.Default.error("TUI worker message could not be deserialized", { error })
         client.fail(error)
+        rejectWorkerReady?.(error)
       }
+      const workerReadyPromise = new Promise<void>((resolve, reject) => {
+        let settled = false
+        let timeout: ReturnType<typeof setTimeout> | undefined
+        let unsubscribe = () => {}
+        const finish = () => {
+          if (settled) return false
+          settled = true
+          if (timeout) clearTimeout(timeout)
+          unsubscribe()
+          rejectWorkerReady = undefined
+          return true
+        }
+        unsubscribe = client.on("worker.ready", () => {
+          if (finish()) resolve()
+        })
+        rejectWorkerReady = (error) => {
+          if (finish()) reject(error)
+        }
+        timeout = setTimeout(() => {
+          if (finish()) reject(new Error("Worker RPC transport did not become ready within 15 seconds"))
+        }, 15_000)
+      })
       process.on("uncaughtException", (e) => {
         Log.Default.error(e)
       })
@@ -175,6 +200,19 @@ export const TuiThreadCommand = cmd({
       process.on("SIGUSR2", async () => {
         await client.call("reload", undefined)
       })
+
+      try {
+        await workerReadyPromise
+        Log.Default.info("TUI startup stage", { stage: "worker-rpc-transport-ready" })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        Log.Default.error("TUI worker transport failed", { error: message })
+        client.fail(error)
+        worker.terminate()
+        UI.error("Failed to start the local engine transport: " + message)
+        process.exitCode = 1
+        return
+      }
 
       Log.Default.info("TUI startup stage", {
         stage: "prompt-input-start",
