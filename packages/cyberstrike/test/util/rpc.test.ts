@@ -1,19 +1,13 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Rpc } from "../../src/util/rpc"
 
-const scope = globalThis as typeof globalThis & {
-  onmessage?: ((event: MessageEvent<string>) => unknown) | null
-  postMessage?: (message: string) => void
-}
-
-const originalOnMessage = Object.getOwnPropertyDescriptor(scope, "onmessage")
-const originalPostMessage = Object.getOwnPropertyDescriptor(scope, "postMessage")
-
 type RpcMessageTarget = {
-  onmessage: ((this: Worker, event: MessageEvent<any>) => unknown) | null
+  addEventListener?: (type: "message", listener: (event: MessageEvent<string>) => void) => void
+  onmessage?: ((event: MessageEvent<string>) => unknown) | null
+  postMessage: (message: string) => void
 }
 
-async function dispatch(target: RpcMessageTarget, payload: unknown) {
+async function dispatch(target: { onmessage: ((this: Worker, event: MessageEvent<any>) => unknown) | null }, payload: unknown) {
   const handler = target.onmessage
   if (!handler) throw new Error("RPC message handler is not registered")
   await Reflect.apply(handler, target as unknown as Worker, [
@@ -21,37 +15,30 @@ async function dispatch(target: RpcMessageTarget, payload: unknown) {
   ])
 }
 
-afterEach(() => {
-  if (originalOnMessage) Object.defineProperty(scope, "onmessage", originalOnMessage)
-  else Reflect.deleteProperty(scope, "onmessage")
-
-  if (originalPostMessage) Object.defineProperty(scope, "postMessage", originalPostMessage)
-  else Reflect.deleteProperty(scope, "postMessage")
-})
-
 describe("util.rpc", () => {
   test("returns handler exceptions to the caller instead of leaving requests pending", async () => {
     const responses: string[] = []
-    Object.defineProperty(scope, "onmessage", {
-      configurable: true,
-      writable: true,
-      value: null,
-    })
-    Object.defineProperty(scope, "postMessage", {
-      configurable: true,
-      writable: true,
-      value: (message: string) => responses.push(message),
-    })
-
-    Rpc.listen({
-      fail: async () => {
-        throw new TypeError("worker request failed")
+    let receive: ((event: MessageEvent<string>) => void) | undefined
+    const target: RpcMessageTarget = {
+      addEventListener(_type, listener) {
+        receive = listener
       },
-    })
+      postMessage(message) {
+        responses.push(message)
+      },
+    }
 
-    const handler = scope.onmessage
-    expect(handler).toBeFunction()
-    await handler!(new MessageEvent("message", {
+    Rpc.listen(
+      {
+        fail: async () => {
+          throw new TypeError("worker request failed")
+        },
+      },
+      target,
+    )
+
+    expect(receive).toBeFunction()
+    await receive!(new MessageEvent("message", {
       data: JSON.stringify({ type: "rpc.request", method: "fail", input: undefined, id: 7 }),
     }))
 
@@ -64,6 +51,24 @@ describe("util.rpc", () => {
         message: "worker request failed",
       },
     })
+  })
+
+  test("uses onmessage when EventTarget listeners are unavailable", async () => {
+    const responses: string[] = []
+    const target: RpcMessageTarget = {
+      onmessage: null,
+      postMessage(message) {
+        responses.push(message)
+      },
+    }
+
+    Rpc.listen({ echo: async (input) => input }, target)
+    expect(target.onmessage).toBeFunction()
+    await target.onmessage!(new MessageEvent("message", {
+      data: JSON.stringify({ type: "rpc.request", method: "echo", input: "ok", id: 8 }),
+    }))
+
+    expect(JSON.parse(responses[0]!)).toEqual({ type: "rpc.result", result: "ok", id: 8 })
   })
 
   test("rejects a pending client call when the worker returns rpc.error", async () => {
@@ -133,5 +138,22 @@ describe("util.rpc", () => {
     client.on("ready", (value) => received.push(value))
     await dispatch(target, { type: "rpc.event", event: "ready", data: { state: "up" } })
     expect(received).toEqual([{ state: "up" }])
+  })
+
+  test("receives requests immediately while the worker continues asynchronous startup", async () => {
+    const worker = new Worker(new URL("../fixtures/rpc-worker.ts", import.meta.url))
+    const client = Rpc.client<{ echo: (input: string) => Promise<string> }>(worker)
+
+    try {
+      const response = await Promise.race([
+        client.call("echo", "sent-during-startup"),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("worker RPC did not answer during startup")), 5000),
+        ),
+      ])
+      expect(response).toBe("sent-during-startup")
+    } finally {
+      worker.terminate()
+    }
   })
 })
