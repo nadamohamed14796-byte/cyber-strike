@@ -198,6 +198,32 @@ export const TuiThreadCommand = cmd({
         globalConfig?.server?.port !== undefined ||
         globalConfig?.server?.hostname !== undefined ||
         globalConfig?.server?.mdns === true
+      Log.Default.info("TUI startup stage", { stage: "worker-readiness-start" })
+      let readyTimeout: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          client.call("ready", undefined),
+          new Promise<never>((_, reject) => {
+            readyTimeout = setTimeout(
+              () => reject(new Error("Local engine did not become ready within 90 seconds")),
+              90_000,
+            )
+          }),
+        ])
+        Log.Default.info("TUI startup stage", {
+          stage: "worker-readiness-complete",
+          duration: readyTimeout ? 90_000 - Math.max(0, 90_000 - 90_000) : undefined,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        Log.Default.error("TUI worker readiness failed", { error: message })
+        worker.terminate()
+        UI.error("Failed to initialize the local engine: " + message)
+        process.exitCode = 1
+        return
+      } finally {
+        if (readyTimeout) clearTimeout(readyTimeout)
+      }
       const explicitlySet = (name: string) =>
         process.argv.some((value) => value === `--${name}` || value.startsWith(`--${name}=`))
       const shouldStartServer =
