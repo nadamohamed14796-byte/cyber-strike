@@ -14,6 +14,7 @@ import type ParcelWatcher from "@parcel/watcher"
 import { $ } from "bun"
 import { Flag } from "@/flag/flag"
 import { readdir } from "fs/promises"
+import { watcherBindingCandidates } from "./watcher-binding"
 
 const SUBSCRIBE_TIMEOUT_MS = 10_000
 
@@ -33,15 +34,23 @@ export namespace FileWatcher {
   }
 
   const watcher = lazy((): typeof import("@parcel/watcher") | undefined => {
-    try {
-      const binding = require(
-        `@parcel/watcher-${process.platform}-${process.arch}${process.platform === "linux" ? `-${CYBERSTRIKE_LIBC || "glibc"}` : ""}`,
-      )
-      return createWrapper(binding) as typeof import("@parcel/watcher")
-    } catch (error) {
-      log.error("failed to load watcher binding", { error })
-      return
+    // CYBERSTRIKE_LIBC is injected by the production bundler only. typeof keeps
+    // raw-source execution safe when that build-time global does not exist.
+    const libcHint = typeof CYBERSTRIKE_LIBC === "undefined" ? undefined : CYBERSTRIKE_LIBC
+    const candidates = watcherBindingCandidates(process.platform, process.arch, libcHint)
+    let lastError: unknown
+
+    for (const candidate of candidates) {
+      try {
+        const binding = require(candidate)
+        return createWrapper(binding) as typeof import("@parcel/watcher")
+      } catch (error) {
+        lastError = error
+      }
     }
+
+    log.error("failed to load watcher binding", { error: lastError, candidates })
+    return
   })
 
   const state = Instance.state(
