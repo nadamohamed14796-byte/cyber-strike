@@ -145,7 +145,14 @@ describe("util.rpc", () => {
     const client = Rpc.client<{ echo: (input: string) => Promise<string> }>(worker)
 
     let timeout: ReturnType<typeof setTimeout> | undefined
+    let unsubscribe = () => {}
     try {
+      await new Promise<void>((resolve, reject) => {
+        unsubscribe = client.on("worker.ready", () => resolve())
+        timeout = setTimeout(() => reject(new Error("worker RPC transport did not become ready")), 5000)
+      })
+      if (timeout) clearTimeout(timeout)
+      timeout = undefined
       const response = await Promise.race([
         client.call("echo", "sent-during-startup"),
         new Promise<never>((_, reject) => {
@@ -155,6 +162,7 @@ describe("util.rpc", () => {
       expect(response).toBe("sent-during-startup")
     } finally {
       if (timeout) clearTimeout(timeout)
+      unsubscribe()
       worker.terminate()
     }
   })
