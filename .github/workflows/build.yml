@@ -18,8 +18,6 @@ concurrency:
 jobs:
   build:
     name: build (linux)
-    permissions:
-      contents: write
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -30,27 +28,6 @@ jobs:
 
       - name: Setup Bun and install dependencies
         uses: ./.github/actions/setup-bun
-
-      - name: Upload resolved Bun lockfile for lockfile verification
-        uses: actions/upload-artifact@v6
-        with:
-          name: resolved-bun-lockfile
-          path: bun.lock
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Commit regenerated Bun lockfile on main
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock
-          if git diff --cached --quiet; then
-            echo "Bun lockfile is already synchronized."
-          else
-            git commit -m "fix(deps): synchronize Bun lockfile"
-            git push origin HEAD:main
-          fi
 
 
       - name: Build monorepo
