@@ -25,29 +25,50 @@ export namespace Rpc {
   }
 
   export function listen(rpc: Definition) {
-    onmessage = async (evt) => {
-      const parsed = JSON.parse(evt.data)
-      if (parsed.type !== "rpc.request") return
-
-      try {
-        const handler = rpc[parsed.method]
-        if (typeof handler !== "function") {
-          throw new Error(`Unknown RPC method: ${String(parsed.method)}`)
-        }
-        const result = await handler(parsed.input)
-        postMessage(JSON.stringify({ type: "rpc.result", result, id: parsed.id }))
-      } catch (error) {
-        // Always answer a request, including failures. Otherwise the caller's
-        // promise remains pending forever and can block TUI startup.
-        postMessage(
-          JSON.stringify({
-            type: "rpc.error",
-            error: serializeError(error),
-            id: parsed.id,
-          }),
-        )
-      }
+    // Bun's WorkerGlobalScope reliably dispatches incoming messages through
+    // EventTarget. Assigning the bare `onmessage` global can leave the handler
+    // detached in some Bun worker/module combinations while postMessage still
+    // works, which makes every RPC call wait until its client-side timeout.
+    const scope = globalThis as typeof globalThis & {
+      addEventListener: (type: "message", listener: (event: MessageEvent<string>) => void) => void
+      postMessage: (message: string) => void
     }
+
+    scope.addEventListener("message", (evt) => {
+      let parsed: { type?: string; method?: string; input?: unknown; id?: number }
+      try {
+        parsed = JSON.parse(evt.data)
+      } catch (error) {
+        LogRpcError("Invalid RPC message", error)
+        return
+      }
+      if (parsed.type !== "rpc.request" || typeof parsed.id !== "number") return
+
+      void (async () => {
+        try {
+          const handler = typeof parsed.method === "string" ? rpc[parsed.method] : undefined
+          if (typeof handler !== "function") {
+            throw new Error(`Unknown RPC method: ${String(parsed.method)}`)
+          }
+          const result = await handler(parsed.input)
+          scope.postMessage(JSON.stringify({ type: "rpc.result", result, id: parsed.id }))
+        } catch (error) {
+          scope.postMessage(
+            JSON.stringify({
+              type: "rpc.error",
+              error: serializeError(error),
+              id: parsed.id,
+            }),
+          )
+        }
+      })()
+    })
+  }
+
+  function LogRpcError(message: string, error: unknown) {
+    // Keep malformed external messages from crashing the worker. The RPC
+    // request path itself always returns a correlated error response.
+    console.error(message, error)
   }
 
   export function emit(event: string, data: unknown) {
