@@ -29,6 +29,14 @@ jobs:
       - name: Setup Bun and install dependencies
         uses: ./.github/actions/setup-bun
 
+      - name: Upload resolved Bun lockfile for lockfile verification
+        uses: actions/upload-artifact@v6
+        with:
+          name: resolved-bun-lockfile
+          path: bun.lock
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build monorepo
         env:
           CYBERSTRIKE_BUILD_OS: linux
