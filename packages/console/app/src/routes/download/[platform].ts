@@ -1,4 +1,4 @@
-import { APIEvent } from "@solidjs/start"
+import type { APIEvent } from "@solidjs/start/server"
 import { DownloadPlatform } from "./types"
 
 const assetNames: Record<string, string> = {
