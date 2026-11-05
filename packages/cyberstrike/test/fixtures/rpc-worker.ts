@@ -5,5 +5,6 @@ import { Rpc } from "../../src/util/rpc"
 Rpc.listen({
   echo: async (input: string) => input,
 })
+Rpc.emit("worker.ready", { protocol: 1 })
 
 await Bun.sleep(300)
