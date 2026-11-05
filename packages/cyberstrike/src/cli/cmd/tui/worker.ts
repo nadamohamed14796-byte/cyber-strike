@@ -1,78 +1,148 @@
-import { Installation } from "@/installation"
-import { Server } from "@/server/server"
-import { Log } from "@/util/log"
-import { Instance } from "@/project/instance"
-import { InstanceBootstrap } from "@/project/bootstrap"
+// Keep this worker entrypoint free of top-level awaits and heavyweight static imports.
+// Bun can dispatch messages while a worker's module graph is still evaluating; messages
+// sent before a handler is installed are dropped. Rpc has no asynchronous dependencies,
+// so install the listener first and load the application runtime asynchronously below.
 import { Rpc } from "@/util/rpc"
-import { upgrade } from "@/cli/upgrade"
-import { Config } from "@/config/config"
-import { GlobalBus } from "@/bus/global"
-import { createCyberstrikeClient, type Event } from "@cyberstrike-io/sdk/v2"
-import type { BunWebSocketData } from "hono/bun"
-import { Flag } from "@/flag/flag"
 
-await Log.init({
-  print: process.argv.includes("--print-logs"),
-  dev: Installation.isLocal(),
-  level: (() => {
-    if (Installation.isLocal()) return "DEBUG"
-    return "INFO"
-  })(),
-})
+type Event = import("@cyberstrike-io/sdk/v2").Event
+type BunWebSocketData = import("hono/bun").BunWebSocketData
 
-Log.Default.info("TUI worker startup stage", { stage: "worker-module-started" })
-
-process.on("unhandledRejection", (e) => {
-  Log.Default.error("rejection", {
-    e: e instanceof Error ? e.message : e,
-    name: e instanceof Error ? e.name : undefined,
-    stack: e instanceof Error ? e.stack : undefined,
-    cause: e instanceof Error && e.cause instanceof Error
-      ? { name: e.cause.name, message: e.cause.message, stack: e.cause.stack }
-      : e instanceof Error
-        ? e.cause
-        : undefined,
-  })
-})
-
-process.on("uncaughtException", (e) => {
-  Log.Default.error("exception", {
-    e: e instanceof Error ? e.message : e,
-  })
-})
-
-// Subscribe to global events and forward them via RPC
-GlobalBus.on("event", (event) => {
-  Rpc.emit("global.event", event)
-})
+type WorkerModules = {
+  Installation: typeof import("@/installation").Installation
+  Server: typeof import("@/server/server").Server
+  Log: typeof import("@/util/log").Log
+  Instance: typeof import("@/project/instance").Instance
+  InstanceBootstrap: typeof import("@/project/bootstrap").InstanceBootstrap
+  upgrade: typeof import("@/cli/upgrade").upgrade
+  Config: typeof import("@/config/config").Config
+  GlobalBus: typeof import("@/bus/global").GlobalBus
+  createCyberstrikeClient: typeof import("@cyberstrike-io/sdk/v2").createCyberstrikeClient
+  Flag: typeof import("@/flag/flag").Flag
+}
 
 let server: Bun.Server<BunWebSocketData> | undefined
+let startup: Promise<WorkerModules> | undefined
 
 const eventStream = {
   abort: undefined as AbortController | undefined,
 }
 
-const startEventStream = (directory: string) => {
+async function initialize(): Promise<WorkerModules> {
+  const [
+    installationModule,
+    serverModule,
+    logModule,
+    instanceModule,
+    bootstrapModule,
+    upgradeModule,
+    configModule,
+    globalBusModule,
+    sdkModule,
+    flagModule,
+  ] = await Promise.all([
+    import("@/installation"),
+    import("@/server/server"),
+    import("@/util/log"),
+    import("@/project/instance"),
+    import("@/project/bootstrap"),
+    import("@/cli/upgrade"),
+    import("@/config/config"),
+    import("@/bus/global"),
+    import("@cyberstrike-io/sdk/v2"),
+    import("@/flag/flag"),
+  ])
+
+  const modules: WorkerModules = {
+    Installation: installationModule.Installation,
+    Server: serverModule.Server,
+    Log: logModule.Log,
+    Instance: instanceModule.Instance,
+    InstanceBootstrap: bootstrapModule.InstanceBootstrap,
+    upgrade: upgradeModule.upgrade,
+    Config: configModule.Config,
+    GlobalBus: globalBusModule.GlobalBus,
+    createCyberstrikeClient: sdkModule.createCyberstrikeClient,
+    Flag: flagModule.Flag,
+  }
+
+  await modules.Log.init({
+    print: process.argv.includes("--print-logs"),
+    dev: modules.Installation.isLocal(),
+    level: modules.Installation.isLocal() ? "DEBUG" : "INFO",
+  })
+
+  modules.Log.Default.info("TUI worker startup stage", { stage: "worker-module-started" })
+
+  process.on("unhandledRejection", (e) => {
+    modules.Log.Default.error("rejection", {
+      e: e instanceof Error ? e.message : e,
+      name: e instanceof Error ? e.name : undefined,
+      stack: e instanceof Error ? e.stack : undefined,
+      cause:
+        e instanceof Error && e.cause instanceof Error
+          ? { name: e.cause.name, message: e.cause.message, stack: e.cause.stack }
+          : e instanceof Error
+            ? e.cause
+            : undefined,
+    })
+  })
+
+  process.on("uncaughtException", (e) => {
+    modules.Log.Default.error("exception", {
+      e: e instanceof Error ? e.message : e,
+    })
+  })
+
+  modules.GlobalBus.on("event", (event) => {
+    Rpc.emit("global.event", event)
+  })
+
+  startEventStream(process.cwd(), modules)
+  modules.Log.Default.info("TUI worker startup stage", { stage: "worker-runtime-ready" })
+  return modules
+}
+
+function start(): Promise<WorkerModules> {
+  if (!startup) {
+    let pending: Promise<WorkerModules>
+    pending = initialize().catch((error) => {
+      if (startup === pending) startup = undefined
+      throw error
+    })
+    startup = pending
+  }
+  return startup
+}
+
+function getAuthorizationHeader(Flag: WorkerModules["Flag"]): string | undefined {
+  const password = Flag.CYBERSTRIKE_SERVER_PASSWORD
+  if (!password) return undefined
+  const username = Flag.CYBERSTRIKE_SERVER_USERNAME ?? "cyberstrike"
+  return "Basic " + btoa(username + ":" + password)
+}
+
+function startEventStream(directory: string, modulesPromise: Promise<WorkerModules> | WorkerModules) {
   if (eventStream.abort) eventStream.abort.abort()
   const abort = new AbortController()
   eventStream.abort = abort
   const signal = abort.signal
 
-  const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request = new Request(input, init)
-    const auth = getAuthorizationHeader()
-    if (auth) request.headers.set("Authorization", auth)
-    return Server.App().fetch(request)
-  }) as typeof globalThis.fetch
+  void (async () => {
+    const modules = await modulesPromise
+    const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      const auth = getAuthorizationHeader(modules.Flag)
+      if (auth) request.headers.set("Authorization", auth)
+      return modules.Server.App().fetch(request)
+    }) as typeof globalThis.fetch
 
-  const sdk = createCyberstrikeClient({
-    baseUrl: "http://cyberstrike.internal",
-    directory,
-    fetch: fetchFn,
-    signal,
-  })
+    const sdk = modules.createCyberstrikeClient({
+      baseUrl: "http://cyberstrike.internal",
+      directory,
+      fetch: fetchFn,
+      signal,
+    })
 
-  ;(async () => {
     while (!signal.aborted) {
       const events = await Promise.resolve(
         sdk.event.subscribe(
@@ -92,23 +162,25 @@ const startEventStream = (directory: string) => {
         Rpc.emit("event", event as Event)
       }
 
-      if (!signal.aborted) {
-        await Bun.sleep(250)
-      }
+      if (!signal.aborted) await Bun.sleep(250)
     }
-  })().catch((error) => {
-    Log.Default.error("event stream error", {
-      error: error instanceof Error ? error.message : error,
-    })
+  })().catch(async (error) => {
+    const modules = await modulesPromise.catch(() => undefined)
+    if (modules) {
+      modules.Log.Default.error("event stream error", {
+        error: error instanceof Error ? error.message : error,
+      })
+    } else {
+      console.error("TUI worker event stream failed", error)
+    }
   })
 }
 
-startEventStream(process.cwd())
-
 export const rpc = {
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
+    const modules = await start()
     const headers = { ...input.headers }
-    const auth = getAuthorizationHeader()
+    const auth = getAuthorizationHeader(modules.Flag)
     if (auth && !headers["authorization"] && !headers["Authorization"]) {
       headers["Authorization"] = auth
     }
@@ -119,20 +191,20 @@ export const rpc = {
       body: input.body,
     })
     const path = new URL(request.url).pathname
-    Log.Default.debug("TUI worker fetch", {
+    modules.Log.Default.debug("TUI worker fetch", {
       stage: "request-start",
       method: request.method,
       path,
     })
-    const app = Server.App()
-    Log.Default.debug("TUI worker fetch", {
+    const app = modules.Server.App()
+    modules.Log.Default.debug("TUI worker fetch", {
       stage: "server-app-ready",
       method: request.method,
       path,
       duration: Date.now() - startedAt,
     })
     const response = await app.fetch(request)
-    Log.Default.debug("TUI worker fetch", {
+    modules.Log.Default.debug("TUI worker fetch", {
       stage: "response-headers",
       method: request.method,
       path,
@@ -140,7 +212,7 @@ export const rpc = {
       duration: Date.now() - startedAt,
     })
     const body = await response.text()
-    Log.Default.debug("TUI worker fetch", {
+    modules.Log.Default.debug("TUI worker fetch", {
       stage: "response-complete",
       method: request.method,
       path,
@@ -155,37 +227,38 @@ export const rpc = {
     }
   },
   async server(input: { port: number; hostname: string; mdns?: boolean; cors?: string[] }) {
+    const modules = await start()
     if (server) await server.stop(true)
-    server = Server.listen(input)
+    server = modules.Server.listen(input)
     return { url: server.url.toString() }
   },
   async checkUpgrade(input: { directory: string }) {
-    await Instance.provide({
+    const modules = await start()
+    await modules.Instance.provide({
       directory: input.directory,
-      init: InstanceBootstrap,
+      init: modules.InstanceBootstrap,
       fn: async () => {
-        await upgrade().catch(() => {})
+        await modules.upgrade().catch(() => {})
       },
     })
   },
   async reload() {
-    Config.global.reset()
-    await Instance.disposeAll()
+    const modules = await start()
+    modules.Config.global.reset()
+    await modules.Instance.disposeAll()
   },
   async shutdown() {
-    Log.Default.info("worker shutting down")
+    const modules = await start()
+    modules.Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
-    await Instance.disposeAll()
-    if (server) server.stop(true)
+    await modules.Instance.disposeAll()
+    if (server) await server.stop(true)
   },
 }
 
+// Register the worker message handler before starting imports, initialization, or any
+// other asynchronous work. Incoming TUI calls can now wait on start() instead of being lost.
 Rpc.listen(rpc)
-Log.Default.info("TUI worker startup stage", { stage: "worker-rpc-ready" })
-
-function getAuthorizationHeader(): string | undefined {
-  const password = Flag.CYBERSTRIKE_SERVER_PASSWORD
-  if (!password) return undefined
-  const username = Flag.CYBERSTRIKE_SERVER_USERNAME ?? "cyberstrike"
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
+void start().catch((error) => {
+  console.error("TUI worker initialization failed", error)
+})
