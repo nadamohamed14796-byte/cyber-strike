@@ -264,6 +264,8 @@ export const rpc = {
 // Register the worker message handler before starting imports, initialization, or any
 // other asynchronous work. Incoming TUI calls can now wait on start() instead of being lost.
 Rpc.listen(rpc)
+// Signal that the transport is installed before the parent sends its first request.
+Rpc.emit("worker.ready", { protocol: 1 })
 void start().catch((error) => {
   console.error("TUI worker initialization failed", error)
 })
