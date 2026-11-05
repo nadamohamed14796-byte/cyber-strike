@@ -177,7 +177,7 @@ export const rpc = {
     const directory = process.cwd()
     const authorization = getAuthorizationHeader(modules.Flag)
     const startedAt = Date.now()
-    const paths = ["/path", "/provider", "/agent", "/config"]
+    const paths = ["/path", "/config/providers", "/provider", "/agent", "/config"]
     await Promise.all(
       paths.map(async (path) => {
         const url = new URL(path, "http://cyberstrike.internal")
