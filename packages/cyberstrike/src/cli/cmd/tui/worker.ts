@@ -173,14 +173,33 @@ function startEventStream(directory: string, modules: WorkerModules) {
 export const rpc = {
   async ready() {
     const modules = await start()
-    const url = new URL("http://cyberstrike.internal/path")
-    url.searchParams.set("directory", process.cwd())
-    const response = await modules.Server.App().fetch(new Request(url))
-    const body = await response.text()
-    if (!response.ok) {
-      throw new Error("Worker readiness check failed: HTTP " + response.status + " " + body.slice(0, 500))
-    }
-    return { ready: true }
+    const app = modules.Server.App()
+    const directory = process.cwd()
+    const authorization = getAuthorizationHeader(modules.Flag)
+    const startedAt = Date.now()
+    const paths = ["/path", "/provider", "/agent", "/config"]
+    await Promise.all(
+      paths.map(async (path) => {
+        const url = new URL(path, "http://cyberstrike.internal")
+        url.searchParams.set("directory", directory)
+        const headers = new Headers()
+        if (authorization) headers.set("Authorization", authorization)
+        const response = await app.fetch(new Request(url, { headers }))
+        const body = await response.text()
+        modules.Log.Default.info("TUI worker readiness probe", {
+          path,
+          status: response.status,
+          duration: Date.now() - startedAt,
+          bytes: body.length,
+        })
+        if (!response.ok) {
+          throw new Error(
+            "Worker readiness check failed for " + path + ": HTTP " + response.status + " " + body.slice(0, 500),
+          )
+        }
+      }),
+    )
+    return { ready: true, duration: Date.now() - startedAt }
   },
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
     const modules = await start()
