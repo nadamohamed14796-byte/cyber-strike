@@ -121,14 +121,13 @@ function getAuthorizationHeader(Flag: WorkerModules["Flag"]): string | undefined
   return "Basic " + btoa(username + ":" + password)
 }
 
-function startEventStream(directory: string, modulesPromise: Promise<WorkerModules> | WorkerModules) {
+function startEventStream(directory: string, modules: WorkerModules) {
   if (eventStream.abort) eventStream.abort.abort()
   const abort = new AbortController()
   eventStream.abort = abort
   const signal = abort.signal
 
   void (async () => {
-    const modules = await modulesPromise
     const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init)
       const auth = getAuthorizationHeader(modules.Flag)
@@ -164,15 +163,10 @@ function startEventStream(directory: string, modulesPromise: Promise<WorkerModul
 
       if (!signal.aborted) await Bun.sleep(250)
     }
-  })().catch(async (error) => {
-    const modules = await modulesPromise.catch(() => undefined)
-    if (modules) {
-      modules.Log.Default.error("event stream error", {
-        error: error instanceof Error ? error.message : error,
-      })
-    } else {
-      console.error("TUI worker event stream failed", error)
-    }
+  })().catch((error) => {
+    modules.Log.Default.error("event stream error", {
+      error: error instanceof Error ? error.message : error,
+    })
   })
 }
 
