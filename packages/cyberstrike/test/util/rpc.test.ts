@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Rpc } from "../../src/util/rpc"
 
 type RpcMessageTarget = {
-  addEventListener?: (type: "message", listener: (event: MessageEvent<string>) => void) => void
+  addEventListener?: (type: "message", listener: (event: MessageEvent<string>) => void | Promise<void>) => void
   onmessage?: ((event: MessageEvent<string>) => unknown) | null
   postMessage: (message: string) => void
 }
@@ -144,15 +144,17 @@ describe("util.rpc", () => {
     const worker = new Worker(new URL("../fixtures/rpc-worker.ts", import.meta.url))
     const client = Rpc.client<{ echo: (input: string) => Promise<string> }>(worker)
 
+    let timeout: ReturnType<typeof setTimeout> | undefined
     try {
       const response = await Promise.race([
         client.call("echo", "sent-during-startup"),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("worker RPC did not answer during startup")), 5000),
-        ),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("worker RPC did not answer during startup")), 5000)
+        }),
       ])
       expect(response).toBe("sent-during-startup")
     } finally {
+      if (timeout) clearTimeout(timeout)
       worker.terminate()
     }
   })
