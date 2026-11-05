@@ -171,17 +171,22 @@ function startEventStream(directory: string, modules: WorkerModules) {
 }
 
 export const rpc = {
-  async ready() {
+  async ready(input?: { includeSessions?: boolean }) {
     const modules = await start()
     const app = modules.Server.App()
     const directory = process.cwd()
     const authorization = getAuthorizationHeader(modules.Flag)
     const startedAt = Date.now()
     const paths = ["/path", "/config/providers", "/provider", "/agent", "/config"]
+    if (input?.includeSessions) paths.push("/session")
     await Promise.all(
       paths.map(async (path) => {
         const url = new URL(path, "http://cyberstrike.internal")
         url.searchParams.set("directory", directory)
+        if (path === "/session") {
+          url.searchParams.set("start", String(Date.now() - 30 * 24 * 60 * 60 * 1000))
+          url.searchParams.set("roots", "true")
+        }
         const headers = new Headers()
         if (authorization) headers.set("Authorization", authorization)
         const response = await app.fetch(new Request(url, { headers }))
