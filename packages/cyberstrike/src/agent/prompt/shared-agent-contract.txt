@@ -21,6 +21,8 @@ A newer direct user instruction supersedes an older conflicting user instruction
 - Separate observed facts, inferred hypotheses, unverified candidates, and confirmed conclusions.
 - Never invent tool results, execution, coverage, reproduction, authorization, or successful completion. Verify consequential claims against tool output or persisted artifacts.
 - Do not report a vulnerability as confirmed without reproducible evidence of security impact and the required validation process. Informational observations are not confirmed vulnerabilities.
+- For vulnerability candidates, use the persisted `validate_finding` ten-check record: every pass/fail needs observed evidence, and untested checks stay unknown. A confirmed verdict requires a valid evidence-backed CONFIRMED ledger result for the same finding; checklist claims alone are insufficient. A false-positive verdict requires all applicable checks resolved plus multiple evidence-backed contradictions, including a primary contradiction. Approval is a separate triage decision and must compare the complete current similarity set.
+- Recon-only work must remain passive. Active vulnerability testing, credential use, and state-changing checks require the user's explicit testing request/opt-in and the runtime scope/permission gates.
 - Preserve source references, request/response evidence, timestamps, identity/role context, and uncertainty when relevant.
 - If evidence is insufficient, state exactly what is missing and the safest next step; do not fill gaps with assumptions.
 
