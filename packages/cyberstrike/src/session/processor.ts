@@ -438,9 +438,16 @@ export namespace SessionProcessor {
               break
             }
             const retry = SessionRetry.retryable(error)
-            if (retry !== undefined) {
+            if (retry !== undefined && SessionRetry.canRetry(attempt)) {
               attempt++
               const delay = SessionRetry.delay(attempt, error.name === "APIError" ? error : undefined)
+              log.warn("provider retry scheduled", {
+                sessionID: input.sessionID,
+                attempt,
+                maxAttempts: SessionRetry.RETRY_MAX_ATTEMPTS,
+                delay,
+                message: retry,
+              })
               SessionStatus.set(input.sessionID, {
                 type: "retry",
                 attempt,
@@ -449,6 +456,14 @@ export namespace SessionProcessor {
               })
               await SessionRetry.sleep(delay, input.abort).catch(() => {})
               continue
+            }
+            if (retry !== undefined) {
+              log.error("provider retry limit reached; returning the error instead of waiting indefinitely", {
+                sessionID: input.sessionID,
+                attempts: attempt,
+                maxAttempts: SessionRetry.RETRY_MAX_ATTEMPTS,
+                message: retry,
+              })
             }
             input.assistantMessage.error = error
             Bus.publish(Session.Event.Error, {
