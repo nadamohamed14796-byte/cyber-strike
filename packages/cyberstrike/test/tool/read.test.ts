@@ -6,6 +6,8 @@ import { tmpdir } from "../fixture/fixture"
 import { PermissionNext } from "../../src/permission/next"
 import { Agent } from "../../src/agent/agent"
 
+const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
+
 const ctx = {
   sessionID: "test",
   messageID: "",
