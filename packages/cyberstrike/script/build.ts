@@ -14,11 +14,12 @@ process.chdir(dir)
 
 import pkg from "../package.json"
 import { Script } from "@cyberstrike-io/script"
+import { modelsCatalogURL } from "../src/provider/models-refresh"
 const modelsUrl = process.env.CYBERSTRIKE_MODELS_URL || "https://models.dev"
 // Fetch and generate models.dev snapshot
 const modelsData = process.env.MODELS_DEV_API_JSON
   ? await Bun.file(process.env.MODELS_DEV_API_JSON).text()
-  : await fetch(`${modelsUrl}/api.json`).then(async (response) => {
+  : await fetch(modelsCatalogURL(modelsUrl)).then(async (response) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch models.dev snapshot: HTTP ${response.status}`)
       }

@@ -14,3 +14,9 @@ export function shouldRefreshModels(args: readonly string[], disabled: boolean):
   if (disabled) return false
   return !args.some((arg) => SKIP_REFRESH_ARGUMENTS.has(arg))
 }
+
+
+/** Request the complete provider/model catalogue; the upstream default omits specialized model types. */
+export function modelsCatalogURL(baseURL: string): string {
+  return `${baseURL.replace(/\\/+$/, "")}/api.json?type=all`
+}

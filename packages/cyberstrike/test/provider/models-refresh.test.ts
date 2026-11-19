@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { selectLocalModelsCatalog, shouldRefreshModels } from "../../src/provider/models-refresh"
+import { modelsCatalogURL, selectLocalModelsCatalog, shouldRefreshModels } from "../../src/provider/models-refresh"
 
 describe("shouldRefreshModels", () => {
   test("refreshes during normal application startup", () => {
@@ -41,4 +41,10 @@ describe("selectLocalModelsCatalog", () => {
     expect(selectLocalModelsCatalog(undefined, undefined)).toEqual({})
     expect(selectLocalModelsCatalog([], null)).toEqual({})
   })
+})
+
+
+test("models catalogue requests include every upstream model type", () => {
+  expect(modelsCatalogURL("https://models.dev")).toBe("https://models.dev/api.json?type=all")
+  expect(modelsCatalogURL("https://models.dev/")).toBe("https://models.dev/api.json?type=all")
 })

@@ -5,7 +5,7 @@ import z from "zod"
 import { Installation } from "../installation"
 import { Flag } from "../flag/flag"
 import { lazy } from "@/util/lazy"
-import { isModelsCatalog, selectLocalModelsCatalog, shouldRefreshModels } from "./models-refresh"
+import { isModelsCatalog, modelsCatalogURL, selectLocalModelsCatalog, shouldRefreshModels } from "./models-refresh"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -154,7 +154,7 @@ export namespace ModelsDev {
     refreshInFlight = (async () => {
       const file = Bun.file(Flag.CYBERSTRIKE_MODELS_PATH ?? filepath)
       try {
-        const response = await fetch(`${url()}/api.json`, {
+        const response = await fetch(modelsCatalogURL(url()), {
           headers: {
             "User-Agent": Installation.USER_AGENT,
           },
