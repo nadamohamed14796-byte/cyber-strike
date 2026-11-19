@@ -7,6 +7,15 @@ export namespace SessionRetry {
   export const RETRY_BACKOFF_FACTOR = 2
   export const RETRY_MAX_DELAY_NO_HEADERS = 30_000 // 30 seconds
   export const RETRY_MAX_DELAY = 2_147_483_647 // max 32-bit signed integer for setTimeout
+  export const RETRY_MAX_ATTEMPTS = 3
+
+  export function canRetry(attempt: number) {
+    return attempt < RETRY_MAX_ATTEMPTS
+  }
+
+  function capDelay(delay: number) {
+    return Math.min(Math.max(0, delay), RETRY_MAX_DELAY_NO_HEADERS)
+  }
 
   export async function sleep(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -48,7 +57,7 @@ export namespace SessionRetry {
         if (retryAfterMs) {
           const parsedMs = parseNonNegativeDelay(retryAfterMs)
           if (parsedMs != null && parsedMs !== undefined) {
-            return Math.ceil(parsedMs)
+            return capDelay(Math.ceil(parsedMs))
           }
         }
 
@@ -57,13 +66,13 @@ export namespace SessionRetry {
           const parsedSeconds = parseNonNegativeDelay(retryAfter)
           if (parsedSeconds != null && parsedSeconds !== undefined) {
             // convert seconds to milliseconds
-            return Math.ceil(parsedSeconds * 1000)
+            return capDelay(Math.ceil(parsedSeconds * 1000))
           }
           if (parsedSeconds === undefined) {
             // Try parsing a non-numeric value as an HTTP date.
             const parsed = Date.parse(retryAfter) - Date.now()
             if (!Number.isNaN(parsed) && parsed > 0) {
-              return Math.ceil(parsed)
+              return capDelay(Math.ceil(parsed))
             }
           }
         }
