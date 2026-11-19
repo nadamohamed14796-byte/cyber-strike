@@ -18,5 +18,5 @@ export function shouldRefreshModels(args: readonly string[], disabled: boolean):
 
 /** Request the complete provider/model catalogue; the upstream default omits specialized model types. */
 export function modelsCatalogURL(baseURL: string): string {
-  return `${baseURL.replace(/\\/+$/, "")}/api.json?type=all`
+  return `${baseURL.replace(/\/+$/, "")}/api.json?type=all`
 }
