@@ -809,24 +809,28 @@ export namespace SessionPrompt {
       const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
       if (targetMemoryCtx) system.push(targetMemoryCtx)
 
-      // Keep the contract available even when the engagement runs from a directory without
-      // an AGENTS.md. Search recent user turns so terse follow-ups still retain target intent.
-      const targetTaskText = msgs
-        .map((msg) => ({
-          role: msg.info.role,
-          text: msg.parts
+      // Resolve target-workflow intent from the root conversation as well as this
+      // session. Child agents have their own short task prompt, which may omit the
+      // user's original target/recon request; without root context they can miss the
+      // shared workflow contract and diverge from the orchestrator.
+      const rootSessionID = Session.root(sessionID)
+      const rootMessages =
+        rootSessionID === sessionID
+          ? msgs
+          : await MessageV2.filterCompacted(MessageV2.stream(rootSessionID))
+      const targetTaskText = [...rootMessages, ...msgs]
+        .filter((msg) => msg.info.role === "user")
+        .flatMap((msg) =>
+          msg.parts
             .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
-            .map((part) => part.type === "text" ? part.text : "")
-            .join(" "),
-        }))
-        .filter((message) => message.role === "user")
-        .map((message) => message.text)
+            .map((part) => part.type === "text" ? part.text : ""),
+        )
         .join(" ")
         .slice(-12000)
       const targetWorkflowRequested =
-        /\b(target|scope|subdomains?|hosts?|recon(?:naissance)?|bug\s*bounty|pentest|penetration\s*test|hunting|asset\s*inventory|evidence|finding|report)\b/i.test(targetTaskText) ||
-        /(?:التارجت|تارجت|اسكوب|السكوب|نطاق|نطاقات|سب.?دومين|استطلاع|صيد\s+الثغرات|تقرير\s+ثغرات)/iu.test(targetTaskText) ||
-        (/\.(?:txt|list|csv)\b/i.test(targetTaskText) && /\b(domain|host|scope|subdomain)\b/i.test(targetTaskText))
+        /\\b(target|scope|subdomains?|hosts?|recon(?:naissance)?|bug\\s*bounty|pentest|penetration\\s*test|hunting|asset\\s*inventory|evidence|finding|report)\\b/i.test(targetTaskText) ||
+        /(?:التارجت|تارجت|اسكوب|السكوب|نطاق|نطاقات|سب.?دومين|استطلاع|صيد\\s+الثغرات|تقرير\\s+ثغرات)/iu.test(targetTaskText) ||
+        (/\\.(?:txt|list|csv)\\b/i.test(targetTaskText) && /\\b(domain|host|scope|subdomain)\\b/i.test(targetTaskText))
       if (targetWorkflowRequested || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
 
       // Use only the latest user turn for explicit research intent. Scanning prior
