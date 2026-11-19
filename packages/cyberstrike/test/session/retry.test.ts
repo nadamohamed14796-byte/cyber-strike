@@ -72,12 +72,28 @@ describe("session.retry.delay", () => {
     expect(SessionRetry.delay(1, error)).toBe(2000)
   })
 
-  test("uses retry-after values even when exceeding 10 minutes with headers", () => {
-    const error = apiError({ "retry-after": "50" })
-    expect(SessionRetry.delay(1, error)).toBe(50000)
+  test("caps provider retry-after hints at 30 seconds", () => {
+    const shortError = apiError({ "retry-after": "10" })
+    expect(SessionRetry.delay(1, shortError)).toBe(10000)
 
-    const longError = apiError({ "retry-after-ms": "700000" })
-    expect(SessionRetry.delay(1, longError)).toBe(700000)
+    const longSecondsError = apiError({ "retry-after": "31536000" })
+    expect(SessionRetry.delay(1, longSecondsError)).toBe(30_000)
+
+    const longMillisecondsError = apiError({ "retry-after-ms": "700000" })
+    expect(SessionRetry.delay(1, longMillisecondsError)).toBe(30_000)
+  })
+
+  test("caps HTTP-date retry hints at 30 seconds", () => {
+    const date = new Date(Date.now() + 60_000).toUTCString()
+    const error = apiError({ "retry-after": date })
+    expect(SessionRetry.delay(1, error)).toBe(30_000)
+  })
+
+  test("allows at most three retries per assistant turn", () => {
+    expect(SessionRetry.canRetry(0)).toBe(true)
+    expect(SessionRetry.canRetry(1)).toBe(true)
+    expect(SessionRetry.canRetry(2)).toBe(true)
+    expect(SessionRetry.canRetry(3)).toBe(false)
   })
 
   test("rejects immediately when the signal is already aborted", async () => {
