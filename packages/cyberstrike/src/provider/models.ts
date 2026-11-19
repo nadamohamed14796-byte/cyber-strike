@@ -196,7 +196,7 @@ export namespace ModelsDev {
   }
 }
 
-if (shouldRefreshModels(process.argv, Flag.CYBERSTRIKE_DISABLE_MODELS_FETCH)) {
+if (shouldRefreshModels(process.argv, Flag.CYBERSTRIKE_DISABLE_MODELS_FETCH, Boolean(process.env["CYBERSTRIKE_TEST_HOME"]))) {
   void ModelsDev.refresh()
   setInterval(
     () => {

@@ -7,6 +7,11 @@ describe("shouldRefreshModels", () => {
     expect(shouldRefreshModels(["cyberstrike", "recon"], false)).toBe(true)
   })
 
+  test("does not refresh in isolated test environments", () => {
+    expect(shouldRefreshModels(["cyberstrike"], false, true)).toBe(false)
+    expect(shouldRefreshModels(["cyberstrike", "recon"], false, true)).toBe(false)
+  })
+
   test("respects explicit models fetch disablement", () => {
     expect(shouldRefreshModels(["cyberstrike"], true)).toBe(false)
     expect(shouldRefreshModels(["cyberstrike", "--version"], true)).toBe(false)

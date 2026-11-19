@@ -10,8 +10,8 @@ export function selectLocalModelsCatalog(cache: unknown, snapshot: unknown): Rec
   return {}
 }
 
-export function shouldRefreshModels(args: readonly string[], disabled: boolean): boolean {
-  if (disabled) return false
+export function shouldRefreshModels(args: readonly string[], disabled: boolean, testEnvironment = false): boolean {
+  if (disabled || testEnvironment) return false
   return !args.some((arg) => SKIP_REFRESH_ARGUMENTS.has(arg))
 }
 
