@@ -38,6 +38,7 @@ export namespace SessionProcessor {
     signal: AbortSignal,
     timeoutMs = STREAM_TIMEOUT_MS,
     stage = "model initialization",
+    onTimeout?: () => void,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       let settled = false
@@ -52,7 +53,10 @@ export namespace SessionProcessor {
         callback(value)
       }
       const timer = setTimeout(
-        () => finish(reject, new Error(`Timed out after ${Math.ceil(timeoutMs / 1000)} seconds during ${stage}.`)),
+        () => {
+          onTimeout?.()
+          finish(reject, new Error(`Timed out after ${Math.ceil(timeoutMs / 1000)} seconds during ${stage}.`))
+        },
         timeoutMs,
       )
       const onAbort = () => finish(reject, new DOMException("Aborted", "AbortError"))
@@ -77,6 +81,7 @@ export namespace SessionProcessor {
     source: AsyncIterable<T>,
     signal: AbortSignal,
     timeoutMs = STREAM_TIMEOUT_MS,
+    onTimeout?: () => void,
   ): AsyncGenerator<T> {
     const iterator = source[Symbol.asyncIterator]()
     let pendingToolCalls = 0
@@ -97,11 +102,13 @@ export namespace SessionProcessor {
           }
           if (pendingToolCalls === 0) {
             timer = setTimeout(
-              () =>
+              () => {
+                onTimeout?.()
                 finish(
                   reject,
                   new Error(`The model stream stopped responding for ${Math.ceil(timeoutMs / 1000)} seconds.`),
-                ),
+                )
+              },
               timeoutMs,
             )
           }
@@ -169,16 +176,24 @@ export namespace SessionProcessor {
               pendingTextChunks = 0
             }
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
+            const streamController = new AbortController()
+            const streamAbort = AbortSignal.any([input.abort, streamController.signal])
             const stream = await withPromiseTimeout(
-              LLM.stream(streamInput),
+              LLM.stream({ ...streamInput, abort: streamAbort }),
               input.abort,
               STREAM_TIMEOUT_MS,
               "provider/model initialization",
+              () => streamController.abort(),
             )
             let observedToolCalls = 0
             let producedText = ""
 
-            for await (const value of withStreamTimeout(stream.fullStream, input.abort)) {
+            for await (const value of withStreamTimeout(
+              stream.fullStream,
+              input.abort,
+              STREAM_TIMEOUT_MS,
+              () => streamController.abort(),
+            )) {
               if (value.type !== "text-delta") await flushTextDelta()
               input.abort.throwIfAborted()
               switch (value.type) {
