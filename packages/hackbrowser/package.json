@@ -20,6 +20,6 @@
     "typescript": "catalog:"
   },
   "scripts": {
-    "test": "bun test --timeout 30000"
+    "test": "bun test --timeout 30000 --max-concurrency 1"
   }
 }
