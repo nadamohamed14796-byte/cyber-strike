@@ -59,6 +59,7 @@ import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, Re
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
+import { requestsTargetWorkflow, targetWorkflowText } from "./target-workflow"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -818,20 +819,8 @@ export namespace SessionPrompt {
         rootSessionID === sessionID
           ? msgs
           : await MessageV2.filterCompacted(MessageV2.stream(rootSessionID))
-      const targetTaskText = [...rootMessages, ...msgs]
-        .filter((msg) => msg.info.role === "user")
-        .flatMap((msg) =>
-          msg.parts
-            .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
-            .map((part) => part.type === "text" ? part.text : ""),
-        )
-        .join(" ")
-        .slice(-12000)
-      const targetWorkflowRequested =
-        /\\b(target|scope|subdomains?|hosts?|recon(?:naissance)?|bug\\s*bounty|pentest|penetration\\s*test|hunting|asset\\s*inventory|evidence|finding|report)\\b/i.test(targetTaskText) ||
-        /(?:التارجت|تارجت|اسكوب|السكوب|نطاق|نطاقات|سب.?دومين|استطلاع|صيد\\s+الثغرات|تقرير\\s+ثغرات)/iu.test(targetTaskText) ||
-        (/\\.(?:txt|list|csv)\\b/i.test(targetTaskText) && /\\b(domain|host|scope|subdomain)\\b/i.test(targetTaskText))
-      if (targetWorkflowRequested || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
+      const targetTaskText = targetWorkflowText(rootMessages, msgs)
+      if (requestsTargetWorkflow(targetTaskText) || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
 
       // Use only the latest user turn for explicit research intent. Scanning prior
       // user turns made "continue" repeatedly re-trigger stale vulnerability signals.
