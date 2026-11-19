@@ -819,7 +819,7 @@ export namespace SessionPrompt {
         rootSessionID === sessionID
           ? msgs
           : await MessageV2.filterCompacted(MessageV2.stream(rootSessionID))
-      const targetTaskText = targetWorkflowText(rootMessages, msgs)
+      const targetTaskText = targetWorkflowText(rootMessages, rootSessionID === sessionID ? [] : msgs)
       if (requestsTargetWorkflow(targetTaskText) || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
 
       // Use only the latest user turn for explicit research intent. Scanning prior
