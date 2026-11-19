@@ -6,8 +6,6 @@ import { tmpdir } from "../fixture/fixture"
 import { PermissionNext } from "../../src/permission/next"
 import { Agent } from "../../src/agent/agent"
 
-const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
-
 const ctx = {
   sessionID: "test",
   messageID: "",
@@ -200,9 +198,11 @@ describe("tool.read truncation", () => {
   test("truncates large file by bytes and sets truncated metadata", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const base = await Bun.file(path.join(FIXTURES_DIR, "models-api.json")).text()
-        const target = 60 * 1024
-        const content = base.length >= target ? base : base.repeat(Math.ceil(target / base.length))
+        // Build deterministic multi-line content so this test exercises the
+        // aggregate byte cap instead of depending on an external model fixture.
+        const content = Array.from({ length: 40 }, (_, index) =>
+          String(index).padStart(2, "0") + ":" + "x".repeat(2048),
+        ).join("\n")
         await Bun.write(path.join(dir, "large.json"), content)
       },
     })
@@ -214,6 +214,24 @@ describe("tool.read truncation", () => {
         expect(result.metadata.truncated).toBe(true)
         expect(result.output).toContain("Output truncated at")
         expect(result.output).toContain("bytes")
+      },
+    })
+  })
+
+
+  test("marks a single overlong line as truncated instead of silently dropping its tail", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "long-line.txt"), "x".repeat(3000))
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const read = await ReadTool.init()
+        const result = await read.execute({ filePath: path.join(tmp.path, "long-line.txt") }, ctx)
+        expect(result.metadata.truncated).toBe(true)
+        expect(result.output).toContain("one or more lines exceeded 2000 characters")
       },
     })
   })

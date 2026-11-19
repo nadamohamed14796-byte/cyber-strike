@@ -150,7 +150,9 @@ export const ReadTool = Tool.define("read", {
     const raw: string[] = []
     let bytes = 0
     let truncatedByBytes = false
+    let truncatedByLineLength = false
     for (let i = start; i < Math.min(lines.length, start + limit); i++) {
+      if (lines[i].length > MAX_LINE_LENGTH) truncatedByLineLength = true
       const line = lines[i].length > MAX_LINE_LENGTH ? lines[i].substring(0, MAX_LINE_LENGTH) + "..." : lines[i]
       const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
       if (bytes + size > MAX_BYTES) {
@@ -172,10 +174,12 @@ export const ReadTool = Tool.define("read", {
     const totalLines = lines.length
     const lastReadLine = offset + raw.length - 1
     const hasMoreLines = totalLines > lastReadLine
-    const truncated = hasMoreLines || truncatedByBytes
+    const truncated = hasMoreLines || truncatedByBytes || truncatedByLineLength
 
     if (truncatedByBytes) {
       output += `\n\n(Output truncated at ${MAX_BYTES} bytes. Use 'offset' parameter to read beyond line ${lastReadLine})`
+    } else if (truncatedByLineLength) {
+      output += `\n\n(Output truncated: one or more lines exceeded ${MAX_LINE_LENGTH} characters and were shortened. Use another method to inspect the complete line contents.)`
     } else if (hasMoreLines) {
       output += `\n\n(File has more lines. Use 'offset' parameter to read beyond line ${lastReadLine})`
     } else {

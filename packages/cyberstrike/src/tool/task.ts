@@ -1,5 +1,5 @@
 import { Tool } from "./tool"
-import { AgentTaskConcurrency } from "./task-concurrency"
+import { AgentTaskConcurrency, linkAbortSignal } from "./task-concurrency"
 import DESCRIPTION from "./task.txt"
 import z from "zod"
 import { Session } from "../session"
@@ -622,32 +622,56 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         // the same bounded scheduler. Queued work is retained and starts when a
         // slot opens; it is never silently dropped.
         await SessionPrompt.prompt({ ...promptInput, noReply: true })
-        const schedule = AgentTaskConcurrency.enqueue(
-          taskLane,
-          async () => {
-            await SessionPrompt.loop({ sessionID: session.id })
-          },
-          (error) => {
-            console.error("[task] background subagent failed", {
-              sessionID: session.id,
-              agent: agent.name,
-              error: error instanceof Error ? error.message : String(error),
-            })
-          },
-          ctx.abort,
-          () => {
-            // The prompt was persisted before entering the bounded scheduler.
-            // Remove this not-yet-started child so cancellation cannot leave a
-            // ghost task with a saved user turn but no worker behind it.
-            void Session.remove(session.id).catch((error) => {
-              console.error("[task] failed to remove cancelled queued subagent", {
+        // The scheduler removes its own abort listener once execution starts.
+        // Keep a separate parent→child link for the entire detached loop so a
+        // later parent abort also stops an already-running background specialist.
+        const unlinkParentAbort = linkAbortSignal(ctx.abort, () => {
+          SessionPrompt.cancel(session.id, { stopCrawl: true })
+        })
+        let schedule: "started" | "queued" | "cancelled"
+        try {
+          schedule = AgentTaskConcurrency.enqueue(
+            taskLane,
+            async () => {
+              try {
+                // Cancellation can win after slot assignment but before this
+                // microtask starts; never resurrect a child already cancelled.
+                if (ctx.abort.aborted) {
+                  SessionPrompt.cancel(session.id, { stopCrawl: true })
+                  return
+                }
+                await SessionPrompt.loop({ sessionID: session.id })
+              } finally {
+                unlinkParentAbort()
+              }
+            },
+            (error) => {
+              console.error("[task] background subagent failed", {
                 sessionID: session.id,
+                agent: agent.name,
                 error: error instanceof Error ? error.message : String(error),
               })
-            })
-          },
-        )
+            },
+            ctx.abort,
+            () => {
+              unlinkParentAbort()
+              // The prompt was persisted before entering the bounded scheduler.
+              // Remove this not-yet-started child so cancellation cannot leave a
+              // ghost task with a saved user turn but no worker behind it.
+              void Session.remove(session.id).catch((error) => {
+                console.error("[task] failed to remove cancelled queued subagent", {
+                  sessionID: session.id,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              })
+            },
+          )
+        } catch (error) {
+          unlinkParentAbort()
+          throw error
+        }
         if (schedule === "cancelled") {
+          unlinkParentAbort();
           return {
             title: params.description,
             metadata: {

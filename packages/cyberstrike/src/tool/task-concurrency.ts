@@ -14,6 +14,32 @@ type ScheduledEntry = {
 }
 
 /**
+ * Keep a parent abort signal connected to detached child work until that work
+ * completes. Scheduler listeners may be removed when a slot starts; this link
+ * deliberately survives that transition.
+ */
+export function linkAbortSignal(signal: AbortSignal, onAbort: () => void): () => void {
+  let active = true
+  const abort = () => {
+    if (!active) return
+    active = false
+    onAbort()
+  }
+
+  if (signal.aborted) {
+    abort()
+    return () => {}
+  }
+
+  signal.addEventListener("abort", abort, { once: true })
+  return () => {
+    if (!active) return
+    active = false
+    signal.removeEventListener("abort", abort)
+  }
+}
+
+/**
  * Small FIFO scheduler for agent loops. It preserves work when saturated and
  * skips a lane temporarily at capacity so an independent lane can still run.
  */

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { createTaskScheduler } from "../../src/tool/task-concurrency"
+import { createTaskScheduler, linkAbortSignal } from "../../src/tool/task-concurrency"
 
 function deferred() {
   let resolve!: () => void
@@ -207,4 +207,27 @@ test("cancellation wins after slot assignment but before the task callback start
   expect(taskStarted).toBe(false)
   expect(cancellations).toBe(1)
   expect(scheduler.stats()).toMatchObject({ active: 0, pending: 0 })
+})
+
+
+test("parent abort remains linked to an active detached child until it completes", () => {
+  const parent = new AbortController()
+  let cancellations = 0
+  const unlink = linkAbortSignal(parent.signal, () => { cancellations++ })
+
+  parent.abort()
+  expect(cancellations).toBe(1)
+  unlink()
+  expect(cancellations).toBe(1)
+})
+
+test("an already-aborted parent immediately cancels detached child work", () => {
+  const parent = new AbortController()
+  parent.abort()
+  let cancellations = 0
+
+  const unlink = linkAbortSignal(parent.signal, () => { cancellations++ })
+  expect(cancellations).toBe(1)
+  unlink()
+  expect(cancellations).toBe(1)
 })
