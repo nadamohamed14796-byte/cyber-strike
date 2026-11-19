@@ -58,6 +58,7 @@ import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
 import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector, toolCallSucceeded } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
+import SHARED_AGENT_CONTRACT_PROMPT from "../agent/prompt/shared-agent-contract.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
 import { requestsTargetWorkflow, targetWorkflowText } from "./target-workflow"
 
@@ -798,6 +799,9 @@ export namespace SessionPrompt {
       const system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
       if (recoveryTurn) system.push(LOOP_RECOVERY_PROMPT)
       system.push(TODO_EXECUTION_PROMPT)
+      // Keep one shared operating contract across all visible agents; hidden utility
+      // agents (title, compaction, summary) retain their narrow specialized prompts.
+      if (!agent.hidden) system.push(SHARED_AGENT_CONTRACT_PROMPT)
       const format = lastUser.format ?? { type: "text" }
       if (format.type === "json_schema") {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
